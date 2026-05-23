@@ -7,6 +7,9 @@
 <script type="module">
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 window._supabaseCreateClient = createClient;
+// Signal that Supabase is ready
+window._supabaseReady = true;
+document.dispatchEvent(new Event('supabase-ready'));
 </script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
@@ -1489,12 +1492,23 @@ function checkAndFixSeasons() {
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
-(async () => {
-  await loadData();
-  migrateShortCodes();
-  checkAndFixSeasons();
-  renderList();
-})();
+function boot() {
+  (async () => {
+    await loadData();
+    migrateShortCodes();
+    checkAndFixSeasons();
+    renderList();
+  })();
+}
+
+// Wait for Supabase ESM module to load before booting
+if (window._supabaseReady) {
+  boot();
+} else {
+  document.addEventListener('supabase-ready', boot);
+  // Fallback: if event never fires, boot after 3 seconds anyway
+  setTimeout(() => { if (!window._supabaseReady) { showToast('Cloud unavailable — working offline'); boot(); } }, 3000);
+}
 </script>
 </body>
 </html>
