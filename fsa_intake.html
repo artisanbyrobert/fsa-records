@@ -4,10 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FSA Intake Records</title>
-<script type="module">
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-window._supabaseCreateClient = createClient;
-</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f2;color:#1a1a1a;font-size:14px;line-height:1.5;}
@@ -68,6 +65,18 @@ window._supabaseCreateClient = createClient;
   .empty-state p{color:#888;font-size:13px;margin-bottom:1.5rem;}
   .big-btn{padding:14px 36px;font-size:15px;}
   .save-bar{display:flex;gap:10px;margin-top:1rem;flex-wrap:wrap;}
+  .daily-card{background:#fff;border:1px solid #e0e0dc;border-radius:10px;padding:1rem 1.25rem;margin-bottom:10px;cursor:pointer;}
+  .daily-card:hover{border-color:#3a6b2a;}
+  .check-section{background:#f9fdf8;border:1px solid #d0e8c8;border-radius:8px;padding:1rem;margin-bottom:12px;}
+  .check-section h3{font-size:13px;font-weight:600;color:#27500a;margin-bottom:10px;}
+  .check-item{display:flex;align-items:flex-start;gap:10px;padding:6px 0;border-bottom:1px solid #eef5ea;}
+  .check-item:last-child{border-bottom:none;}
+  .check-item label{font-size:13px;color:#1a1a1a;flex:1;cursor:pointer;line-height:1.4;}
+  .check-item input[type=checkbox]{width:18px;height:18px;flex-shrink:0;margin-top:1px;accent-color:#3a6b2a;cursor:pointer;}
+  .machine-section{background:#fff8f0;border:1px solid #f0d4a8;border-radius:8px;padding:1rem;margin-bottom:12px;}
+  .machine-section h3{font-size:13px;font-weight:600;color:#633806;margin-bottom:10px;}
+  .day-type-btn{padding:8px 12px;border:1px solid #ddd;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;text-align:left;margin-bottom:6px;width:100%;}
+  .day-type-btn.active{border-color:#3a6b2a;background:#e8f4e3;color:#27500a;font-weight:600;}
   .del-card{background:#fff;border:1px solid #e0e0dc;border-radius:10px;padding:1rem 1.25rem;margin-bottom:10px;cursor:pointer;}
   .del-card:hover{border-color:#3a6b2a;}
   .flavour-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
@@ -108,6 +117,7 @@ window._supabaseCreateClient = createClient;
   <div id="view-manage" style="display:none"></div>
   <div id="view-wetmeat" style="display:none"></div>
   <div id="view-delivery" style="display:none"></div>
+  <div id="view-daily" style="display:none"></div>
 </div>
 
 <script>
@@ -119,7 +129,7 @@ let sb = null; // supabase client - initialised on boot
 
 // ── State ────────────────────────────────────────────────────────────────────
 let species = ['Pheasant','Partridge','Rabbit','Hare','Venison','Mallard','Other'];
-let intakes = [], deliveries = [], estates = [], processors = [], parts = [
+let intakes = [], deliveries = [], dailyRecords = [], estates = [], processors = [], parts = [
   'Whole','Leg','Shoulder','Breast','Saddle','Haunch','Loin','Carcass','Mixed cuts'
 ];
 let currentView = 'list';
@@ -131,17 +141,11 @@ let saveStatusTimer = null;
 async function loadData() {
   try {
     if (!sb) {
-      if (typeof window._supabaseCreateClient === 'function') {
-        sb = window._supabaseCreateClient(SUPABASE_URL, SUPABASE_KEY);
+      if (typeof window.supabase !== 'undefined') {
+        sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
       } else {
-        // Wait briefly for module to load then retry
-        await new Promise(r => setTimeout(r, 500));
-        if (typeof window._supabaseCreateClient === 'function') {
-          sb = window._supabaseCreateClient(SUPABASE_URL, SUPABASE_KEY);
-        } else {
-          showToast('Supabase library not loaded — check internet connection');
-          return;
-        }
+        showToast('Could not load Supabase — check internet connection');
+        return;
       }
     }
 
@@ -154,7 +158,8 @@ async function loadData() {
     // Load deliveries
     const {data: deliveryRows} = await sb.from('deliveries').select('*');
     if (deliveryRows && deliveryRows.length) {
-      deliveries = deliveryRows.map(r => r.data);
+      deliveries = deliveryRows.filter(r => !r.data._type).map(r => r.data);
+      dailyRecords = deliveryRows.filter(r => r.data._type === 'daily').map(r => r.data);
     }
 
     // Load config (estates, processors, parts, species)
@@ -215,6 +220,10 @@ async function saveData() {
     await sb.from('app_config').upsert({key: 'processors', data: processors});
     await sb.from('app_config').upsert({key: 'parts', data: parts});
     await sb.from('app_config').upsert({key: 'species', data: species});
+    // Save daily records
+    for (const dr of dailyRecords) {
+      await sb.from('deliveries').upsert({id: 'daily_' + dr.id, data: {...dr, _type: 'daily'}});
+    }
 
     showStatus('saved');
   } catch(e) {
@@ -426,10 +435,11 @@ function renderTabs(activeTab) {
   bar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:0;margin-bottom:1.5rem;border-bottom:2px solid #e0e0dc;';
   const tabsLeft = div('row');
   tabsLeft.style.gap = '0';
-  const tabs = [['list','Intake records'],['delivery','Finished Product'],['wetmeat','Wet Meat'],['manage','Manage']];
+  const tabs = [['list','Intake records'],['daily','Daily Record'],['delivery','Finished Product'],['wetmeat','Wet Meat'],['manage','Manage']];
   for (const [id, label] of tabs) {
     const b = btn(`tab-btn${activeTab===id?' active':''}`, label, () => {
       if (id === 'list') renderList();
+      else if (id === 'daily') renderDailyList();
       else if (id === 'delivery') renderDeliveryList();
       else if (id === 'wetmeat') renderWetMeat();
       else renderManage();
@@ -441,6 +451,369 @@ function renderTabs(activeTab) {
   saveBtn.style.cssText = 'color:#3a6b2a;border-color:#3a6b2a;font-size:12px;padding:5px 12px;margin-bottom:2px;white-space:nowrap;flex-shrink:0;';
   bar.appendChild(saveBtn);
   v.appendChild(bar);
+}
+
+// ── DAILY RECORD ──────────────────────────────────────────────────────────────
+
+const DAY_TYPES = [
+  {id:'monitor', label:'Monitor / Check day', machines:[]},
+  {id:'delivery_in', label:'Delivery day in', machines:[]},
+  {id:'delivery_in_feather', label:'Delivery day in — birds in feather', machines:['plucker']},
+  {id:'delivery_out', label:'Delivery day out', machines:[]},
+  {id:'mincing', label:'Mincing & prep day', machines:['mincer']},
+  {id:'stuffing', label:'Stuffing & hanging day', machines:['stuffer']},
+];
+
+const START_CHECKS = [
+  'Switch on water heaters',
+  'Check enough soap, paper towels and hand wash working',
+  'Re-sanitise work area and utensils with Ensure Alcohol Sanitiser (30 sec contact, air dry)',
+  'Door handles sanitised',
+  'Sinks sanitised',
+  'Table top sanitised',
+  'Equipment sanitised',
+  'Boards sanitised',
+  'Knives sanitised',
+  'Trays sanitised',
+];
+
+const END_CHECKS = [
+  '3-stage clean all areas used (wash, rinse, sanitise)',
+  'Door handles cleaned',
+  'Sinks cleaned',
+  'Table top cleaned',
+  'Equipment cleaned',
+  'Boards cleaned',
+  'Knives cleaned',
+  'Trays cleaned',
+  'Cleaning cloths to washing machine 90°C wash',
+  'Mop floor',
+  'Knives into UV cabinet, spray with alcohol sanitiser, set timer 120 mins',
+  'Water heaters switched off',
+  'Broken glass declaration — Nil return (or detail below)',
+  'Wear and tear check completed',
+  'Toilet area checked',
+  'Plucking room checked',
+  'Hanging fridge checked',
+  'Work area checked',
+];
+
+const MINCER_STEPS = [
+  'Spray out sink and draining board with Ensure alcohol sanitiser — 30 sec contact, air dry',
+  'Fill sink with hot water and 2 pumps washing up liquid',
+  'Disassemble mincer — blade collar, mincing disk, cutting blade — remove meat debris first',
+  'Remove feed screw and separate white nylon washer — remove meat debris first',
+  'Remove mincing housing from motor body — remove meat debris first',
+  'Wash all parts thoroughly, rinse, leave on drainer',
+  'Empty and rinse sink. Refill with water and 2 pumps Esteem sanitiser — 30 sec contact',
+  'Rewash and rinse all parts, leave to drain',
+  'Spray all parts with Ensure alcohol sanitiser, air dry 30 sec minimum',
+  'Load parts into water boiler, add citric acid granules, check pH below 4.0, temp minimum 82°C — soak 5 mins minimum',
+  'Remove and leave to air dry',
+  'Cleaning cloths to washing machine 90°C wash',
+];
+
+const PLUCKER_STEPS = [
+  'Spray out sink and draining board with Ensure alcohol sanitiser — 30 sec contact, air dry',
+  'Fill sink with hot water and 2 pumps washing up liquid',
+  'Disassemble plucking machine — cover plate and disks — remove feather and skin debris first',
+  'Spray inside machine body with Esteem spray, leave 30 seconds, rinse clean with damp cloth',
+  'Spray inside body with Ensure alcohol spray and leave to air dry',
+  'Wash all parts thoroughly, rinse, leave on drainer',
+  'Empty and rinse sink. Refill with water and 2 pumps Esteem sanitiser — 30 sec contact',
+  'Rewash and rinse all parts, leave to drain',
+  'Spray all parts with Ensure alcohol sanitiser, air dry 30 sec minimum',
+  'Load all parts into blue tray, cover with hot water from boiler — temp minimum 82°C — soak 5 mins',
+  'Remove and leave to air dry',
+  'Re-assemble plucking machine',
+  'Cleaning cloths to washing machine 90°C wash',
+];
+
+const STUFFER_STEPS = [
+  'Spray out sink and draining board with Ensure alcohol sanitiser — 30 sec contact, air dry',
+  'Fill sink with hot water and 2 pumps washing up liquid',
+  'Disassemble stuffer — spout collar, spout, head plate — remove meat debris first',
+  'Remove pusher disk and rubber seal using plastic square (do not damage rubber) — remove meat debris first',
+  'Spray inside machine body with Esteem spray, leave 30 seconds, rinse clean with damp cloth',
+  'Spray inside body with Ensure alcohol spray and leave to air dry',
+  'Wash all parts thoroughly, rinse, leave on drainer',
+  'Empty and rinse sink. Refill with water and 2 pumps Esteem sanitiser — 30 sec contact',
+  'Rewash and rinse all parts, leave to drain',
+  'Spray all parts with Ensure alcohol sanitiser, air dry 30 sec minimum',
+  'Load all parts into blue tray, cover with hot water from boiler — temp minimum 82°C — soak 5 mins',
+  'Remove and leave to air dry',
+  'Cleaning cloths to washing machine 90°C wash',
+];
+
+function blankDaily() {
+  const c = seasonCode(today());
+  const n = nextNum(c, intakes);
+  return {
+    id: uid(),
+    date: today(),
+    batchCode: intakes.length > 0 ? intakes[intakes.length-1].batchCode : `${c}-${n}`,
+    batchOverride: false,
+    dayTypeId: 'monitor',
+    stufferAlsoUsed: false,
+    startChecks: Object.fromEntries(START_CHECKS.map(c => [c, false])),
+    endChecks: Object.fromEntries(END_CHECKS.map(c => [c, false])),
+    mincerSteps: Object.fromEntries(MINCER_STEPS.map(s => [s, false])),
+    pluckerSteps: Object.fromEntries(PLUCKER_STEPS.map(s => [s, false])),
+    stufferSteps: Object.fromEntries(STUFFER_STEPS.map(s => [s, false])),
+    brokenGlassDetail: '',
+    wearTearDetail: '',
+    notes: '',
+  };
+}
+
+function renderDailyList() {
+  currentView = 'daily';
+  ['view-list','view-form','view-manage','view-wetmeat','view-delivery'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.style.display = 'none';
+  });
+  const v = document.getElementById('view-daily');
+  v.style.display = 'block'; v.innerHTML = '';
+  renderTabs('daily');
+
+  const hdr = div('header-bar');
+  const hdrLeft = div('');
+  hdrLeft.appendChild(el('h2', {style:'font-size:18px;font-weight:600;margin:0;'}, 'Daily records'));
+  hdrLeft.appendChild(p('muted', `${dailyRecords.length} record${dailyRecords.length!==1?'s':''}`));
+  hdr.appendChild(hdrLeft);
+  const nb = btn('btn-primary', '+ New daily record', () => renderDailyForm(blankDaily(), null));
+  hdr.appendChild(nb);
+  v.appendChild(hdr);
+
+  if (dailyRecords.length === 0) {
+    const empty = div('empty-state');
+    empty.appendChild(el('h3', {}, 'No daily records yet'));
+    empty.appendChild(p('', 'Click below to start today's record.'));
+    const b = btn('btn-primary big-btn', '+ Start today's record', () => renderDailyForm(blankDaily(), null));
+    empty.appendChild(b);
+    v.appendChild(empty);
+    return;
+  }
+
+  for (const r of [...dailyRecords].reverse()) {
+    const dayType = DAY_TYPES.find(d => d.id === r.dayTypeId) || {label: r.dayTypeId};
+    const card = div('daily-card');
+    const top = div('row-sb');
+    const left = div(''); left.style.flex = '1';
+    const titleRow = div('row'); titleRow.style.marginBottom = '4px';
+    titleRow.appendChild(el('span', {style:'font-size:15px;font-weight:600;color:#1a1a1a;'}, r.date));
+    titleRow.appendChild(el('span', {className:'batch-tag'}, r.batchCode));
+    left.appendChild(titleRow);
+    left.appendChild(p('muted', dayType.label + (r.stufferAlsoUsed ? ' + Sausage stuffer' : '')));
+    
+    // Quick completion summary
+    const startDone = Object.values(r.startChecks).filter(Boolean).length;
+    const startTotal = START_CHECKS.length;
+    const endDone = Object.values(r.endChecks).filter(Boolean).length;
+    const endTotal = END_CHECKS.length;
+    const summaryEl = document.createElement('p');
+    summaryEl.style.cssText = 'font-size:11px;color:#888;margin-top:4px;';
+    summaryEl.textContent = `Start: ${startDone}/${startTotal} · End: ${endDone}/${endTotal}`;
+    left.appendChild(summaryEl);
+    top.appendChild(left);
+
+    const btns = div('row');
+    const eb = btn('btn-sm', 'Edit', () => renderDailyForm(JSON.parse(JSON.stringify(r)), r.id));
+    eb.style.marginRight = '4px';
+    const db = btn('btn-sm btn-danger', 'Del', () => {
+      if (!confirm('Delete this daily record?')) return;
+      dailyRecords = dailyRecords.filter(x => x.id !== r.id);
+      saveData(); renderDailyList(); showToast('Record deleted');
+    });
+    btns.appendChild(eb); btns.appendChild(db);
+    top.appendChild(btns);
+    card.appendChild(top);
+    card.addEventListener('click', e => { if (e.target.tagName !== 'BUTTON') renderDailyForm(JSON.parse(JSON.stringify(r)), r.id); });
+    v.appendChild(card);
+  }
+}
+
+function renderDailyForm(dform, dEditId) {
+  currentView = 'daily-form';
+  ['view-list','view-form','view-manage','view-wetmeat','view-delivery'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.style.display = 'none';
+  });
+  const v = document.getElementById('view-daily');
+  v.style.display = 'block'; v.innerHTML = '';
+  renderTabs('daily');
+
+  // Header
+  const hdr = div('header-bar');
+  const backBtn = btn('back-btn', '← All daily records', () => renderDailyList());
+  hdr.appendChild(backBtn);
+  hdr.appendChild(el('h2', {style:'font-size:16px;font-weight:600;margin:0;'}, dEditId ? 'Edit daily record' : 'New daily record'));
+  const statusEl = el('span', {id:'save-status', className:'status muted'});
+  statusEl.innerHTML = '<span class="dot dot-grey"></span> Auto-saves to cloud';
+  hdr.appendChild(statusEl);
+  v.appendChild(hdr);
+
+  // ── Date and batch code ──
+  const topCard = div('card');
+  const topGrid = div('grid2');
+
+  const dateF = div('field');
+  dateF.appendChild(label('Date'));
+  const dateInp = input({type:'date', value: dform.date});
+  dateInp.addEventListener('change', e => { dform.date = e.target.value; });
+  dateF.appendChild(dateInp);
+  topGrid.appendChild(dateF);
+
+  const batchF = div('field');
+  batchF.appendChild(label('Batch code for today'));
+  const batchInp = input({type:'text', value: dform.batchCode, style:'font-family:monospace;font-size:15px;font-weight:600;color:#3a6b2a;'});
+  batchInp.addEventListener('input', e => { dform.batchCode = e.target.value; dform.batchOverride = true; });
+  batchF.appendChild(batchInp);
+  batchF.appendChild(p('muted', 'Auto-filled from last intake. Override if needed.'));
+  topGrid.appendChild(batchF);
+  topCard.appendChild(topGrid);
+  v.appendChild(topCard);
+
+  // ── Day type ──
+  v.appendChild(p('section-title', 'What type of day is this?'));
+  const dayTypeCard = div('card');
+  DAY_TYPES.forEach(dt => {
+    const b = btn(`day-type-btn${dform.dayTypeId === dt.id ? ' active' : ''}`, dt.label, () => {
+      dform.dayTypeId = dt.id;
+      // Re-render to show/hide machine sections
+      renderDailyForm(dform, dEditId);
+    });
+    dayTypeCard.appendChild(b);
+  });
+
+  // Stuffer also used option for mincing day
+  if (dform.dayTypeId === 'mincing') {
+    const stufferRow = div('check-item'); stufferRow.style.marginTop = '8px';
+    const stufferChk = input({type:'checkbox'});
+    stufferChk.checked = dform.stufferAlsoUsed;
+    stufferChk.addEventListener('change', e => {
+      dform.stufferAlsoUsed = e.target.checked;
+      renderDailyForm(dform, dEditId);
+    });
+    const stufferLbl = document.createElement('label');
+    stufferLbl.textContent = 'Sausage stuffer also used today';
+    stufferLbl.style.fontWeight = '500';
+    stufferRow.appendChild(stufferChk);
+    stufferRow.appendChild(stufferLbl);
+    dayTypeCard.appendChild(stufferRow);
+  }
+  v.appendChild(dayTypeCard);
+
+  // ── Start of day checks ──
+  v.appendChild(p('section-title', 'Start of day'));
+  const startCard = div('check-section');
+  startCard.querySelector('h3') || (() => {
+    const h = document.createElement('h3'); h.textContent = 'Opening checks'; startCard.appendChild(h);
+  })();
+  const startH = document.createElement('h3'); startH.textContent = 'Opening checks'; startCard.appendChild(startH);
+  START_CHECKS.forEach(check => {
+    const row = div('check-item');
+    const chk = input({type:'checkbox'});
+    chk.checked = dform.startChecks[check] || false;
+    chk.id = 'start_' + check.slice(0,20).replace(/\s/g,'_');
+    chk.addEventListener('change', e => dform.startChecks[check] = e.target.checked);
+    const lbl = document.createElement('label');
+    lbl.textContent = check;
+    lbl.htmlFor = chk.id;
+    row.appendChild(chk); row.appendChild(lbl);
+    startCard.appendChild(row);
+  });
+  const allStartBtn = btn('add-link', '✓ Tick all', () => {
+    START_CHECKS.forEach(c => { dform.startChecks[c] = true; });
+    renderDailyForm(dform, dEditId);
+  });
+  allStartBtn.style.marginTop = '10px';
+  startCard.appendChild(allStartBtn);
+  v.appendChild(startCard);
+
+  // ── Machine deep cleans ──
+  const dayType = DAY_TYPES.find(d => d.id === dform.dayTypeId);
+  const machines = [...(dayType?.machines || [])];
+  if (dform.stufferAlsoUsed && !machines.includes('stuffer')) machines.push('stuffer');
+
+  if (machines.length > 0) {
+    v.appendChild(p('section-title', 'Machine deep cleans'));
+
+    machines.forEach(machine => {
+      const machineCard = div('machine-section');
+      const names = {mincer:'Mincer deep clean', plucker:'Plucking machine deep clean', stuffer:'Sausage stuffer deep clean'};
+      const steps = {mincer: MINCER_STEPS, plucker: PLUCKER_STEPS, stuffer: STUFFER_STEPS};
+      const stepsKey = {mincer:'mincerSteps', plucker:'pluckerSteps', stuffer:'stufferSteps'};
+      const mh = document.createElement('h3'); mh.textContent = names[machine]; machineCard.appendChild(mh);
+
+      steps[machine].forEach(step => {
+        const row = div('check-item');
+        const chk = input({type:'checkbox'});
+        const key = stepsKey[machine];
+        chk.checked = dform[key][step] || false;
+        chk.addEventListener('change', e => dform[key][step] = e.target.checked);
+        const lbl = document.createElement('label'); lbl.textContent = step;
+        row.appendChild(chk); row.appendChild(lbl);
+        machineCard.appendChild(row);
+      });
+
+      const allMachineBtn = btn('add-link', '✓ Tick all', () => {
+        steps[machine].forEach(s => { dform[stepsKey[machine]][s] = true; });
+        renderDailyForm(dform, dEditId);
+      });
+      allMachineBtn.style.marginTop = '10px';
+      machineCard.appendChild(allMachineBtn);
+      v.appendChild(machineCard);
+    });
+  }
+
+  // ── End of day checks ──
+  v.appendChild(p('section-title', 'End of day'));
+  const endCard = div('check-section');
+  const endH = document.createElement('h3'); endH.textContent = 'Closing checks'; endCard.appendChild(endH);
+  END_CHECKS.forEach(check => {
+    const row = div('check-item');
+    const chk = input({type:'checkbox'});
+    chk.checked = dform.endChecks[check] || false;
+    chk.id = 'end_' + check.slice(0,20).replace(/\s/g,'_');
+    chk.addEventListener('change', e => dform.endChecks[check] = e.target.checked);
+    const lbl = document.createElement('label'); lbl.textContent = check; lbl.htmlFor = chk.id;
+    row.appendChild(chk); row.appendChild(lbl);
+    endCard.appendChild(row);
+  });
+  const allEndBtn = btn('add-link', '✓ Tick all', () => {
+    END_CHECKS.forEach(c => { dform.endChecks[c] = true; });
+    renderDailyForm(dform, dEditId);
+  });
+  allEndBtn.style.marginTop = '10px';
+  endCard.appendChild(allEndBtn);
+  v.appendChild(endCard);
+
+  // ── Notes ──
+  const notesCard = div('card');
+  notesCard.appendChild(label('Additional notes / observations'));
+  const notesInp = document.createElement('textarea');
+  notesInp.rows = 3; notesInp.value = dform.notes || '';
+  notesInp.placeholder = 'Any incidents, issues, observations or extra detail for FSA records...';
+  notesInp.addEventListener('input', e => dform.notes = e.target.value);
+  notesCard.appendChild(notesInp);
+  v.appendChild(notesCard);
+
+  // ── Save ──
+  const saveBar = div('save-bar');
+  const saveBtn = btn('btn-primary', dEditId ? 'Save changes' : 'Save daily record', () => {
+    const rec = {...dform, id: dEditId || uid()};
+    if (dEditId) {
+      dailyRecords = dailyRecords.map(r => r.id === dEditId ? rec : r);
+    } else {
+      dailyRecords.push(rec);
+    }
+    saveData();
+    renderDailyList();
+    showToast('Daily record saved');
+  });
+  saveBar.appendChild(saveBtn);
+  const cancelBtn = btn('', 'Cancel', () => renderDailyList());
+  saveBar.appendChild(cancelBtn);
+  v.appendChild(saveBar);
 }
 
 // ── FINISHED PRODUCT DELIVERY ─────────────────────────────────────────────────
@@ -956,6 +1329,7 @@ function renderList() {
   document.getElementById('view-manage').style.display = 'none';
   if(document.getElementById('view-wetmeat'))document.getElementById('view-wetmeat').style.display = 'none';
   if(document.getElementById('view-delivery'))document.getElementById('view-delivery').style.display = 'none';
+  if(document.getElementById('view-daily'))document.getElementById('view-daily').style.display = 'none';
   const v = document.getElementById('view-list');
   v.style.display = 'block';
   v.innerHTML = '';
