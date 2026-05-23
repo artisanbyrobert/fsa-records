@@ -1,0 +1,1419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FSA Intake Records</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f2;color:#1a1a1a;font-size:14px;line-height:1.5;}
+  .wrap{max-width:720px;margin:0 auto;padding:1.5rem 1rem;}
+  h1{font-size:20px;font-weight:600;color:#1a1a1a;}
+  h2{font-size:16px;font-weight:600;margin-bottom:1rem;color:#1a1a1a;}
+  label{font-size:12px;color:#666;display:block;margin-bottom:4px;}
+  input,select,textarea{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;font-family:inherit;background:#fff;color:#1a1a1a;outline:none;}
+  input:focus,select:focus,textarea:focus{border-color:#3a6b2a;}
+  textarea{resize:vertical;}
+  button{cursor:pointer;font-family:inherit;font-size:13px;border-radius:6px;padding:7px 14px;border:1px solid #ddd;background:#fff;color:#444;}
+  button:hover{background:#f0f0ee;}
+  .btn-primary{background:#3a6b2a;color:#fff;border-color:#3a6b2a;font-weight:600;}
+  .btn-primary:hover{background:#2d5a20;}
+  .btn-danger{color:#c0392b;border-color:#f0b8b8;}
+  .btn-danger:hover{background:#fce8e8;}
+  .btn-sm{padding:4px 10px;font-size:12px;}
+  .card{background:#fff;border:1px solid #e0e0dc;border-radius:10px;padding:1rem 1.25rem;margin-bottom:12px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .span2{grid-column:1/-1;}
+  .field{margin-bottom:0;}
+  .row{display:flex;gap:8px;align-items:center;}
+  .row-sb{display:flex;justify-content:space-between;align-items:center;}
+  .tag{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;}
+  .tag-pass{background:#e6f4e0;color:#27500a;}
+  .tag-fail{background:#fce8e8;color:#791f1f;}
+  .tag-pending{background:#f0f0ee;color:#666;}
+  .mono{font-family:'Courier New',monospace;letter-spacing:1px;}
+  .green{color:#3a6b2a;}
+  .muted{color:#888;font-size:12px;}
+  .section-title{font-size:14px;font-weight:600;margin:1.5rem 0 0.75rem;color:#1a1a1a;}
+  .toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#3a6b2a;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:500;z-index:999;display:none;}
+  .warn-box{background:#faeeda;border:1px solid #ef9f27;border-radius:8px;padding:12px;margin-bottom:12px;}
+  .warn-box p{color:#633806;font-size:12px;margin-bottom:4px;}
+  .status{font-size:11px;display:flex;align-items:center;gap:5px;}
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block;}
+  .dot-green{background:#3a6b2a;}
+  .dot-grey{background:#aaa;}
+  .dot-red{background:#c0392b;}
+  .storage-note{font-size:11px;color:#888;margin-top:4px;}
+  .intake-card{background:#fff;border:1px solid #e0e0dc;border-radius:10px;padding:1rem 1.25rem;margin-bottom:10px;cursor:pointer;}
+  .intake-card:hover{border-color:#3a6b2a;}
+  .batch-code{font-size:16px;font-weight:700;font-family:'Courier New',monospace;letter-spacing:1px;color:#3a6b2a;}
+  .toggle-btn{flex:1;padding:8px 0;border:1px solid #ddd;border-radius:6px;text-align:center;font-size:13px;font-weight:500;background:#fff;color:#666;}
+  .toggle-btn.active{border-color:#3a6b2a;background:#e8f4e3;color:#3a6b2a;}
+  .pkg-btn{flex:1;padding:6px 0;border:1px solid #ddd;border-radius:6px;text-align:center;font-size:12px;font-weight:500;background:#fff;color:#666;}
+  .pkg-btn.pass{border-color:#3a6b2a;background:#e8f4e3;color:#27500a;}
+  .pkg-btn.fail{border-color:#c0392b;background:#fce8e8;color:#791f1f;}
+  .pkg-btn.note{border-color:#d35400;background:#faeeda;color:#633806;}
+  .add-link{color:#3a6b2a;background:none;border:1px solid #3a6b2a;border-radius:6px;padding:5px 12px;font-size:12px;}
+  .add-link:hover{background:#e8f4e3;}
+  .sub-form{background:#f5f5f2;border-radius:8px;padding:12px;margin-top:8px;}
+  .header-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:10px;}
+  .back-btn{background:none;border:none;color:#666;padding:0;font-size:13px;display:flex;align-items:center;gap:4px;}
+  .back-btn:hover{color:#3a6b2a;background:none;}
+  .empty-state{border:1px dashed #ccc;border-radius:10px;padding:3rem 2rem;text-align:center;margin-top:1rem;}
+  .empty-state h3{font-size:16px;font-weight:600;margin-bottom:8px;}
+  .empty-state p{color:#888;font-size:13px;margin-bottom:1.5rem;}
+  .big-btn{padding:14px 36px;font-size:15px;}
+  .save-bar{display:flex;gap:10px;margin-top:1rem;flex-wrap:wrap;}
+  .del-card{background:#fff;border:1px solid #e0e0dc;border-radius:10px;padding:1rem 1.25rem;margin-bottom:10px;cursor:pointer;}
+  .del-card:hover{border-color:#3a6b2a;}
+  .flavour-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+  .batch-tag{display:inline-block;padding:3px 10px;background:#e8f4e3;color:#27500a;border-radius:20px;font-size:12px;font-weight:500;margin:2px;}
+  .batch-search-results{background:#fff;border:1px solid #ddd;border-radius:6px;max-height:200px;overflow-y:auto;margin-top:4px;}
+  .batch-search-item{padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f5f5f5;}
+  .batch-search-item:hover{background:#f0f7ee;}
+  .batch-search-item .batch-meta{font-size:11px;color:#888;margin-top:2px;}
+  .wm-table{width:100%;border-collapse:collapse;margin-bottom:1.5rem;}
+  .wm-table th{background:#f0f7ee;color:#27500a;font-size:12px;font-weight:600;padding:8px 12px;text-align:left;border-bottom:2px solid #b8d9b0;}
+  .wm-table td{padding:8px 12px;font-size:13px;border-bottom:1px solid #f0f0ee;vertical-align:top;}
+  .wm-table tr:last-child td{border-bottom:none;}
+  .wm-table .total-row td{font-weight:600;background:#f9fdf8;border-top:2px solid #b8d9b0;}
+  .wm-season-header{background:#3a6b2a;color:#fff;padding:10px 14px;border-radius:8px 8px 0 0;font-size:14px;font-weight:600;margin-top:1.5rem;}
+  .wm-season-header:first-child{margin-top:0;}
+  .tab-bar{display:flex;gap:0;margin-bottom:1.5rem;border-bottom:2px solid #e0e0dc;}
+  .tab-btn{padding:8px 20px;font-size:14px;font-weight:500;background:none;border:none;border-bottom:3px solid transparent;margin-bottom:-2px;cursor:pointer;color:#888;border-radius:0;}
+  .tab-btn:hover{color:#3a6b2a;background:none;}
+  .tab-btn.active{color:#3a6b2a;border-bottom:3px solid #3a6b2a;background:none;}
+  .manage-card{background:#fff;border:1px solid #e0e0dc;border-radius:10px;padding:1rem 1.25rem;margin-bottom:10px;}
+  .manage-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0ee;}
+  .manage-row:last-child{border-bottom:none;}
+  @media print{
+    body{background:#fff;}
+    .no-print{display:none!important;}
+    .card{border:1px solid #bbb;break-inside:avoid;}
+    .intake-card{border:1px solid #bbb;}
+  }
+</style>
+</head>
+<body>
+<div class="toast" id="toast"></div>
+
+<div class="wrap">
+  <div id="view-tabs"></div>
+  <div id="view-list"></div>
+  <div id="view-form" style="display:none"></div>
+  <div id="view-manage" style="display:none"></div>
+  <div id="view-wetmeat" style="display:none"></div>
+  <div id="view-delivery" style="display:none"></div>
+</div>
+
+<script>
+// ── Storage key ──────────────────────────────────────────────────────────────
+const KEY = 'fsa_intake_v1';
+
+// ── State ────────────────────────────────────────────────────────────────────
+let species = ['Pheasant','Partridge','Rabbit','Hare','Venison','Mallard','Other'];
+let intakes = [], deliveries = [], estates = [], processors = [], parts = [
+  'Whole','Leg','Shoulder','Breast','Saddle','Haunch','Loin','Carcass','Mixed cuts'
+];
+let currentView = 'list';
+let editId = null;
+let form = null;
+let saveStatusTimer = null;
+
+// ── Persistence ───────────────────────────────────────────────────────────────
+function loadData() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) {
+      const d = JSON.parse(raw);
+      if (d.intakes) intakes = d.intakes;
+      if (d.deliveries) deliveries = d.deliveries;
+      if (d.estates) estates = d.estates;
+      if (d.processors) processors = d.processors;
+      if (d.parts && d.parts.length) parts = d.parts;
+      if (d.species && d.species.length) species = d.species;
+      if (d.deliveries) deliveries = d.deliveries;
+      if (intakes.length) showToast(`${intakes.length} record${intakes.length>1?'s':''} · ${estates.length} estate${estates.length!==1?'s':''} · ${processors.length} processor${processors.length!==1?'s':''} loaded`);
+    }
+  } catch(e) { console.error('Load error', e); }
+}
+
+function saveData() {
+  try {
+    localStorage.setItem(KEY, JSON.stringify({intakes, deliveries, estates, processors, parts, species}));
+    showStatus('saved');
+  } catch(e) {
+    showStatus('error');
+    showToast('Save failed — storage may be full');
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const uid = () => Math.random().toString(36).slice(2,10);
+const today = () => new Date().toISOString().split('T')[0];
+
+function seasonCode(dateStr) {
+  // Always returns full 6-digit code e.g. 202526
+  const d = dateStr ? new Date(dateStr + 'T12:00:00') : new Date();
+  const y = d.getFullYear(), m = d.getMonth() + 1;
+  const openYear = m >= 9 ? y : y - 1;
+  const closeYY = String(openYear + 1).slice(-2);
+  return `${openYear}${closeYY}`;
+}
+
+function fmtSeason(c) {
+  return c && c.length === 6 ? c.slice(0,4) + '/' + c.slice(4) : c;
+}
+
+function nextNum(season, list) {
+  // Match by batchCode prefix — robust against mismatched season fields
+  const prefix = season + '-';
+  const rel = (list||[]).filter(i => i.batchCode && i.batchCode.startsWith(prefix));
+  if (!rel.length) return 1;
+  const nums = rel.map(i => parseInt(i.batchCode.slice(prefix.length)) || 0);
+  return Math.max(...nums) + 1;
+}
+
+function migrateShortCodes() {
+  // Fix any records saved with truncated 4-digit season codes e.g. 2526 → 202526
+  let changed = false;
+  intakes = intakes.map(r => {
+    if (r.season && r.season.length === 4) {
+      const fullSeason = '20' + r.season;
+      const fixedCode = (r.batchCode||'').startsWith(r.season + '-')
+        ? fullSeason + '-' + r.batchCode.slice(r.season.length + 1)
+        : r.batchCode;
+      changed = true;
+      return {...r, season: fullSeason, batchCode: fixedCode};
+    }
+    return r;
+  });
+  if (changed) saveData();
+}
+
+function seasonFromBatch(batchCode) {
+  // Extract season from batch code e.g. 202526-3 → 202526
+  const parts = (batchCode||'').split('-');
+  const s = parts[0];
+  return s.length === 6 ? s : null;
+}
+
+function describeSeason(code) {
+  // 202526 → "Sept 2025 – Jan 2026"
+  if (!code || code.length !== 6) return '';
+  const openYear = code.slice(0,4);
+  const closeYY = code.slice(4);
+  const closeYear = '20' + closeYY;
+  return `Sept ${openYear} – Jan ${closeYear}`;
+}
+
+function tempOk(item) {
+  const t = parseFloat(item.temp);
+  if (isNaN(t)) return null;
+  return item.storage === 'Chilled' ? t <= 4 : t <= -18;
+}
+
+function getName(list, id) {
+  const x = list.find(i => i.id === id);
+  return x ? x.name : '—';
+}
+
+function newItem() {
+  return { id: uid(), species: 'Pheasant', custom: '', part: parts[0]||'', storage: 'Chilled', qty: '', unit: 'kg', temp: '', pkg: 'Pass' };
+}
+
+function blankForm() {
+  const c = seasonCode(today());
+  const n = nextNum(c, intakes);
+  return { date: today(), season: c, batchCode: `${c}-${n}`, batchOverride: false, estateId: '', processorId: '', ref: '', items: [newItem()], notes: '' };
+}
+
+function checkDups(f, eid) {
+  const w = [], o = intakes.filter(r => r.id !== eid);
+  if (f.batchCode && o.some(r => r.batchCode === f.batchCode)) w.push(`Batch code ${f.batchCode} already exists.`);
+  if (f.date && f.estateId && f.processorId) {
+    const c = o.find(r => r.date === f.date && r.estateId === f.estateId && r.processorId === f.processorId);
+    if (c) w.push(`Same estate & processor already recorded on ${f.date} (${c.batchCode}).`);
+  }
+  if (f.ref && f.ref.trim() && o.some(r => r.ref && r.ref.trim() === f.ref.trim() && r.date === f.date))
+    w.push(`Processor ref "${f.ref}" already used on ${f.date}.`);
+  return w;
+}
+
+// ── Toast & status ────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 3500);
+}
+
+function showStatus(s) {
+  const el = document.getElementById('save-status');
+  if (!el) return;
+  if (s === 'saved') el.innerHTML = `<span class="dot dot-green"></span> Saved to this device`;
+  else if (s === 'error') el.innerHTML = `<span class="dot dot-red"></span> Save failed`;
+  clearTimeout(saveStatusTimer);
+  saveStatusTimer = setTimeout(() => { if(el) el.innerHTML = `<span class="dot dot-grey"></span> Auto-saves here`; }, 3000);
+}
+
+// ── Render helpers ────────────────────────────────────────────────────────────
+function el(tag, attrs, ...children) {
+  const e = document.createElement(tag);
+  for (const [k,v] of Object.entries(attrs||{})) {
+    if (k.startsWith('on')) e.addEventListener(k.slice(2).toLowerCase(), v);
+    else if (k === 'className') e.className = v;
+    else e.setAttribute(k, v);
+  }
+  for (const c of children) {
+    if (c == null) continue;
+    e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+  }
+  return e;
+}
+
+function div(cls, ...children) { return el('div', {className: cls}, ...children); }
+function p(cls, text) { const e = document.createElement('p'); e.className = cls||''; e.textContent = text||''; return e; }
+function span(cls, text) { const e = document.createElement('span'); e.className = cls||''; e.textContent = text||''; return e; }
+function label(text, forId) { const e = document.createElement('label'); e.textContent = text; if(forId) e.htmlFor = forId; return e; }
+function input(attrs) { return el('input', attrs); }
+function select(opts, val, onChange) {
+  const s = document.createElement('select');
+  for (const [v,t] of opts) { const o = document.createElement('option'); o.value = v; o.textContent = t; if(v===val) o.selected=true; s.appendChild(o); }
+  s.addEventListener('change', e => onChange(e.target.value));
+  return s;
+}
+function btn(cls, text, onClick) { const b = document.createElement('button'); b.className = cls; b.textContent = text; b.addEventListener('click', onClick); return b; }
+
+// ── Dropdown component ────────────────────────────────────────────────────────
+function makeDropdown(container, labelText, entities, selectedId, onSelect, onAdd, hasFSA) {
+  container.innerHTML = '';
+  const lbl = document.createElement('label');
+  lbl.textContent = labelText; lbl.style.cssText = 'font-size:12px;color:#666;display:block;margin-bottom:4px;';
+  container.appendChild(lbl);
+
+  const row = div('row');
+  const sel = document.createElement('select');
+  sel.style.flex = '1';
+  const blank = document.createElement('option'); blank.value = ''; blank.textContent = `— select ${labelText.toLowerCase()} —`; sel.appendChild(blank);
+  for (const e of entities) { const o = document.createElement('option'); o.value = e.id; o.textContent = e.name + (hasFSA && e.fsa ? ` (FSA: ${e.fsa})` : hasFSA ? ' (no FSA)' : ''); if(e.id===selectedId) o.selected=true; sel.appendChild(o); }
+  sel.addEventListener('change', e => { onSelect(e.target.value); renderFSAHint(); });
+  row.appendChild(sel);
+
+  const addBtn = document.createElement('button');
+  addBtn.className = 'add-link'; addBtn.textContent = '+ Add new';
+  addBtn.addEventListener('click', () => { subForm.style.display = subForm.style.display==='none'?'block':'none'; });
+  row.appendChild(addBtn);
+  container.appendChild(row);
+
+  const hint = p('storage-note','');
+  const renderFSAHint = () => {
+    if (!hasFSA) return;
+    const found = entities.find(e => e.id === sel.value);
+    hint.textContent = found ? `FSA: ${found.fsa||'not registered'}` : '';
+  };
+  renderFSAHint();
+  container.appendChild(hint);
+
+  const subForm = div('sub-form'); subForm.style.display = 'none';
+  const nameInput = input({type:'text', placeholder: labelText + ' name', style:'margin-bottom:8px;'});
+  subForm.appendChild(nameInput);
+  let fsaInput;
+  if (hasFSA) {
+    fsaInput = input({type:'text', placeholder:'FSA number (leave blank if none)', style:'margin-bottom:8px;'});
+    subForm.appendChild(fsaInput);
+  }
+  const saveBtn = btn('btn-primary btn-sm', `Save ${labelText.toLowerCase()}`, () => {
+    const name = nameInput.value.trim();
+    if (!name) return;
+    const entry = {id: uid(), name, fsa: hasFSA ? (fsaInput.value.trim()||'') : undefined};
+    onAdd(entry);
+    nameInput.value = ''; if(fsaInput) fsaInput.value = '';
+    subForm.style.display = 'none';
+    showToast(`${labelText} "${name}" saved`);
+    saveData();
+  });
+  const cancelBtn = btn('', 'Cancel', () => { subForm.style.display = 'none'; nameInput.value = ''; if(fsaInput) fsaInput.value=''; });
+  cancelBtn.style.marginLeft = '8px';
+  subForm.appendChild(el('div', {}, saveBtn, cancelBtn));
+  container.appendChild(subForm);
+}
+
+// ── LIST VIEW ─────────────────────────────────────────────────────────────────
+// ── TABS ─────────────────────────────────────────────────────────────────────
+function renderTabs(activeTab) {
+  const v = document.getElementById('view-tabs');
+  v.innerHTML = '';
+  const bar = div('tab-bar');
+  bar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:0;margin-bottom:1.5rem;border-bottom:2px solid #e0e0dc;';
+  const tabsLeft = div('row');
+  tabsLeft.style.gap = '0';
+  const tabs = [['list','Intake records'],['delivery','Finished Product'],['wetmeat','Wet Meat'],['manage','Manage']];
+  for (const [id, label] of tabs) {
+    const b = btn(`tab-btn${activeTab===id?' active':''}`, label, () => {
+      if (id === 'list') renderList();
+      else if (id === 'delivery') renderDeliveryList();
+      else if (id === 'wetmeat') renderWetMeat();
+      else renderManage();
+    });
+    tabsLeft.appendChild(b);
+  }
+  bar.appendChild(tabsLeft);
+  const saveBtn = btn('', '⬇ Save to Dropbox', exportData);
+  saveBtn.style.cssText = 'color:#3a6b2a;border-color:#3a6b2a;font-size:12px;padding:5px 12px;margin-bottom:2px;white-space:nowrap;flex-shrink:0;';
+  bar.appendChild(saveBtn);
+  v.appendChild(bar);
+}
+
+// ── FINISHED PRODUCT DELIVERY ─────────────────────────────────────────────────
+function newFlavour() { return {id: uid(), name: '', qty: '', unit: 'kg'}; }
+
+function blankDelivery() {
+  return {
+    date: today(),
+    clientId: '',
+    batchCodes: [],
+    flavours: [newFlavour()],
+    notes: ''
+  };
+}
+
+function renderDeliveryList() {
+  currentView = 'delivery';
+  document.getElementById('view-list').style.display = 'none';
+  document.getElementById('view-form').style.display = 'none';
+  document.getElementById('view-manage').style.display = 'none';
+  document.getElementById('view-wetmeat').style.display = 'none';
+  const v = document.getElementById('view-delivery');
+  v.style.display = 'block';
+  v.innerHTML = '';
+  renderTabs('delivery');
+
+  const hdr = div('header-bar');
+  const hdrLeft = div('');
+  hdrLeft.appendChild(el('h2', {style:'font-size:18px;font-weight:600;margin:0;'}, 'Finished product deliveries'));
+  hdrLeft.appendChild(p('muted', `${deliveries.length} delivery record${deliveries.length!==1?'s':''}`));
+  hdr.appendChild(hdrLeft);
+  const nb = btn('btn-primary', '+ New delivery', () => renderDeliveryForm(blankDelivery(), null));
+  hdr.appendChild(nb);
+  v.appendChild(hdr);
+
+  if (deliveries.length === 0) {
+    const empty = div('empty-state');
+    empty.appendChild(el('h3', {}, 'No delivery records yet'));
+    empty.appendChild(p('', 'Click below to record your first finished product delivery.'));
+    const b = btn('btn-primary big-btn', '+ New delivery record', () => renderDeliveryForm(blankDelivery(), null));
+    empty.appendChild(b);
+    v.appendChild(empty);
+    return;
+  }
+
+  for (const d of [...deliveries].reverse()) {
+    const card = div('del-card');
+    const top = div('row-sb');
+    const left = div(''); left.style.flex = '1';
+
+    const titleRow = div('row'); titleRow.style.marginBottom = '4px';
+    titleRow.appendChild(el('span', {style:'font-size:15px;font-weight:600;color:#1a1a1a;'}, getName(estates, d.clientId)));
+    titleRow.appendChild(el('span', {className:'muted'}, ' · ' + d.date));
+    left.appendChild(titleRow);
+
+    // Batch codes
+    const batchDiv = div(''); batchDiv.style.marginBottom = '6px';
+    for (const bc of (d.batchCodes||[])) {
+      batchDiv.appendChild(el('span', {className:'batch-tag'}, bc));
+    }
+    left.appendChild(batchDiv);
+
+    // Flavours
+    const flavDiv = div(''); flavDiv.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;';
+    for (const f of (d.flavours||[])) {
+      if (f.name) {
+        flavDiv.appendChild(el('span', {className:'tag tag-pending'}, `${f.name}${f.qty?' · '+f.qty+f.unit:''}`));
+      }
+    }
+    left.appendChild(flavDiv);
+    top.appendChild(left);
+
+    const btns = div('row');
+    const eb = btn('btn-sm', 'Edit', () => renderDeliveryForm(JSON.parse(JSON.stringify(d)), d.id));
+    eb.style.marginRight = '4px';
+    const db = btn('btn-sm btn-danger', 'Del', () => {
+      if (!confirm('Delete this delivery record?')) return;
+      deliveries = deliveries.filter(x => x.id !== d.id);
+      saveData(); renderDeliveryList(); showToast('Delivery record deleted');
+    });
+    btns.appendChild(eb); btns.appendChild(db);
+    top.appendChild(btns);
+    card.appendChild(top);
+    card.addEventListener('click', e => { if (e.target.tagName !== 'BUTTON') renderDeliveryForm(JSON.parse(JSON.stringify(d)), d.id); });
+    v.appendChild(card);
+  }
+}
+
+function renderDeliveryForm(dform, dEditId) {
+  currentView = 'delivery-form';
+  document.getElementById('view-list').style.display = 'none';
+  document.getElementById('view-form').style.display = 'none';
+  document.getElementById('view-manage').style.display = 'none';
+  document.getElementById('view-wetmeat').style.display = 'none';
+  const v = document.getElementById('view-delivery');
+  v.style.display = 'block';
+  v.innerHTML = '';
+  renderTabs('delivery');
+
+  let confirmMode = false;
+
+  // Header
+  const hdr = div('header-bar');
+  const backBtn = btn('back-btn', '← All deliveries', () => renderDeliveryList());
+  hdr.appendChild(backBtn);
+  hdr.appendChild(el('h2', {style:'font-size:16px;font-weight:600;margin:0;'}, dEditId ? 'Edit delivery' : 'New delivery record'));
+  const statusEl = el('span', {id:'save-status', className:'status muted'});
+  statusEl.innerHTML = '<span class="dot dot-grey"></span> Auto-saves here';
+  hdr.appendChild(statusEl);
+  v.appendChild(hdr);
+
+  const card = div('card');
+  const grid = div('grid2');
+
+  // Date
+  const dateF = div('field');
+  dateF.appendChild(label('Delivery date'));
+  const dateInp = input({type:'date', value: dform.date});
+  dateInp.addEventListener('change', e => dform.date = e.target.value);
+  dateF.appendChild(dateInp);
+  grid.appendChild(dateF);
+
+  // Spacer
+  grid.appendChild(div(''));
+
+  // Client dropdown
+  const clientF = div('field span2');
+  clientF.appendChild(label('Client (estate or outlet)'));
+  const clientRow = div('row');
+  const clientSel = document.createElement('select'); clientSel.style.flex = '1';
+  const blankOpt = document.createElement('option'); blankOpt.value = ''; blankOpt.textContent = '— select client —'; clientSel.appendChild(blankOpt);
+  for (const e of estates) {
+    const o = document.createElement('option'); o.value = e.id; o.textContent = e.name;
+    if (e.id === dform.clientId) o.selected = true;
+    clientSel.appendChild(o);
+  }
+  clientSel.addEventListener('change', e => { dform.clientId = e.target.value; batchFilterSel.value = e.target.value; filterBatches(); });
+  clientRow.appendChild(clientSel);
+  const addClientBtn = btn('add-link', '+ Add new', () => { newClientForm.style.display = newClientForm.style.display==='none'?'block':'none'; });
+  clientRow.appendChild(addClientBtn);
+  clientF.appendChild(clientRow);
+
+  const newClientForm = div('sub-form'); newClientForm.style.display = 'none';
+  const newClientInput = input({type:'text', placeholder:'Client / outlet name', style:'margin-bottom:8px;'});
+  newClientForm.appendChild(newClientInput);
+  const saveClientBtn = btn('btn-primary btn-sm', 'Save client', () => {
+    const name = newClientInput.value.trim(); if (!name) return;
+    const entry = {id: uid(), name};
+    estates.push(entry);
+    dform.clientId = entry.id;
+    saveData();
+    newClientInput.value = ''; newClientForm.style.display = 'none';
+    // Rebuild select
+    const o = document.createElement('option'); o.value = entry.id; o.textContent = entry.name; o.selected = true;
+    clientSel.appendChild(o); clientSel.value = entry.id;
+    showToast(`Client "${name}" saved`);
+  });
+  newClientForm.appendChild(saveClientBtn);
+  clientF.appendChild(newClientForm);
+  grid.appendChild(clientF);
+
+  card.appendChild(grid);
+  v.appendChild(card);
+
+  // ── Batch codes ──────────────────────────────────────────────────────────────
+  v.appendChild(p('section-title', 'Source batch codes'));
+  const batchCard = div('card');
+
+  // Selected batches display
+  const selectedBatchesDiv = div(''); selectedBatchesDiv.style.marginBottom = '10px';
+  function renderSelectedBatches() {
+    selectedBatchesDiv.innerHTML = '';
+    if (dform.batchCodes.length === 0) {
+      selectedBatchesDiv.appendChild(p('muted', 'No batch codes added yet'));
+    } else {
+      for (const bc of dform.batchCodes) {
+        const tag = el('span', {className:'batch-tag'}, bc);
+        const rem = btn('', '×', () => {
+          dform.batchCodes = dform.batchCodes.filter(x => x !== bc);
+          renderSelectedBatches();
+        });
+        rem.style.cssText = 'background:none;border:none;color:#c0392b;cursor:pointer;padding:0 0 0 4px;font-size:14px;';
+        const wrap = el('span', {style:'display:inline-flex;align-items:center;margin:2px;'}, tag, rem);
+        selectedBatchesDiv.appendChild(wrap);
+      }
+    }
+  }
+  renderSelectedBatches();
+  batchCard.appendChild(selectedBatchesDiv);
+
+  // Estate filter for batches
+  const filterRow = div('row'); filterRow.style.marginBottom = '8px';
+  const filterLbl = el('span', {style:'font-size:12px;color:#666;white-space:nowrap;'}, 'Filter by estate:');
+  const batchFilterSel = document.createElement('select'); batchFilterSel.style.flex = '1';
+  const allOpt = document.createElement('option'); allOpt.value = ''; allOpt.textContent = '— all estates —'; batchFilterSel.appendChild(allOpt);
+  for (const e of estates) {
+    const o = document.createElement('option'); o.value = e.id; o.textContent = e.name;
+    if (e.id === dform.clientId) o.selected = true;
+    batchFilterSel.appendChild(o);
+  }
+  filterRow.appendChild(filterLbl); filterRow.appendChild(batchFilterSel);
+  batchCard.appendChild(filterRow);
+
+  // Search input
+  const batchSearchInp = input({type:'text', placeholder:'Type to search batch codes...'});
+  batchCard.appendChild(batchSearchInp);
+
+  // Results list
+  const batchResults = div('batch-search-results'); batchResults.style.display = 'none';
+  batchCard.appendChild(batchResults);
+
+  function filterBatches() {
+    const estFilter = batchFilterSel.value;
+    const query = batchSearchInp.value.trim().toLowerCase();
+    let filtered = intakes;
+    if (estFilter) filtered = filtered.filter(i => i.estateId === estFilter);
+    if (query) filtered = filtered.filter(i => i.batchCode && i.batchCode.toLowerCase().includes(query));
+    filtered = filtered.filter(i => !dform.batchCodes.includes(i.batchCode));
+    filtered = [...filtered].reverse().slice(0, 30);
+
+    if (filtered.length === 0 && !query) { batchResults.style.display = 'none'; return; }
+    batchResults.style.display = 'block';
+    batchResults.innerHTML = '';
+    for (const intake of filtered) {
+      const item = div('batch-search-item');
+      const topLine = el('div', {style:'font-weight:500;'}, intake.batchCode);
+      const meta = el('div', {className:'batch-meta'}, `${intake.date} · ${getName(estates, intake.estateId)} · ${intake.items.map(i=>i.species==='Other'?i.custom:i.species).join(', ')}`);
+      item.appendChild(topLine); item.appendChild(meta);
+      item.addEventListener('click', () => {
+        if (!dform.batchCodes.includes(intake.batchCode)) {
+          dform.batchCodes.push(intake.batchCode);
+          renderSelectedBatches();
+          batchSearchInp.value = '';
+          batchResults.style.display = 'none';
+          filterBatches();
+        }
+      });
+      batchResults.appendChild(item);
+    }
+  }
+
+  batchSearchInp.addEventListener('input', filterBatches);
+  batchFilterSel.addEventListener('change', filterBatches);
+  filterBatches();
+
+  // Manual batch entry
+  const manualRow = div('row'); manualRow.style.marginTop = '10px';
+  const manualInp = input({type:'text', placeholder:'Or type batch code manually e.g. 202526-5'});
+  const addManualBtn = btn('add-link', '+ Add', () => {
+    const bc = manualInp.value.trim();
+    if (!bc) return;
+    if (!dform.batchCodes.includes(bc)) { dform.batchCodes.push(bc); renderSelectedBatches(); }
+    manualInp.value = '';
+  });
+  manualRow.appendChild(manualInp); manualRow.appendChild(addManualBtn);
+  batchCard.appendChild(manualRow);
+  v.appendChild(batchCard);
+
+  // ── Flavours / products ──────────────────────────────────────────────────────
+  v.appendChild(p('section-title', 'Finished products delivered'));
+  const flavoursContainer = div('');
+  v.appendChild(flavoursContainer);
+
+  function renderFlavours() {
+    flavoursContainer.innerHTML = '';
+    const fcard = div('card');
+    dform.flavours.forEach((fl, idx) => {
+      const row = div('flavour-row');
+      const numLbl = el('span', {style:'font-size:12px;color:#888;min-width:20px;'}, `${idx+1}.`);
+      const nameInp = input({type:'text', value: fl.name, placeholder:'Flavour / product name'});
+      nameInp.addEventListener('input', e => fl.name = e.target.value);
+      nameInp.style.flex = '3';
+      const qtyInp = input({type:'number', value: fl.qty, placeholder:'Qty'});
+      qtyInp.addEventListener('input', e => fl.qty = e.target.value);
+      qtyInp.style.flex = '1';
+      const unitSel = select([['kg','kg'],['pcs','pcs']], fl.unit, v => fl.unit = v);
+      unitSel.style.flex = '1';
+      const delBtn = dform.flavours.length > 1 ? btn('btn-sm btn-danger', '✕', () => {
+        dform.flavours = dform.flavours.filter(x => x.id !== fl.id);
+        renderFlavours();
+      }) : null;
+      row.appendChild(numLbl); row.appendChild(nameInp); row.appendChild(qtyInp); row.appendChild(unitSel);
+      if (delBtn) row.appendChild(delBtn);
+      fcard.appendChild(row);
+    });
+    const addFlavBtn = btn('add-link', '+ Add another product', () => { dform.flavours.push(newFlavour()); renderFlavours(); });
+    addFlavBtn.style.marginTop = '4px';
+    fcard.appendChild(addFlavBtn);
+    flavoursContainer.appendChild(fcard);
+  }
+  renderFlavours();
+
+  // Notes
+  const notesCard = div('card');
+  notesCard.appendChild(label('Notes'));
+  const notesInp = document.createElement('textarea');
+  notesInp.rows = 3; notesInp.value = dform.notes||'';
+  notesInp.placeholder = 'Any observations or extra info...';
+  notesInp.addEventListener('input', e => dform.notes = e.target.value);
+  notesCard.appendChild(notesInp);
+  v.appendChild(notesCard);
+
+  // Save bar
+  const saveBar = div('save-bar');
+  const saveBtn = btn('btn-primary', dEditId ? 'Save changes' : 'Save delivery record', () => {
+    const rec = {...dform, id: dEditId || uid()};
+    if (dEditId) {
+      deliveries = deliveries.map(r => r.id === dEditId ? rec : r);
+    } else {
+      deliveries.push(rec);
+    }
+    saveData();
+    renderDeliveryList();
+    showToast('Delivery record saved');
+  });
+  saveBar.appendChild(saveBtn);
+  const cancelBtn = btn('', 'Cancel', () => renderDeliveryList());
+  saveBar.appendChild(cancelBtn);
+  v.appendChild(saveBar);
+}
+
+// ── WET MEAT SUMMARY ─────────────────────────────────────────────────────────
+function renderWetMeat() {
+  currentView = 'wetmeat';
+  document.getElementById('view-list').style.display = 'none';
+  document.getElementById('view-form').style.display = 'none';
+  document.getElementById('view-manage').style.display = 'none';
+  const v = document.getElementById('view-wetmeat');
+  v.style.display = 'block';
+  v.innerHTML = '';
+  renderTabs('wetmeat');
+
+  const hdr = div('header-bar');
+  hdr.appendChild(el('h2', {style:'font-size:16px;font-weight:600;margin:0;'}, 'Wet meat received'));
+  hdr.appendChild(p('muted', 'Kilos received at intake by season and species'));
+  v.appendChild(hdr);
+
+  if (intakes.length === 0) {
+    v.appendChild(p('muted', 'No intake records yet.'));
+    return;
+  }
+
+  // Build summary: { season: { species: totalKg } }
+  const summary = {};
+  for (const record of intakes) {
+    const s = record.season || 'Unknown';
+    if (!summary[s]) summary[s] = {};
+    for (const item of (record.items || [])) {
+      const sp = item.species === 'Other' ? (item.custom || 'Other') : item.species;
+      const kg = item.unit === 'kg' ? parseFloat(item.qty) || 0 : 0;
+      summary[s][sp] = (summary[s][sp] || 0) + kg;
+    }
+  }
+
+  // Sort seasons newest first
+  const seasons = Object.keys(summary).sort().reverse();
+
+  for (const season of seasons) {
+    // Season header
+    const seasonDesc = describeSeason(season) || fmtSeason(season) || season;
+    const hdrEl = div('wm-season-header');
+    hdrEl.textContent = seasonDesc;
+    v.appendChild(hdrEl);
+
+    // Table
+    const table = document.createElement('table');
+    table.className = 'wm-table';
+    table.style.borderRadius = '0 0 8px 8px';
+    table.style.overflow = 'hidden';
+    const thead = document.createElement('thead');
+    const hrow = document.createElement('tr');
+    for (const h of ['Species', 'Total kg received']) {
+      const th = document.createElement('th');
+      th.textContent = h; hrow.appendChild(th);
+    }
+    thead.appendChild(hrow); table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    const speciesData = summary[season];
+    const speciesList = Object.keys(speciesData).sort();
+    let total = 0;
+
+    for (const sp of speciesList) {
+      const kg = speciesData[sp];
+      total += kg;
+      const row = document.createElement('tr');
+      const tdSp = document.createElement('td'); tdSp.textContent = sp;
+      const tdKg = document.createElement('td'); tdKg.textContent = kg % 1 === 0 ? `${kg} kg` : `${kg.toFixed(2)} kg`;
+      row.appendChild(tdSp); row.appendChild(tdKg);
+      tbody.appendChild(row);
+    }
+
+    // Total row
+    const totalRow = document.createElement('tr');
+    totalRow.className = 'total-row';
+    const tdTotalLbl = document.createElement('td'); tdTotalLbl.textContent = 'Total';
+    const tdTotalKg = document.createElement('td'); tdTotalKg.textContent = total % 1 === 0 ? `${total} kg` : `${total.toFixed(2)} kg`;
+    totalRow.appendChild(tdTotalLbl); totalRow.appendChild(tdTotalKg);
+    tbody.appendChild(totalRow);
+
+    table.appendChild(tbody);
+    v.appendChild(table);
+  }
+}
+
+// ── MANAGE VIEW ───────────────────────────────────────────────────────────────
+function renderManage() {
+  currentView = 'manage';
+  document.getElementById('view-list').style.display = 'none';
+  document.getElementById('view-form').style.display = 'none';
+  const v = document.getElementById('view-manage');
+  v.style.display = 'block';
+  v.innerHTML = '';
+  renderTabs('manage');
+
+  // ── Estates ──
+  const estTitle = p('section-title', 'Estates');
+  v.appendChild(estTitle);
+
+  if (estates.length === 0) {
+    v.appendChild(p('muted', 'No estates saved yet — add them when entering an intake record.'));
+  } else {
+    const estCard = div('manage-card');
+    for (const e of estates) {
+      const row = div('manage-row');
+      const left = div('');
+      left.appendChild(el('span', {style:'font-weight:500;font-size:13px;'}, e.name));
+      row.appendChild(left);
+      const rb = div('row');
+      const delB = btn('btn-sm btn-danger', 'Delete', () => {
+        if (!confirm(`Delete estate "${e.name}"?`)) return;
+        estates = estates.filter(x => x.id !== e.id);
+        saveData(); renderManage(); showToast(`Estate "${e.name}" deleted`);
+      });
+      rb.appendChild(delB);
+      row.appendChild(rb);
+      estCard.appendChild(row);
+    }
+    v.appendChild(estCard);
+  }
+
+  // Add new estate inline
+  const addEstCard = div('manage-card');
+  addEstCard.appendChild(p('muted', 'Add new estate'));
+  const estNameInput = input({type:'text', placeholder:'Estate name', style:'margin-top:8px;margin-bottom:8px;'});
+  addEstCard.appendChild(estNameInput);
+  const addEstBtn = btn('btn-primary btn-sm', 'Save estate', () => {
+    const name = estNameInput.value.trim();
+    if (!name) return;
+    estates.push({id: uid(), name});
+    saveData(); renderManage(); showToast(`Estate "${name}" saved`);
+  });
+  addEstCard.appendChild(addEstBtn);
+  v.appendChild(addEstCard);
+
+  // ── Processors ──
+  const procTitle = p('section-title', 'Processors');
+  v.appendChild(procTitle);
+
+  if (processors.length === 0) {
+    v.appendChild(p('muted', 'No processors saved yet — add them when entering an intake record.'));
+  } else {
+    const procCard = div('manage-card');
+    for (const proc of processors) {
+      const row = div('manage-row');
+      const left = div('');
+      left.appendChild(el('span', {style:'font-weight:500;font-size:13px;display:block;'}, proc.name));
+      // Editable FSA number
+      const fsaRow = div('row'); fsaRow.style.marginTop = '6px';
+      const fsaLbl = el('span', {style:'font-size:11px;color:#888;margin-right:6px;'}, 'FSA:');
+      const fsaInp = input({type:'text', value: proc.fsa||'', placeholder:'Enter FSA number', style:'flex:1;font-size:12px;padding:4px 8px;'});
+      const saveB = btn('btn-sm btn-primary', 'Save', () => {
+        proc.fsa = fsaInp.value.trim();
+        saveData(); showToast('FSA number saved'); renderManage();
+      });
+      saveB.style.marginLeft = '6px';
+      fsaRow.appendChild(fsaLbl); fsaRow.appendChild(fsaInp); fsaRow.appendChild(saveB);
+      left.appendChild(fsaRow);
+      row.appendChild(left);
+      const rb = div('row'); rb.style.alignSelf = 'flex-start';
+      const delB = btn('btn-sm btn-danger', 'Delete', () => {
+        if (!confirm(`Delete processor "${proc.name}"?`)) return;
+        processors = processors.filter(x => x.id !== proc.id);
+        saveData(); renderManage(); showToast(`Processor "${proc.name}" deleted`);
+      });
+      rb.appendChild(delB);
+      row.appendChild(rb);
+      procCard.appendChild(row);
+    }
+    v.appendChild(procCard);
+  }
+
+  // Add new processor inline
+  const addProcCard = div('manage-card');
+  addProcCard.appendChild(p('muted', 'Add new processor'));
+  const procNameInput = input({type:'text', placeholder:'Processor name', style:'margin-top:8px;margin-bottom:8px;'});
+  addProcCard.appendChild(procNameInput);
+  const procFSAInput = input({type:'text', placeholder:'FSA number (leave blank if none)', style:'margin-bottom:8px;'});
+  addProcCard.appendChild(procFSAInput);
+  const addProcBtn = btn('btn-primary btn-sm', 'Save processor', () => {
+    const name = procNameInput.value.trim();
+    if (!name) return;
+    processors.push({id: uid(), name, fsa: procFSAInput.value.trim()});
+    saveData(); renderManage(); showToast(`Processor "${name}" saved`);
+  });
+  addProcCard.appendChild(addProcBtn);
+  v.appendChild(addProcCard);
+}
+
+function renderList() {
+  currentView = 'list';
+  document.getElementById('view-form').style.display = 'none';
+  document.getElementById('view-manage').style.display = 'none';
+  if(document.getElementById('view-wetmeat'))document.getElementById('view-wetmeat').style.display = 'none';
+  if(document.getElementById('view-delivery'))document.getElementById('view-delivery').style.display = 'none';
+  const v = document.getElementById('view-list');
+  v.style.display = 'block';
+  v.innerHTML = '';
+  renderTabs('list');
+
+  const season = seasonCode(today());
+  const seasonIntakes = intakes.filter(i => i.season === season);
+
+  // Header
+  const hdr = div('header-bar');
+  const hdrLeft = div('');
+  const titleRow = div('row'); titleRow.style.marginBottom = '2px';
+  titleRow.appendChild(el('h1', {}, 'Intake records'));
+  const statusEl = el('span', {id:'save-status', className:'status muted'}, el('span',{className:'dot dot-grey'}), ' Auto-saves here');
+  titleRow.appendChild(statusEl);
+  hdrLeft.appendChild(titleRow);
+  hdrLeft.appendChild(p('muted', `${intakes.length} intake${intakes.length!==1?'s':''} total · ${seasonIntakes.length} this season (${fmtSeason(season)}) · ${estates.length} estate${estates.length!==1?'s':''} · ${processors.length} processor${processors.length!==1?'s':''}`));
+  hdr.appendChild(hdrLeft);
+  const hdrBtns = div('row');
+  const importBtn = btn('', '⬆ Load from file', () => importInput.click());
+  importBtn.style.cssText = 'color:#666;font-size:12px;padding:5px 12px;';
+  hdrBtns.appendChild(importBtn);
+  const importInput = document.createElement('input');
+  importInput.type = 'file'; importInput.accept = '.json'; importInput.style.display = 'none';
+  importInput.addEventListener('change', importData);
+  hdrBtns.appendChild(importInput);
+  if (intakes.length > 0) {
+    const nb = btn('btn-primary', '+ New intake', startNew);
+    hdrBtns.appendChild(nb);
+  }
+  hdr.appendChild(hdrBtns);
+  v.appendChild(hdr);
+
+  // ── Future date warning ──────────────────────────────────────────────────────
+  const todayDate = today();
+  const futureRecords = intakes.filter(r => r.date > todayDate);
+  if (futureRecords.length > 0) {
+    const warn = div('warn-box');
+    warn.style.marginBottom = '1rem';
+    const warnTitle = document.createElement('p');
+    warnTitle.style.fontWeight = '600'; warnTitle.style.marginBottom = '6px';
+    warnTitle.textContent = `⚠ ${futureRecords.length} record${futureRecords.length>1?'s have':' has'} a future delivery date — please check`;
+    warn.appendChild(warnTitle);
+    for (const r of futureRecords) {
+      const wl = document.createElement('p');
+      wl.style.cssText = 'font-size:12px;color:#633806;margin-bottom:4px;cursor:pointer;text-decoration:underline;';
+      wl.textContent = `${r.batchCode} · ${r.date} · ${getName(estates,r.estateId)} — click to edit`;
+      wl.addEventListener('click', () => startEdit(r));
+      warn.appendChild(wl);
+    }
+    const warnNote = document.createElement('p');
+    warnNote.style.cssText = 'font-size:11px;color:#633806;margin-top:6px;';
+    warnNote.textContent = 'Click any record above to open and correct the date.';
+    warn.appendChild(warnNote);
+    v.appendChild(warn);
+  }
+
+  if (intakes.length === 0) {
+    const empty = div('empty-state');
+    empty.appendChild(el('h3', {}, 'No records yet'));
+    empty.appendChild(p('', 'Click below to log your first delivery. Data saves automatically to this device.'));
+    const b = btn('btn-primary big-btn', '+ Enter intake record 1', startNew);
+    empty.appendChild(b);
+    empty.appendChild(p('storage-note', 'Saves to this browser on this computer — open this file in Chrome each time'));
+    v.appendChild(empty);
+    return;
+  }
+
+  for (const r of [...intakes].reverse()) {
+    const card = div('intake-card');
+    const top = div('row-sb');
+    const left = div(''); left.style.flex = '1';
+    const batchRow = div('row'); batchRow.style.marginBottom = '4px';
+    batchRow.appendChild(el('span', {className:'batch-code'}, r.batchCode));
+    batchRow.appendChild(el('span', {className:'muted'}, ' ' + r.date));
+    left.appendChild(batchRow);
+    left.appendChild(p('muted', `Estate: ${getName(estates,r.estateId)} · Processor: ${getName(processors,r.processorId)}`));
+    if (r.ref) left.appendChild(p('muted', `Ref: ${r.ref}`));
+    const tags = div(''); tags.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;';
+    for (const item of r.items) {
+      const ok = tempOk(item);
+      const cls = ok===true?'tag tag-pass':ok===false?'tag tag-fail':'tag tag-pending';
+      const label = (item.species==='Other'?item.custom:item.species) + (item.part?` – ${item.part}`:'') + (item.qty?` ${item.qty}${item.unit}`:'');
+      tags.appendChild(el('span', {className:cls}, label));
+    }
+    left.appendChild(tags);
+    top.appendChild(left);
+
+    const btns = div('row');
+    const eb = btn('btn-sm', 'Edit', () => startEdit(r)); eb.style.marginRight='4px';
+    const db = btn('btn-sm btn-danger', 'Del', () => {
+      if (!confirm(`Delete ${r.batchCode}?`)) return;
+      intakes = intakes.filter(x => x.id !== r.id);
+      saveData(); renderList(); showToast('Record deleted');
+    });
+    btns.appendChild(eb); btns.appendChild(db);
+    top.appendChild(btns);
+    card.appendChild(top);
+    card.addEventListener('click', e => { if (e.target.tagName !== 'BUTTON') startEdit(r); });
+    v.appendChild(card);
+  }
+}
+
+// ── FORM VIEW ─────────────────────────────────────────────────────────────────
+function renderForm() {
+  currentView = 'form';
+  document.getElementById('view-list').style.display = 'none';
+  document.getElementById('view-manage').style.display = 'none';
+  const v = document.getElementById('view-form');
+  v.style.display = 'block';
+  v.innerHTML = '';
+
+  let confirmMode = false;
+
+  // Back button + title
+  const hdr = div('header-bar');
+  const backBtn = btn('back-btn', '← All intakes', () => { form = null; editId = null; renderList(); });
+  hdr.appendChild(backBtn);
+  const titleEl = el('h2', {}, editId ? `Edit ${form.batchCode}` : 'New intake record');
+  titleEl.style.margin = '0';
+  hdr.appendChild(titleEl);
+  const statusEl = el('span', {id:'save-status', className:'status muted'});
+  statusEl.innerHTML = `<span class="dot dot-grey"></span> Auto-saves here`;
+  hdr.appendChild(statusEl);
+  v.appendChild(hdr);
+
+  // ── Header card ──
+  const hcard = div('card');
+  const grid = div('grid2');
+
+  // Date
+  // ── Season dropdown ──────────────────────────────────────────────────────────
+  // Build list of seasons: 3 years back, current, 2 ahead
+  function buildSeasons() {
+    const now = new Date();
+    const curYear = now.getFullYear();
+    const seasons = [];
+    for (let openYear = curYear - 3; openYear <= curYear + 2; openYear++) {
+      const closeYear = openYear + 1;
+      const code = `${openYear}${String(closeYear).slice(-2)}`;
+      const label = `Spring, Summer & Autumn ${openYear} through to Season End Feb ${closeYear}`;
+      seasons.push({code, label});
+    }
+    return seasons;
+  }
+  const seasonList = buildSeasons();
+
+  // Date field
+  const dateField = div('field span2');
+  dateField.appendChild(label('Date of delivery'));
+  const dateInput = input({type:'date', value: form.date});
+  dateInput.addEventListener('change', e => {
+    form.date = e.target.value;
+    const c = seasonCode(form.date);
+    form.season = c;
+    seasonSel.value = c;
+    updateBatchDisplay();
+  });
+  dateField.appendChild(dateInput);
+  grid.appendChild(dateField);
+
+  // Season dropdown
+  const seasonField = div('field span2');
+  seasonField.appendChild(label('Season'));
+  const seasonSel = document.createElement('select');
+  seasonSel.style.width = '100%';
+  // Add options
+  for (const s of seasonList) {
+    const o = document.createElement('option');
+    o.value = s.code;
+    o.textContent = s.label;
+    if (s.code === form.season) o.selected = true;
+    seasonSel.appendChild(o);
+  }
+  // If current season not in list, add it
+  if (!seasonList.find(s => s.code === form.season)) {
+    const o = document.createElement('option');
+    o.value = form.season;
+    o.textContent = `Season ${fmtSeason(form.season)} (imported)`;
+    o.selected = true;
+    seasonSel.insertBefore(o, seasonSel.firstChild);
+  }
+  seasonSel.addEventListener('change', e => {
+    form.season = e.target.value;
+    updateBatchDisplay();
+  });
+  seasonField.appendChild(seasonSel);
+  grid.appendChild(seasonField);
+
+  // Batch number input + generated code display
+  const batchField = div('field span2');
+  batchField.appendChild(label('Intake batch number for this season'));
+
+  // Extract just the number from existing batchCode
+  const existingNum = form.batchCode ? (form.batchCode.split('-')[1] || '') : '';
+  const batchNumInput = input({type:'number', value: existingNum, placeholder: `Next: ${nextNum(form.season, intakes)}`, style:'font-size:16px;font-weight:600;width:120px;'});
+
+  const batchDisplay = div('');
+  batchDisplay.style.cssText = 'margin-top:8px;padding:10px 14px;background:#f0f7ee;border:1px solid #b8d9b0;border-radius:8px;display:flex;align-items:center;gap:10px;';
+  const batchLabel = el('span', {style:'font-size:12px;color:#666;'}, 'Generated batch code:');
+  const batchCode = el('span', {style:'font-family:monospace;font-size:20px;font-weight:700;color:#3a6b2a;letter-spacing:2px;'}, form.batchCode || '—');
+  batchDisplay.appendChild(batchLabel);
+  batchDisplay.appendChild(batchCode);
+
+  function updateBatchDisplay() {
+    const num = batchNumInput.value.trim();
+    const season = form.season;
+    if (num && season) {
+      const code = `${season}-${num}`;
+      form.batchCode = code;
+      batchCode.textContent = code;
+      batchDisplay.style.borderColor = '#b8d9b0';
+    } else if (!num) {
+      const autoNum = nextNum(season, intakes);
+      batchCode.textContent = `${season}-${autoNum} (auto)`;
+      form.batchCode = `${season}-${autoNum}`;
+      batchDisplay.style.borderColor = '#ddd';
+    }
+  }
+
+  batchNumInput.addEventListener('input', updateBatchDisplay);
+  updateBatchDisplay();
+
+  batchField.appendChild(batchNumInput);
+  batchField.appendChild(batchDisplay);
+  batchField.appendChild(p('muted', 'Just enter the number — the full batch code is generated above'));
+  grid.appendChild(batchField);
+
+  // Estate
+  const estateContainer = div('span2');
+  grid.appendChild(estateContainer);
+  makeDropdown(estateContainer, 'Estate', estates, form.estateId,
+    id => { form.estateId = id; },
+    entry => { estates.push(entry); form.estateId = entry.id; makeDropdown(estateContainer,'Estate',estates,form.estateId,id=>form.estateId=id,entry=>{estates.push(entry);form.estateId=entry.id;saveData();},false); },
+    false
+  );
+
+  // Processor
+  const procContainer = div('span2');
+  grid.appendChild(procContainer);
+  makeDropdown(procContainer, 'Processor', processors, form.processorId,
+    id => { form.processorId = id; },
+    entry => { processors.push(entry); form.processorId = entry.id; makeDropdown(procContainer,'Processor',processors,form.processorId,id=>form.processorId=id,entry=>{processors.push(entry);form.processorId=entry.id;saveData();},true); saveData(); },
+    true
+  );
+
+  // Ref
+  const refField = div('field span2');
+  refField.appendChild(label('Processor batch ref / identifier'));
+  const refInput = input({type:'text', value: form.ref, placeholder:"Processor's own tag, label, or reference number"});
+  refInput.addEventListener('input', e => form.ref = e.target.value);
+  refField.appendChild(refInput);
+  grid.appendChild(refField);
+
+  hcard.appendChild(grid);
+  v.appendChild(hcard);
+
+  // ── Items ──
+  const itemsTitle = p('section-title', 'Items in this delivery');
+  v.appendChild(itemsTitle);
+  const itemsContainer = div('');
+  v.appendChild(itemsContainer);
+
+  function renderItems() {
+    itemsContainer.innerHTML = '';
+    form.items.forEach((item, idx) => {
+      const icard = div('card');
+      const itop = div('row-sb'); itop.style.marginBottom = '12px';
+      itop.appendChild(el('span', {className:'muted'}, `Item ${idx+1}`));
+      if (form.items.length > 1) {
+        const xb = btn('btn-sm btn-danger', '✕ Remove', () => { form.items = form.items.filter(x=>x.id!==item.id); renderItems(); });
+        itop.appendChild(xb);
+      }
+      icard.appendChild(itop);
+
+      const igrid = div('grid2');
+
+      // Species
+      const specField = div('field');
+      specField.appendChild(label('Species'));
+      const specOpts = species.map(s => [s, s==='Other'?'Other (type below)':s]);
+      const specSel = select(specOpts, item.species, v => { item.species = v; renderItems(); });
+      specField.appendChild(specSel);
+      igrid.appendChild(specField);
+
+      if (item.species === 'Other') {
+        const custField = div('field');
+        custField.appendChild(label('Species name'));
+        const custInput = input({type:'text', value: item.custom, placeholder:'Type species name'});
+        custInput.addEventListener('input', e => item.custom = e.target.value);
+        custField.appendChild(custInput);
+        igrid.appendChild(custField);
+      } else {
+        igrid.appendChild(div(''));
+      }
+
+      // Part / cut
+      const partContainer = div('field span2');
+      partContainer.appendChild(label('Part / cut / description'));
+      const partRow = div('row');
+      const partSel = document.createElement('select'); partSel.style.flex='1';
+      for (const p of parts) { const o = document.createElement('option'); o.value=p; o.textContent=p; if(p===item.part) o.selected=true; partSel.appendChild(o); }
+      partSel.addEventListener('change', e => item.part = e.target.value);
+      partRow.appendChild(partSel);
+      const addPartBtn = btn('add-link', '+ Add new', () => { addPartForm.style.display = addPartForm.style.display==='none'?'block':'none'; });
+      partRow.appendChild(addPartBtn);
+      partContainer.appendChild(partRow);
+      const addPartForm = div('sub-form'); addPartForm.style.display='none';
+      const partNameInput = input({type:'text', placeholder:'e.g. Crown, Rack, Offal...'});
+      partNameInput.style.marginBottom='8px';
+      addPartForm.appendChild(partNameInput);
+      const savePartBtn = btn('btn-primary btn-sm','Save & select', () => {
+        const name = partNameInput.value.trim();
+        if (!name) return;
+        if (!parts.includes(name)) parts.push(name);
+        item.part = name;
+        saveData();
+        addPartForm.style.display='none';
+        partNameInput.value='';
+        renderItems();
+      });
+      addPartForm.appendChild(savePartBtn);
+      partContainer.appendChild(addPartForm);
+      igrid.appendChild(partContainer);
+
+      // Storage toggle
+      const storField = div('field');
+      storField.appendChild(label(`Storage · limit: ${item.storage==='Chilled'?'≤4°C':'≤-18°C'}`));
+      const storRow = div('row');
+      for (const s of ['Chilled','Frozen']) {
+        const b = btn(`toggle-btn${item.storage===s?' active':''}`, s, () => {
+          item.storage = s;
+          renderItems();
+        });
+        storRow.appendChild(b);
+      }
+      storField.appendChild(storRow);
+      igrid.appendChild(storField);
+
+      // Temp
+      const tempField = div('field');
+      tempField.appendChild(label('Core temp at intake (°C)'));
+      const tempRow = div('row');
+      const tempInput = input({type:'number', step:'0.1', value: item.temp, style:'width:90px;'});
+      tempInput.addEventListener('input', e => {
+        item.temp = e.target.value;
+        const ok = tempOk(item);
+        tempBadge.textContent = ok===true?'✓ Pass':ok===false?'✗ FAIL':'';
+        tempBadge.className = 'tag ' + (ok===true?'tag-pass':ok===false?'tag-fail':'tag-pending');
+        tempBadge.style.display = ok===null?'none':'inline-block';
+      });
+      tempRow.appendChild(tempInput);
+      const ok = tempOk(item);
+      const tempBadge = el('span', {className:`tag ${ok===true?'tag-pass':ok===false?'tag-fail':'tag-pending'}`}, ok===true?'✓ Pass':ok===false?'✗ FAIL':'');
+      tempBadge.style.display = ok===null?'none':'inline-block';
+      tempRow.appendChild(tempBadge);
+      tempField.appendChild(tempRow);
+      igrid.appendChild(tempField);
+
+      // Qty
+      const qtyField = div('field');
+      qtyField.appendChild(label('Quantity'));
+      const qtyRow = div('row');
+      const qtyInput = input({type:'number', value: item.qty, placeholder:'Amount', style:'flex:2;'});
+      qtyInput.addEventListener('input', e => item.qty = e.target.value);
+      const unitSel = select([['kg','kg'],['pcs','pcs']], item.unit, v => item.unit = v);
+      unitSel.style.cssText='flex:1;min-width:60px;';
+      qtyRow.appendChild(qtyInput); qtyRow.appendChild(unitSel);
+      qtyField.appendChild(qtyRow);
+      igrid.appendChild(qtyField);
+
+      // Packaging
+      const pkgField = div('field');
+      pkgField.appendChild(label('Packaging'));
+      const pkgRow = div('row');
+      for (const s of ['Pass','Fail','Note']) {
+        const b = btn(`pkg-btn${item.pkg===s?' '+s.toLowerCase():''}`, s, () => {
+          item.pkg = s;
+          renderItems();
+        });
+        pkgRow.appendChild(b);
+      }
+      pkgField.appendChild(pkgRow);
+      igrid.appendChild(pkgField);
+
+      icard.appendChild(igrid);
+      itemsContainer.appendChild(icard);
+    });
+
+    const addItemBtn = btn('add-link', '+ Add another item', () => { form.items.push(newItem()); renderItems(); });
+    addItemBtn.style.marginBottom = '1.5rem';
+    itemsContainer.appendChild(addItemBtn);
+  }
+
+  renderItems();
+
+  // Notes
+  const notesCard = div('card');
+  notesCard.appendChild(label('Notes for this delivery'));
+  const notesInput = document.createElement('textarea');
+  notesInput.rows = 3; notesInput.value = form.notes;
+  notesInput.placeholder = 'Any observations, issues, or extra info...';
+  notesInput.addEventListener('input', e => form.notes = e.target.value);
+  notesCard.appendChild(notesInput);
+  v.appendChild(notesCard);
+
+  // Duplicate warning container
+  const warnContainer = div('');
+  v.appendChild(warnContainer);
+
+  // Save bar
+  const saveBar = div('save-bar');
+  const saveBtn = btn('btn-primary', editId ? 'Save changes' : 'Save & store record', () => {
+    const warnings = checkDups(form, editId);
+    if (warnings.length > 0 && !confirmMode) {
+      confirmMode = true;
+      warnContainer.innerHTML = '';
+      const wb = div('warn-box');
+      const wp = document.createElement('p'); wp.style.fontWeight='600'; wp.textContent='Possible duplicate detected'; wb.appendChild(wp);
+      for (const w of warnings) { const wl = document.createElement('p'); wl.textContent = '· ' + w; wb.appendChild(wl); }
+      const wn = document.createElement('p'); wn.textContent = 'If correct, hit Save anyway.'; wb.appendChild(wn);
+      warnContainer.appendChild(wb);
+      saveBtn.textContent = 'Save anyway';
+      saveBtn.style.background = '#854f0b';
+      return;
+    }
+    doSave();
+  });
+  saveBar.appendChild(saveBtn);
+
+  const cancelBtn = btn('', 'Cancel', () => { form = null; editId = null; renderList(); });
+  saveBar.appendChild(cancelBtn);
+  v.appendChild(saveBar);
+}
+
+function doSave() {
+  // Add any custom species to the permanent species list
+  for (const item of form.items) {
+    if (item.species === 'Other' && item.custom.trim()) {
+      const name = item.custom.trim();
+      // Insert before 'Other'
+      if (!species.includes(name)) {
+        species.splice(species.indexOf('Other'), 0, name);
+        item.species = name;
+        item.custom = '';
+      } else {
+        item.species = name;
+        item.custom = '';
+      }
+    }
+  }
+  const rec = {...form, id: editId || uid()};
+  if (editId) {
+    intakes = intakes.map(r => r.id === editId ? rec : r);
+  } else {
+    intakes.push(rec);
+  }
+  saveData();
+  form = null; editId = null;
+  renderList();
+  showToast('Record saved');
+}
+
+function startNew() {
+  // Always recalculate from current intakes so batch code is always next in sequence
+  const c = seasonCode(today());
+  const n = nextNum(c, intakes);
+  form = { date: today(), season: c, batchCode: `${c}-${n}`, batchOverride: false, estateId: '', processorId: '', ref: '', items: [newItem()], notes: '' };
+  editId = null;
+  renderForm();
+}
+
+function startEdit(r) {
+  form = JSON.parse(JSON.stringify(r));
+  form.batchOverride = true;
+  editId = r.id;
+  renderForm();
+}
+
+// ── Export / Import ───────────────────────────────────────────────────────────
+function exportData() {
+  // Fixed filename so it always overwrites the previous backup
+  const filename = `FSA-intake-records.json`;
+  const data = JSON.stringify({intakes, deliveries, estates, processors, parts, species}, null, 2);
+  const blob = new Blob([data], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+  showToast('Saved as FSA-intake-records.json — save to your Dropbox folder');
+}
+
+function importData(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const d = JSON.parse(ev.target.result);
+      if (d.intakes) intakes = d.intakes;
+      if (d.deliveries) deliveries = d.deliveries;
+      if (d.estates) estates = d.estates;
+      if (d.processors) processors = d.processors;
+      if (d.parts && d.parts.length) parts = d.parts;
+      if (d.species && d.species.length) species = d.species;
+      if (d.deliveries) deliveries = d.deliveries;
+      migrateShortCodes();
+      saveData();
+      renderList();
+      showToast(`Loaded ${intakes.length} records from file`);
+    } catch(err) { showToast('Could not read file — is it the right format?'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+// ── Season integrity check ───────────────────────────────────────────────────
+function checkAndFixSeasons() {
+  let fixed = 0;
+  intakes = intakes.map(r => {
+    const extracted = seasonFromBatch(r.batchCode);
+    if (extracted && r.season !== extracted) {
+      fixed++;
+      return {...r, season: extracted};
+    }
+    return r;
+  });
+  if (fixed > 0) {
+    saveData();
+    showToast(`Fixed season code on ${fixed} record${fixed>1?'s':''}`);
+  }
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+loadData();
+migrateShortCodes();
+checkAndFixSeasons();
+renderList();
+</script>
+</body>
+</html>
