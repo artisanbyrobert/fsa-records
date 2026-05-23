@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FSA Intake Records</title>
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+window._supabaseCreateClient = createClient;
+</script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f2;color:#1a1a1a;font-size:14px;line-height:1.5;}
@@ -108,7 +112,10 @@
 
 <script>
 // ── Storage key ──────────────────────────────────────────────────────────────
-const KEY = 'fsa_intake_v1';
+const SUPABASE_URL = 'https://rgmstzswgosoelvamgds.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbXN0enN3Z29zb2VsdmFtZ2RzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1MjEwMzIsImV4cCI6MjA5NTA5NzAzMn0.Wj73PXTKp0zmrMgE5ne_0FORy0ihhGt0MpvF0oouu6s';
+const KEY = 'fsa_intake_v1'; // kept for migration from localStorage
+let sb = null; // supabase client - initialised on boot
 
 // ── State ────────────────────────────────────────────────────────────────────
 let species = ['Pheasant','Partridge','Rabbit','Hare','Venison','Mallard','Other'];
@@ -121,30 +128,99 @@ let form = null;
 let saveStatusTimer = null;
 
 // ── Persistence ───────────────────────────────────────────────────────────────
-function loadData() {
+async function loadData() {
   try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) {
-      const d = JSON.parse(raw);
-      if (d.intakes) intakes = d.intakes;
-      if (d.deliveries) deliveries = d.deliveries;
-      if (d.estates) estates = d.estates;
-      if (d.processors) processors = d.processors;
-      if (d.parts && d.parts.length) parts = d.parts;
-      if (d.species && d.species.length) species = d.species;
-      if (d.deliveries) deliveries = d.deliveries;
-      if (intakes.length) showToast(`${intakes.length} record${intakes.length>1?'s':''} · ${estates.length} estate${estates.length!==1?'s':''} · ${processors.length} processor${processors.length!==1?'s':''} loaded`);
+    if (!sb) {
+      if (typeof window._supabaseCreateClient === 'function') {
+        sb = window._supabaseCreateClient(SUPABASE_URL, SUPABASE_KEY);
+      } else {
+        // Wait briefly for module to load then retry
+        await new Promise(r => setTimeout(r, 500));
+        if (typeof window._supabaseCreateClient === 'function') {
+          sb = window._supabaseCreateClient(SUPABASE_URL, SUPABASE_KEY);
+        } else {
+          showToast('Supabase library not loaded — check internet connection');
+          return;
+        }
+      }
     }
-  } catch(e) { console.error('Load error', e); }
+
+    // Load intakes
+    const {data: intakeRows} = await sb.from('intakes').select('*');
+    if (intakeRows && intakeRows.length) {
+      intakes = intakeRows.map(r => r.data);
+    }
+
+    // Load deliveries
+    const {data: deliveryRows} = await sb.from('deliveries').select('*');
+    if (deliveryRows && deliveryRows.length) {
+      deliveries = deliveryRows.map(r => r.data);
+    }
+
+    // Load config (estates, processors, parts, species)
+    const {data: configRows} = await sb.from('app_config').select('*');
+    if (configRows) {
+      for (const row of configRows) {
+        if (row.key === 'estates' && row.data.length) estates = row.data;
+        if (row.key === 'processors' && row.data.length) processors = row.data;
+        if (row.key === 'parts' && row.data.length) parts = row.data;
+        if (row.key === 'species' && row.data.length) species = row.data;
+      }
+    }
+
+    // Migration: if Supabase empty, check localStorage
+    if (intakes.length === 0) {
+      try {
+        const raw = localStorage.getItem(KEY);
+        if (raw) {
+          const d = JSON.parse(raw);
+          if (d.intakes && d.intakes.length) {
+            intakes = d.intakes;
+            deliveries = d.deliveries || [];
+            estates = d.estates || [];
+            processors = d.processors || [];
+            if (d.parts && d.parts.length) parts = d.parts;
+            if (d.species && d.species.length) species = d.species;
+            showToast('Migrating local records to cloud...');
+            await saveData();
+            return;
+          }
+        }
+      } catch(e) {}
+    }
+
+    if (intakes.length) showToast(`${intakes.length} record${intakes.length>1?'s':''} · ${estates.length} estate${estates.length!==1?'s':''} · ${processors.length} processor${processors.length!==1?'s':''} loaded`);
+  } catch(e) {
+    console.error('Load error', e);
+    showToast('Could not connect to cloud — check internet connection');
+  }
 }
 
-function saveData() {
+async function saveData() {
   try {
-    localStorage.setItem(KEY, JSON.stringify({intakes, deliveries, estates, processors, parts, species}));
+    showStatus('saving');
+
+    // Save all intakes
+    for (const intake of intakes) {
+      await sb.from('intakes').upsert({id: intake.id, data: intake});
+    }
+
+    // Save all deliveries
+    for (const delivery of deliveries) {
+      await sb.from('deliveries').upsert({id: delivery.id, data: delivery});
+    }
+
+    // Save config
+    await sb.from('app_config').upsert({key: 'estates', data: estates});
+    await sb.from('app_config').upsert({key: 'processors', data: processors});
+    await sb.from('app_config').upsert({key: 'parts', data: parts});
+    await sb.from('app_config').upsert({key: 'species', data: species});
+
     showStatus('saved');
   } catch(e) {
+    console.error('Save error', e);
     showStatus('error');
-    showToast('Save failed — storage may be full');
+    showToast('Cloud save failed — check internet connection');
   }
 }
 
@@ -250,10 +326,13 @@ function showToast(msg) {
 function showStatus(s) {
   const el = document.getElementById('save-status');
   if (!el) return;
-  if (s === 'saved') el.innerHTML = `<span class="dot dot-green"></span> Saved to this device`;
+  if (s === 'saving') el.innerHTML = `<span class="dot dot-grey"></span> Saving...`;
+  else if (s === 'saved') el.innerHTML = `<span class="dot dot-green"></span> Saved to cloud`;
   else if (s === 'error') el.innerHTML = `<span class="dot dot-red"></span> Save failed`;
-  clearTimeout(saveStatusTimer);
-  saveStatusTimer = setTimeout(() => { if(el) el.innerHTML = `<span class="dot dot-grey"></span> Auto-saves here`; }, 3000);
+  if (s !== 'saving') {
+    clearTimeout(saveStatusTimer);
+    saveStatusTimer = setTimeout(() => { if(el) el.innerHTML = `<span class="dot dot-grey"></span> Auto-saves to cloud`; }, 3000);
+  }
 }
 
 // ── Render helpers ────────────────────────────────────────────────────────────
@@ -1410,10 +1489,12 @@ function checkAndFixSeasons() {
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
-loadData();
-migrateShortCodes();
-checkAndFixSeasons();
-renderList();
+(async () => {
+  await loadData();
+  migrateShortCodes();
+  checkAndFixSeasons();
+  renderList();
+})();
 </script>
 </body>
 </html>
