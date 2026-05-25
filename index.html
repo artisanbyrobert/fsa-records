@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/RobertFry/Downloads/fsa_intake_11.html -->
+<!-- saved from url=(0055)file:///C:/Users/RobertFry/Downloads/fsa_intake_12.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1459,6 +1459,31 @@ function renderStepStart(container) {
   checkSection.appendChild(tickAllBtn);
   container.appendChild(checkSection);
 
+  // Day-specific pre-selected tasks
+  const preselect = DAY_PRESELECT[dailyForm.dayTypeId];
+  if (preselect && preselect.length > 0) {
+    if (!dailyForm.dayPreChecks || Object.keys(dailyForm.dayPreChecks).length === 0) {
+      dailyForm.dayPreChecks = {};
+      preselect.forEach(c => { dailyForm.dayPreChecks[c] = true; });
+    }
+    const preSection = document.createElement('div');
+    preSection.className = 'check-section';
+    const preTitle = document.createElement('p'); preTitle.className = 'check-section-title'; preTitle.textContent = 'Ready to start checks';
+    preSection.appendChild(preTitle);
+    const preNote = document.createElement('p'); preNote.style.cssText = 'font-size:11px;color:#888;margin-bottom:8px;'; preNote.textContent = 'Pre-ticked — untick anything not done';
+    preSection.appendChild(preNote);
+    preselect.forEach(check => {
+      const rowEl = document.createElement('div'); rowEl.className = 'check-item';
+      const chkEl = document.createElement('input'); chkEl.type = 'checkbox';
+      chkEl.checked = dailyForm.dayPreChecks[check] !== false;
+      chkEl.addEventListener('change', ev => { dailyForm.dayPreChecks[check] = ev.target.checked; });
+      const lblEl = document.createElement('label'); lblEl.textContent = check;
+      rowEl.appendChild(chkEl); rowEl.appendChild(lblEl);
+      preSection.appendChild(rowEl);
+    });
+    container.appendChild(preSection);
+  }
+
   buildNotesAndTodo(container);
 
   buildNavBar(container, () => renderDailyForm2('daytype'), () => {
@@ -1999,6 +2024,7 @@ function renderDeliveryForm(dform, dEditId) {
 // ── WET MEAT SUMMARY ─────────────────────────────────────────────────────────
 function renderWetMeat() {
   currentView = 'wetmeat';
+  if(document.getElementById('view-daily'))document.getElementById('view-daily').style.display = 'none';
   document.getElementById('view-list').style.display = 'none';
   document.getElementById('view-form').style.display = 'none';
   document.getElementById('view-manage').style.display = 'none';
@@ -2083,6 +2109,7 @@ function renderWetMeat() {
 // ── MANAGE VIEW ───────────────────────────────────────────────────────────────
 function renderManage() {
   currentView = 'manage';
+  if(document.getElementById('view-daily'))document.getElementById('view-daily').style.display = 'none';
   document.getElementById('view-list').style.display = 'none';
   document.getElementById('view-form').style.display = 'none';
   const v = document.getElementById('view-manage');
