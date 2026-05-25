@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/RobertFry/Downloads/fsa_intake_10.html -->
+<!-- saved from url=(0055)file:///C:/Users/RobertFry/Downloads/fsa_intake_11.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1092,7 +1092,19 @@ function renderDailyRecordsList() {
     editBtn.className = 'btn-sm';
     editBtn.textContent = 'Edit';
     editBtn.addEventListener('click', ev => { ev.stopPropagation(); dailyForm = JSON.parse(JSON.stringify(rec)); dailyEditId = rec.id; renderDailyForm2('review'); });
+    const delBtnD = document.createElement('button');
+    delBtnD.className = 'btn-sm btn-danger';
+    delBtnD.textContent = 'Delete';
+    delBtnD.addEventListener('click', ev => {
+      ev.stopPropagation();
+      if (!confirm('Delete this daily record?')) return;
+      dailyRecords = dailyRecords.filter(r => r.id !== rec.id);
+      saveData();
+      showToast('Record deleted');
+      renderDailyRecordsList();
+    });
     topEl.appendChild(editBtn);
+    topEl.appendChild(delBtnD);
     cardEl.appendChild(topEl);
     listEl.appendChild(cardEl);
   }
@@ -1679,8 +1691,11 @@ function renderDeliveryList() {
   currentView = 'delivery';
   document.getElementById('view-list').style.display = 'none';
   document.getElementById('view-form').style.display = 'none';
+  if(document.getElementById('view-daily'))document.getElementById('view-daily').style.display = 'none';
   document.getElementById('view-manage').style.display = 'none';
+  if(document.getElementById('view-daily'))document.getElementById('view-daily').style.display = 'none';
   document.getElementById('view-wetmeat').style.display = 'none';
+  if(document.getElementById('view-daily'))document.getElementById('view-daily').style.display = 'none';
   const v = document.getElementById('view-delivery');
   v.style.display = 'block';
   v.innerHTML = '';
@@ -2190,13 +2205,32 @@ function renderDailyLanding() {
   if (currentView !== 'list-records') {
     const landingEl = div('');
     landingEl.style.cssText = 'text-align:center;padding:2rem 1rem;';
-    const photoEl = document.createElement('img');
-    photoEl.src = 'data:image/jpeg;base64,' + PHOTO_B64;
-    photoEl.alt = 'Artisan by Robert';
-    photoEl.style.cssText = 'width:100%;max-width:300px;height:auto;border-radius:12px;display:block;margin:0 auto 1rem;';
-    landingEl.appendChild(photoEl);
     const titleH = document.createElement('h1'); titleH.style.cssText = 'font-size:22px;font-weight:500;margin:0 0 4px;'; titleH.textContent = 'Artisan by Robert'; landingEl.appendChild(titleH);
-    const subP = document.createElement('p'); subP.style.cssText = 'font-size:14px;color:#888;margin:0 0 2rem;'; subP.textContent = 'FSA Intake Records'; landingEl.appendChild(subP);
+    const subP = document.createElement('p'); subP.style.cssText = 'font-size:14px;color:#888;margin:0 0 1rem;'; subP.textContent = 'FSA Intake Records'; landingEl.appendChild(subP);
+    // Outstanding tasks panel
+    const allTodos = dailyRecords.reduce((acc, r) => acc.concat((r.todoList||[]).filter(t => !t.done)), []);
+    if (allTodos.length > 0) {
+      const tasksPanel = document.createElement('div');
+      tasksPanel.style.cssText = 'background:#fff8f0;border:1px solid #f0d4a8;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1.5rem;text-align:left;max-width:360px;margin-left:auto;margin-right:auto;';
+      const tasksPanelTitle = document.createElement('p');
+      tasksPanelTitle.style.cssText = 'font-size:12px;font-weight:600;color:#633806;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;';
+      tasksPanelTitle.textContent = '⚠️ Outstanding tasks — ' + allTodos.length + ' to do';
+      tasksPanel.appendChild(tasksPanelTitle);
+      allTodos.slice(0,5).forEach(task => {
+        const taskRowEl = document.createElement('div');
+        taskRowEl.style.cssText = 'display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #f0d4a8;align-items:flex-start;';
+        const circleEl = document.createElement('span'); circleEl.style.cssText = 'color:#d35400;flex-shrink:0;'; circleEl.textContent = '○';
+        const taskTextEl = document.createElement('span'); taskTextEl.style.cssText = 'font-size:13px;color:#633806;flex:1;'; taskTextEl.textContent = task.text;
+        const dateEl = document.createElement('span'); dateEl.style.cssText = 'font-size:10px;color:#aaa;white-space:nowrap;'; dateEl.textContent = fmtDate(task.addedDate);
+        taskRowEl.appendChild(circleEl); taskRowEl.appendChild(taskTextEl); taskRowEl.appendChild(dateEl);
+        tasksPanel.appendChild(taskRowEl);
+      });
+      if (allTodos.length > 5) {
+        const moreEl = document.createElement('p'); moreEl.style.cssText = 'font-size:11px;color:#aaa;margin-top:6px;text-align:center;'; moreEl.textContent = '+ ' + (allTodos.length - 5) + ' more — see Daily Record';
+        tasksPanel.appendChild(moreEl);
+      }
+      landingEl.appendChild(tasksPanel);
+    }
     const newBtnL = btn('btn-primary', '+ New intake', startNew);
     newBtnL.style.cssText = 'padding:12px 36px;font-size:15px;font-weight:600;display:block;margin:0 auto 1.5rem;border:none;border-radius:8px;background:#3a6b2a;color:#fff;cursor:pointer;';
     landingEl.appendChild(newBtnL);
