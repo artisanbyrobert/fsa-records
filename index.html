@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0054)file:///C:/Users/RobertFry/Downloads/fsa_intake_9.html -->
+<!-- saved from url=(0055)file:///C:/Users/RobertFry/Downloads/fsa_intake_10.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -830,6 +830,70 @@ function renderStepReview(container) {
     container.appendChild(notesCard);
   }
 
+  // Monitor notes
+  if (dailyForm.monitorNotes && dailyForm.monitorNotes.trim()) {
+    const monNotesCard = document.createElement('div');
+    monNotesCard.className = 'card';
+    const monNotesTitleEl = document.createElement('p');
+    monNotesTitleEl.style.cssText = 'font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;';
+    monNotesTitleEl.textContent = 'Notes';
+    monNotesCard.appendChild(monNotesTitleEl);
+    const monNotesTextEl = document.createElement('p');
+    monNotesTextEl.style.cssText = 'font-size:13px;color:#1a1a1a;line-height:1.5;margin:0;';
+    monNotesTextEl.textContent = dailyForm.monitorNotes;
+    monNotesCard.appendChild(monNotesTextEl);
+    container.appendChild(monNotesCard);
+  }
+
+  // To-do list summary
+  if (dailyForm.todoList && dailyForm.todoList.length > 0) {
+    const todoSummaryCard = document.createElement('div');
+    todoSummaryCard.className = 'card';
+    const todoSummaryTitle = document.createElement('p');
+    todoSummaryTitle.style.cssText = 'font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;';
+    todoSummaryTitle.textContent = 'To-do list';
+    todoSummaryCard.appendChild(todoSummaryTitle);
+    const openTasks = dailyForm.todoList.filter(t => !t.done);
+    const doneTasks = dailyForm.todoList.filter(t => t.done);
+    openTasks.forEach(task => {
+      const taskRowEl = document.createElement('div');
+      taskRowEl.style.cssText = 'display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid #f5f5f2;';
+      const circleEl = document.createElement('span');
+      circleEl.style.cssText = 'color:#ddd;font-size:14px;flex-shrink:0;';
+      circleEl.textContent = '○';
+      const taskLblEl = document.createElement('span');
+      taskLblEl.style.cssText = 'font-size:13px;flex:1;';
+      taskLblEl.textContent = task.text;
+      const addedEl = document.createElement('span');
+      addedEl.style.cssText = 'font-size:10px;color:#aaa;white-space:nowrap;';
+      addedEl.textContent = 'Added ' + fmtDate(task.addedDate);
+      taskRowEl.appendChild(circleEl); taskRowEl.appendChild(taskLblEl); taskRowEl.appendChild(addedEl);
+      todoSummaryCard.appendChild(taskRowEl);
+    });
+    if (doneTasks.length > 0) {
+      const doneLblEl = document.createElement('p');
+      doneLblEl.style.cssText = 'font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:0.5px;margin:10px 0 6px;';
+      doneLblEl.textContent = 'Completed';
+      todoSummaryCard.appendChild(doneLblEl);
+      doneTasks.forEach(task => {
+        const taskRowEl = document.createElement('div');
+        taskRowEl.style.cssText = 'display:flex;align-items:flex-start;gap:8px;padding:4px 0;opacity:0.5;';
+        const tickEl = document.createElement('span');
+        tickEl.style.cssText = 'color:#3a6b2a;font-size:14px;flex-shrink:0;';
+        tickEl.textContent = '✓';
+        const taskLblEl = document.createElement('span');
+        taskLblEl.style.cssText = 'font-size:12px;flex:1;text-decoration:line-through;color:#888;';
+        taskLblEl.textContent = task.text;
+        const doneDateEl = document.createElement('span');
+        doneDateEl.style.cssText = 'font-size:10px;color:#aaa;white-space:nowrap;';
+        doneDateEl.textContent = 'Done ' + fmtDate(task.doneDate);
+        taskRowEl.appendChild(tickEl); taskRowEl.appendChild(taskLblEl); taskRowEl.appendChild(doneDateEl);
+        todoSummaryCard.appendChild(taskRowEl);
+      });
+    }
+    container.appendChild(todoSummaryCard);
+  }
+
   // Save bar
   const saveBarEl = document.createElement('div');
   saveBarEl.className = 'save-bar';
@@ -1382,6 +1446,8 @@ function renderStepStart(container) {
   tickAllBtn.addEventListener('click', () => { START_CHECKS.forEach(c => { dailyForm.startChecks[c] = true; }); renderDailyForm2('start'); });
   checkSection.appendChild(tickAllBtn);
   container.appendChild(checkSection);
+
+  buildNotesAndTodo(container);
 
   buildNavBar(container, () => renderDailyForm2('daytype'), () => {
     const machines = getMachines();
