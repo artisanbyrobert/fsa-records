@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/RobertFry/Downloads/fsa_intake_12.html -->
+<!-- saved from url=(0055)file:///C:/Users/RobertFry/Downloads/fsa_intake_13.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -968,13 +968,31 @@ function renderDailyHome() {
   renderTabs('daily');
   var landingD = document.createElement('div');
   landingD.style.cssText = 'text-align:center;padding:1.5rem 1rem 1rem;';
-  var photoD = document.createElement('img');
-  photoD.src = 'data:image/jpeg;base64,' + PHOTO_B64;
-  photoD.alt = 'Artisan by Robert';
-  photoD.style.cssText = 'width:100%;max-width:260px;height:auto;border-radius:12px;display:block;margin:0 auto 1rem;';
-  landingD.appendChild(photoD);
-  var titleD = document.createElement('h1'); titleD.style.cssText = 'font-size:20px;font-weight:500;margin:0 0 4px;'; titleD.textContent = 'Artisan by Robert'; landingD.appendChild(titleD);
-  var subD = document.createElement('p'); subD.style.cssText = 'font-size:13px;color:#888;margin:0 0 1.5rem;'; subD.textContent = 'Daily records'; landingD.appendChild(subD);
+  var titleD = document.createElement('h1'); titleD.style.cssText = 'font-size:20px;font-weight:600;margin:0 0 4px;'; titleD.textContent = 'Daily Records'; landingD.appendChild(titleD);
+  var subD = document.createElement('p'); subD.style.cssText = 'font-size:13px;color:#888;margin:0 0 1rem;'; subD.textContent = 'Artisan by Robert'; landingD.appendChild(subD);
+  // Outstanding tasks panel
+  var allDailyTodos = dailyRecords.reduce(function(acc, r) { return acc.concat((r.todoList||[]).filter(function(t){ return !t.done; })); }, []);
+  var tasksPanelD = document.createElement('div');
+  tasksPanelD.style.cssText = 'background:#fff8f0;border:1px solid #f0d4a8;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1.5rem;text-align:left;max-width:360px;margin-left:auto;margin-right:auto;width:100%;box-sizing:border-box;';
+  var tasksPanelTitleD = document.createElement('p');
+  tasksPanelTitleD.style.cssText = 'font-size:12px;font-weight:600;color:#633806;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;';
+  tasksPanelTitleD.textContent = allDailyTodos.length > 0 ? '⚠️ Outstanding tasks — ' + allDailyTodos.length + ' to do' : '✓ No outstanding tasks';
+  tasksPanelTitleD.style.color = allDailyTodos.length > 0 ? '#633806' : '#27500a';
+  tasksPanelD.appendChild(tasksPanelTitleD);
+  allDailyTodos.slice(0,5).forEach(function(task) {
+    var taskRowD = document.createElement('div');
+    taskRowD.style.cssText = 'display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #f0d4a8;align-items:flex-start;';
+    var circleD = document.createElement('span'); circleD.style.cssText = 'color:#d35400;flex-shrink:0;'; circleD.textContent = '○';
+    var taskTextD = document.createElement('span'); taskTextD.style.cssText = 'font-size:13px;color:#633806;flex:1;'; taskTextD.textContent = task.text;
+    var dateD = document.createElement('span'); dateD.style.cssText = 'font-size:10px;color:#aaa;white-space:nowrap;'; dateD.textContent = fmtDate(task.addedDate);
+    taskRowD.appendChild(circleD); taskRowD.appendChild(taskTextD); taskRowD.appendChild(dateD);
+    tasksPanelD.appendChild(taskRowD);
+  });
+  if (allDailyTodos.length > 5) {
+    var moreD = document.createElement('p'); moreD.style.cssText = 'font-size:11px;color:#aaa;margin-top:6px;text-align:center;'; moreD.textContent = '+ ' + (allDailyTodos.length - 5) + ' more below';
+    tasksPanelD.appendChild(moreD);
+  }
+  landingD.appendChild(tasksPanelD);
   var newBtnD = document.createElement('button');
   newBtnD.className = 'btn-primary';
   newBtnD.style.cssText = 'padding:12px 36px;font-size:15px;font-weight:600;display:block;margin:0 auto 1.5rem;border:none;border-radius:8px;background:#3a6b2a;color:#fff;cursor:pointer;';
@@ -1210,7 +1228,9 @@ function renderStepDayType(container) {
   const blankOpt = document.createElement('option'); blankOpt.value = ''; blankOpt.textContent = '— select batch —'; batchDropdown.appendChild(blankOpt);
   intakes.forEach(intake => {
     const optEl = document.createElement('option'); optEl.value = intake.batchCode;
-    optEl.textContent = intake.batchCode + ' · ' + intake.estate + ' · ' + intake.species;
+    const estateName = getName(estates, intake.estateId) || intake.estate || '';
+    const speciesName = (intake.items && intake.items[0]) ? (intake.items[0].species === 'Other' ? intake.items[0].custom : intake.items[0].species) : (intake.species || '');
+    optEl.textContent = intake.batchCode + (estateName ? ' · ' + estateName : '') + (speciesName ? ' · ' + speciesName : '');
     batchDropdown.appendChild(optEl);
   });
   const addBatchSelBtn = document.createElement('button');
