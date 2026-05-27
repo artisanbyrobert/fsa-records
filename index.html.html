@@ -713,7 +713,7 @@ function blankRecord() {
   MONITOR_CHECKS.forEach(c => { monitorDefaults[c] = true; });
   return {
     id: uid(),
-    date: todayStr(),
+    date: today(),
     dayTypeId: null,
     stufferAlsoUsed: false,
     summary: '',
@@ -1304,7 +1304,7 @@ function renderStepStart(container) {
         taskRow.style.cssText = 'display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0ee;';
         const taskChk = document.createElement('input'); taskChk.type = 'checkbox';
         taskChk.style.cssText = 'width:18px;height:18px;accent-color:#3a6b2a;cursor:pointer;flex-shrink:0;margin-top:2px;';
-        taskChk.addEventListener('change', () => { task.done = true; task.doneDate = todayStr(); refreshTodo(); });
+        taskChk.addEventListener('change', () => { task.done = true; task.doneDate = today(); refreshTodo(); });
         const taskTextEl = document.createElement('span');
         taskTextEl.style.cssText = 'font-size:13px;flex:1;line-height:1.4;';
         taskTextEl.textContent = task.text;
@@ -1349,7 +1349,7 @@ function renderStepStart(container) {
     addTaskBtnEl.textContent = '+ Add';
     addTaskBtnEl.addEventListener('click', () => {
       const text = taskInpEl.value.trim(); if (!text) return;
-      dailyForm.todoList.push({id: uid(), text, done: false, addedDate: todayStr(), doneDate: null});
+      dailyForm.todoList.push({id: uid(), text, done: false, addedDate: today(), doneDate: null});
       taskInpEl.value = ''; refreshTodo();
     });
     taskInpEl.addEventListener('keydown', ev => { if (ev.key === 'Enter') addTaskBtnEl.click(); });
@@ -1507,7 +1507,7 @@ function buildNotesAndTodo(container) {
       taskRow.style.cssText = 'display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0ee;';
       const taskChk = document.createElement('input'); taskChk.type = 'checkbox';
       taskChk.style.cssText = 'width:18px;height:18px;accent-color:#3a6b2a;cursor:pointer;flex-shrink:0;margin-top:2px;';
-      taskChk.addEventListener('change', () => { task.done = true; task.doneDate = todayStr(); refreshTodoShared(); });
+      taskChk.addEventListener('change', () => { task.done = true; task.doneDate = today(); refreshTodoShared(); });
       const taskTextEl = document.createElement('span');
       taskTextEl.style.cssText = 'font-size:13px;flex:1;line-height:1.4;';
       taskTextEl.textContent = task.text;
@@ -1551,7 +1551,7 @@ function buildNotesAndTodo(container) {
   addTaskBtnEl.textContent = '+ Add';
   addTaskBtnEl.addEventListener('click', () => {
     const text = taskInpEl.value.trim(); if (!text) return;
-    dailyForm.todoList.push({id: uid(), text, done: false, addedDate: todayStr(), doneDate: null});
+    dailyForm.todoList.push({id: uid(), text, done: false, addedDate: today(), doneDate: null});
     taskInpEl.value = ''; refreshTodoShared();
   });
   taskInpEl.addEventListener('keydown', ev => { if (ev.key === 'Enter') addTaskBtnEl.click(); });

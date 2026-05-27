@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/RobertFry/Downloads/fsa_intake_17.html -->
+<!-- saved from url=(0055)file:///C:/Users/RobertFry/Downloads/fsa_intake_18.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -796,20 +796,20 @@ function renderStepReview(container) {
   topCard.appendChild(topType);
   container.appendChild(topCard);
 
-  // Summary
-  if (dailyForm.summary && dailyForm.summary.trim()) {
-    const summaryCard = document.createElement('div');
-    summaryCard.className = 'card';
-    const summaryTitle = document.createElement('p');
-    summaryTitle.style.cssText = 'font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;';
-    summaryTitle.textContent = "Today's summary";
-    summaryCard.appendChild(summaryTitle);
-    const summaryText = document.createElement('p');
-    summaryText.style.cssText = 'font-size:14px;color:#1a1a1a;line-height:1.5;margin:0;';
-    summaryText.textContent = dailyForm.summary;
-    summaryCard.appendChild(summaryText);
-    container.appendChild(summaryCard);
-  }
+  // Summary — editable
+  const summaryCard = document.createElement('div');
+  summaryCard.className = 'card';
+  const summaryTitle = document.createElement('p');
+  summaryTitle.style.cssText = 'font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;';
+  summaryTitle.textContent = "Today's summary";
+  summaryCard.appendChild(summaryTitle);
+  const summaryAreaEl = document.createElement('textarea');
+  summaryAreaEl.rows = 3; summaryAreaEl.value = dailyForm.summary || '';
+  summaryAreaEl.style.cssText = 'width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-family:inherit;font-size:13px;resize:vertical;';
+  summaryAreaEl.placeholder = 'Add a summary for today...';
+  summaryAreaEl.addEventListener('input', ev => { dailyForm.summary = ev.target.value; });
+  summaryCard.appendChild(summaryAreaEl);
+  container.appendChild(summaryCard);
 
   // Start / monitor checks summary
   if (dailyForm.dayTypeId === 'monitor') {
@@ -840,34 +840,36 @@ function renderStepReview(container) {
     container.appendChild(endCard);
   }
 
-  // Notes
-  if (dailyForm.notes && dailyForm.notes.trim()) {
-    const notesCard = document.createElement('div');
-    notesCard.className = 'card';
-    const notesTitle = document.createElement('p');
-    notesTitle.style.cssText = 'font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;';
-    notesTitle.textContent = 'Notes';
-    notesCard.appendChild(notesTitle);
-    const notesText = document.createElement('p');
-    notesText.style.cssText = 'font-size:13px;color:#1a1a1a;line-height:1.5;margin:0;';
-    notesText.textContent = dailyForm.notes;
-    notesCard.appendChild(notesText);
-    container.appendChild(notesCard);
-  }
+  // Notes — editable
+  const notesCardRev = document.createElement('div');
+  notesCardRev.className = 'card';
+  const notesTitleRev = document.createElement('p');
+  notesTitleRev.style.cssText = 'font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;';
+  notesTitleRev.textContent = 'Notes';
+  notesCardRev.appendChild(notesTitleRev);
+  const notesAreaRev = document.createElement('textarea');
+  notesAreaRev.rows = 3; notesAreaRev.value = dailyForm.notes || '';
+  notesAreaRev.style.cssText = 'width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-family:inherit;font-size:13px;resize:vertical;';
+  notesAreaRev.placeholder = 'Add notes...';
+  notesAreaRev.addEventListener('input', ev => { dailyForm.notes = ev.target.value; });
+  notesCardRev.appendChild(notesAreaRev);
+  container.appendChild(notesCardRev);
 
-  // Monitor notes
-  if (dailyForm.monitorNotes && dailyForm.monitorNotes.trim()) {
-    const monNotesCard = document.createElement('div');
-    monNotesCard.className = 'card';
-    const monNotesTitleEl = document.createElement('p');
-    monNotesTitleEl.style.cssText = 'font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;';
-    monNotesTitleEl.textContent = 'Notes';
-    monNotesCard.appendChild(monNotesTitleEl);
-    const monNotesTextEl = document.createElement('p');
-    monNotesTextEl.style.cssText = 'font-size:13px;color:#1a1a1a;line-height:1.5;margin:0;';
-    monNotesTextEl.textContent = dailyForm.monitorNotes;
-    monNotesCard.appendChild(monNotesTextEl);
-    container.appendChild(monNotesCard);
+  // Monitor notes — editable
+  if (dailyForm.dayTypeId === 'monitor') {
+    const monNotesCardRev = document.createElement('div');
+    monNotesCardRev.className = 'card';
+    const monNotesTitleRev = document.createElement('p');
+    monNotesTitleRev.style.cssText = 'font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;';
+    monNotesTitleRev.textContent = 'Notes';
+    monNotesCardRev.appendChild(monNotesTitleRev);
+    const monNotesAreaRev = document.createElement('textarea');
+    monNotesAreaRev.rows = 3; monNotesAreaRev.value = dailyForm.monitorNotes || '';
+    monNotesAreaRev.style.cssText = 'width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-family:inherit;font-size:13px;resize:vertical;';
+    monNotesAreaRev.placeholder = 'Add notes...';
+    monNotesAreaRev.addEventListener('input', ev => { dailyForm.monitorNotes = ev.target.value; });
+    monNotesCardRev.appendChild(monNotesAreaRev);
+    container.appendChild(monNotesCardRev);
   }
 
   // To-do list summary
