@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apply View Button Fix</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+  body{background:#f5f5f2;color:#1a1a1a;padding:1.5rem 1rem;max-width:560px;margin:0 auto;font-size:14px;line-height:1.5;}
+  h1{font-size:22px;font-weight:600;margin-bottom:6px;color:#1a1a1a;}
+  .sub{color:#888;font-size:13px;margin-bottom:1.5rem;}
+  .card{background:#fff;border:1px solid #e0e0dc;border-radius:10px;padding:1.25rem;margin-bottom:14px;}
+  label{font-size:12px;color:#666;display:block;margin-bottom:6px;font-weight:600;}
+  input[type=password],input[type=text]{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;font-family:monospace;}
+  input:focus{outline:none;border-color:#3a6b2a;}
+  .btn{padding:12px 28px;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;width:100%;margin-top:8px;}
+  .btn-primary{background:#3a6b2a;color:#fff;}
+  .btn-primary:hover{background:#2d5a20;}
+  .btn-primary:disabled{background:#aaa;cursor:not-allowed;}
+  .log{background:#1a1a1a;color:#9ee07a;padding:14px;border-radius:8px;font-family:'Courier New',monospace;font-size:12px;line-height:1.6;min-height:120px;max-height:380px;overflow-y:auto;white-space:pre-wrap;}
+  .step{padding:6px 0;}
+  .ok{color:#9ee07a;}
+  .err{color:#ff7a7a;}
+  .info{color:#9ec8ff;}
+  .warn{color:#ffd479;}
+  .hint{font-size:12px;color:#888;margin-top:6px;line-height:1.5;}
+  .save-tok{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:#666;}
+  .save-tok input{width:16px;height:16px;accent-color:#3a6b2a;cursor:pointer;}
+</style>
+</head>
+<body>
+
+<h1>Apply View Button Fix</h1>
+<p class="sub">Fixes the "View &amp; edit existing records" button by patching the live index.html directly on GitHub. One click, no copy-paste.</p>
+
+<div class="card">
+  <label for="token">GitHub token</label>
+  <input type="password" id="token" placeholder="ghp_... or github_pat_...">
+  <div class="save-tok">
+    <input type="checkbox" id="remember" checked>
+    <label for="remember" style="margin:0;cursor:pointer;font-weight:normal;">Remember on this device</label>
+  </div>
+  <p class="hint">Use your existing fsa-records push token. Token is stored only in this browser if Remember is ticked.</p>
+</div>
+
+<button class="btn btn-primary" id="go">✓ Apply the fix</button>
+
+<div class="card" style="margin-top:14px;">
+  <label>Progress</label>
+  <div class="log" id="log">Ready. Paste token above and click Apply.</div>
+</div>
+
+<script>
+const REPO_OWNER = 'artisanbyrobert';
+const REPO_NAME = 'fsa-records';
+const FILE_PATH = 'index.html';
+const BRANCH = 'main';
+const COMMIT_MSG = 'Fix: View & edit existing records button now works (renderList mode parameter)';
+
+const TOK_KEY = 'fsa_gh_token';
+const tokenInput = document.getElementById('token');
+const rememberChk = document.getElementById('remember');
+const goBtn = document.getElementById('go');
+const logEl = document.getElementById('log');
+
+// Load saved token
+try {
+  const saved = localStorage.getItem(TOK_KEY);
+  if (saved) tokenInput.value = saved;
+} catch(e) {}
+
+function log(msg, cls) {
+  const line = document.createElement('div');
+  line.className = 'step ' + (cls || '');
+  line.textContent = msg;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function clearLog() { logEl.innerHTML = ''; }
+
+goBtn.addEventListener('click', async () => {
+  const token = tokenInput.value.trim();
+  if (!token) { alert('Paste your GitHub token first'); return; }
+
+  if (rememberChk.checked) {
+    try { localStorage.setItem(TOK_KEY, token); } catch(e) {}
+  } else {
+    try { localStorage.removeItem(TOK_KEY); } catch(e) {}
+  }
+
+  goBtn.disabled = true;
+  goBtn.textContent = 'Working...';
+  clearLog();
+
+  try {
+    // ── Step 1: Fetch current index.html ──
+    log('1. Fetching current index.html from GitHub...', 'info');
+    const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}?ref=${BRANCH}`;
+    const getRes = await fetch(apiUrl, {
+      headers: {
+        'Authorization': 'token ' + token,
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    });
+    if (!getRes.ok) {
+      const err = await getRes.text();
+      throw new Error(`Could not fetch file (${getRes.status}): ${err.slice(0,200)}`);
+    }
+    const fileData = await getRes.json();
+    const sha = fileData.sha;
+    // Decode base64 content
+    const currentContent = atob(fileData.content.replace(/\n/g, ''));
+    log(`   ✓ Got file (${currentContent.length} bytes, SHA: ${sha.slice(0,7)}...)`, 'ok');
+
+    // ── Step 2: Check if fix is already applied ──
+    log('2. Checking if fix is already applied...', 'info');
+    if (currentContent.includes('function renderList(mode)') &&
+        currentContent.includes("currentView = mode === 'records'")) {
+      log('   ! Fix is already applied. Nothing to do.', 'warn');
+      goBtn.textContent = '✓ Already fixed';
+      return;
+    }
+    log('   ✓ Bug is present, ready to fix', 'ok');
+
+    // ── Step 3: Apply the 3 textual patches ──
+    log('3. Applying surgical fix (3 edits)...', 'info');
+
+    // Patch 1: function signature
+    const oldFn = 'function renderList() {';
+    const newFn = 'function renderList(mode) {';
+    if (!currentContent.includes(oldFn)) throw new Error('Could not find renderList() definition');
+    let patched = currentContent.replace(oldFn, newFn);
+    log('   ✓ Edit 1/3: renderList() → renderList(mode)', 'ok');
+
+    // Patch 2: the line that wipes currentView
+    // Find the first occurrence INSIDE renderList where currentView = 'list' is set
+    // We do this by finding the function and replacing the first matching line within it
+    const oldWipe = "  currentView = 'list';";
+    const newWipe = "  currentView = mode === 'records' ? 'list-records' : 'list';";
+    if (!patched.includes(oldWipe)) throw new Error('Could not find currentView wipe line');
+    // Replace only the first occurrence (which is inside renderList based on file structure)
+    const wipeIdx = patched.indexOf(oldWipe);
+    patched = patched.slice(0, wipeIdx) + newWipe + patched.slice(wipeIdx + oldWipe.length);
+    log('   ✓ Edit 2/3: state wipe replaced with conditional', 'ok');
+
+    // Patch 3: the click handler that sets state before calling renderList
+    const oldClick = "viewLink.addEventListener('click', () => { currentView = 'list-records'; renderList(); });";
+    const newClick = "viewLink.addEventListener('click', () => { renderList('records'); });";
+    if (!patched.includes(oldClick)) throw new Error('Could not find View link click handler');
+    patched = patched.replace(oldClick, newClick);
+    log('   ✓ Edit 3/3: View link handler updated', 'ok');
+
+    // ── Step 4: Safety checks before pushing ──
+    log('4. Running safety checks...', 'info');
+    const opens = (patched.match(/{/g) || []).length;
+    const closes = (patched.match(/}/g) || []).length;
+    if (opens !== closes) throw new Error(`Brace mismatch: ${opens} open vs ${closes} close. Aborting.`);
+    log(`   ✓ Braces balanced (${opens} open, ${closes} close)`, 'ok');
+
+    const fnCount = (patched.match(/function renderList\(mode\)/g) || []).length;
+    if (fnCount !== 1) throw new Error(`Expected 1 renderList(mode) definition, found ${fnCount}`);
+    log(`   ✓ Exactly one renderList(mode) definition`, 'ok');
+
+    if (Math.abs(patched.length - currentContent.length) > 200) {
+      throw new Error(`File size changed too much (${currentContent.length} → ${patched.length}). Aborting.`);
+    }
+    log(`   ✓ Size delta safe (${currentContent.length} → ${patched.length})`, 'ok');
+
+    // ── Step 5: Push to GitHub ──
+    log('5. Pushing to GitHub...', 'info');
+    // Encode content as base64
+    const newContentB64 = btoa(unescape(encodeURIComponent(patched)));
+    const putRes = await fetch(apiUrl, {
+      method: 'PUT',
+      headers: {
+        'Authorization': 'token ' + token,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message: COMMIT_MSG,
+        content: newContentB64,
+        sha: sha,
+        branch: BRANCH
+      })
+    });
+    if (!putRes.ok) {
+      const err = await putRes.text();
+      throw new Error(`Push failed (${putRes.status}): ${err.slice(0,300)}`);
+    }
+    const result = await putRes.json();
+    log(`   ✓ Pushed! Commit: ${result.commit.sha.slice(0,7)}`, 'ok');
+    log('', '');
+    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'ok');
+    log('✓ FIX DEPLOYED', 'ok');
+    log('Wait 1-2 minutes for GitHub Pages to rebuild,', 'info');
+    log('then hard-reload the app on your phone.', 'info');
+    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'ok');
+    goBtn.textContent = '✓ Done';
+
+  } catch(err) {
+    log('', '');
+    log('✗ ERROR — nothing was pushed', 'err');
+    log(err.message, 'err');
+    log('', '');
+    log('Your file on GitHub is unchanged. Safe to retry.', 'warn');
+    goBtn.disabled = false;
+    goBtn.textContent = '✓ Apply the fix';
+  }
+});
+</script>
+
+</body></html>
