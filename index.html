@@ -2504,7 +2504,7 @@ function blankPestRecord() {
     ? [...pestRecords].sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); })[0]
     : null;
   const stations = lastRecord && lastRecord.stations
-    ? lastRecord.stations.map(function(s) { return {id: uid(), name: s.name, status: 'replaced', notes: ''}; })
+    ? lastRecord.stations.map(function(s) { return {id: uid(), name: s.name, status: '', notes: ''}; })
     : [];
   return {
     id: uid(),
@@ -2769,7 +2769,7 @@ function renderPestForm() {
 
   // Bait stations section
   vP.appendChild(p('section-title', 'Bait stations'));
-  const stationsHelp = p('muted', 'Replaced bait is the default. Untick and switch to "No activity" if a station shows no signs of pest activity.');
+  const stationsHelp = p('muted', 'Tap "Replaced bait" or "No activity" for each station you visited today. Skip any you didn\'t visit — they\'ll be left off the saved record.');
   stationsHelp.style.cssText = 'margin-bottom:10px;font-size:12px;';
   vP.appendChild(stationsHelp);
   const stationsContainer = div('');
@@ -2895,6 +2895,10 @@ function renderPestForm() {
   const saveBar = div('save-bar');
   const saveBtn = btn('btn-primary', pestEditId ? 'Save changes' : 'Save pest check', function() {
     const rec = Object.assign({}, pestForm, {id: pestEditId || uid()});
+    // Strip stations where no status was chosen — user skipped them
+    rec.stations = (rec.stations || []).filter(function(s) {
+      return s.status === 'replaced' || s.status === 'no_activity';
+    });
     if (pestEditId) {
       pestRecords = pestRecords.map(function(r) { return r.id === pestEditId ? rec : r; });
     } else {
