@@ -149,6 +149,7 @@
   <div id="view-delivery" style="display:none"></div>
   <div id="view-daily" style="display:none"></div>
   <div id="view-pest" style="display:none"></div>
+  <div id="view-prod" style="display:none"></div>
 </div>
 
 <script>
@@ -158,7 +159,8 @@ const KEY = 'fsa_intake_v1';
 let sb = null;
 
 let species = ['Pheasant','Partridge','Rabbit','Hare','Venison','Mallard','Other'];
-let intakes = [], deliveries = [], dailyRecords = [], pestRecords = [], estates = [], processors = [], parts = [
+let speciesFat = {Pheasant: 20, Partridge: 25, Venison: 25};
+let intakes = [], deliveries = [], dailyRecords = [], pestRecords = [], productionRecords = [], estates = [], processors = [], parts = [
   'Whole','Leg','Shoulder','Breast','Saddle','Haunch','Loin','Carcass','Mixed cuts'
 ];
 let currentView = 'list';
@@ -200,6 +202,7 @@ async function loadData() {
       deliveries = deliveryRows.filter(r => !r.data._type).map(r => r.data);
       dailyRecords = deliveryRows.filter(r => r.data._type === 'daily').map(r => r.data);
       pestRecords = deliveryRows.filter(r => r.data._type === 'pest').map(r => r.data);
+      productionRecords = deliveryRows.filter(r => r.data._type === 'production').map(r => r.data);
     }
 
     const {data: configRows} = await sb.from('app_config').select('*');
@@ -209,6 +212,7 @@ async function loadData() {
         if (row.key === 'processors' && row.data.length) processors = row.data;
         if (row.key === 'parts' && row.data.length) parts = row.data;
         if (row.key === 'species' && row.data.length) species = row.data;
+        if (row.key === 'speciesFat' && row.data) speciesFat = Object.assign(speciesFat, row.data);
       }
     }
 
@@ -255,11 +259,15 @@ async function saveData() {
     await sb.from('app_config').upsert({key: 'processors', data: processors});
     await sb.from('app_config').upsert({key: 'parts', data: parts});
     await sb.from('app_config').upsert({key: 'species', data: species});
+    await sb.from('app_config').upsert({key: 'speciesFat', data: speciesFat});
     for (const dr of dailyRecords) {
       await sb.from('deliveries').upsert({id: 'daily_' + dr.id, data: {...dr, _type: 'daily'}});
     }
     for (const pr of pestRecords) {
       await sb.from('deliveries').upsert({id: 'pest_' + pr.id, data: {...pr, _type: 'pest'}});
+    }
+    for (const r of productionRecords) {
+      await sb.from('deliveries').upsert({id: 'prod_' + r.id, data: {...r, _type: 'production'}});
     }
 
     showStatus('saved');
@@ -464,7 +472,7 @@ function renderTabs(activeTab) {
   bar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:0;margin-bottom:1.5rem;border-bottom:2px solid #e0e0dc;';
   const tabsLeft = div('row');
   tabsLeft.style.gap = '0';
-  const tabs = [['list','Intake records'],['daily','Daily Record'],['delivery','Finished Product'],['wetmeat','Wet Meat'],['pest','Pest Control'],['manage','Manage']];
+  const tabs = [['list','Intake records'],['daily','Daily Record'],['delivery','Finished Product'],['wetmeat','Wet Meat'],['pest','Pest Control'],['prod','Production'],['manage','Manage']];
   for (const [id, label] of tabs) {
     const b = btn(`tab-btn${activeTab===id?' active':''}`, label, () => {
       if (id === 'list') renderList();
@@ -472,6 +480,7 @@ function renderTabs(activeTab) {
       else if (id === 'delivery') renderDeliveryList();
       else if (id === 'wetmeat') renderWetMeat();
       else if (id === 'pest') renderPestControl();
+      else if (id === 'prod') renderProduction();
       else renderManage();
     });
     tabsLeft.appendChild(b);
@@ -715,6 +724,7 @@ function renderDailyHome() {
 function renderDailyRecordsList() {
   document.getElementById('view-daily').style.display = 'none';
   if(document.getElementById('view-pest'))document.getElementById('view-pest').style.display = 'none';
+  if(document.getElementById('view-prod'))document.getElementById('view-prod').style.display = 'none';
   const listEl = document.getElementById('view-daily');
   if (!listEl) return;
   listEl.style.display = 'block'; listEl.innerHTML = '';
@@ -1497,6 +1507,7 @@ function blankDelivery() {
 function renderDeliveryList() {
   currentView = 'delivery';
   if(document.getElementById('view-pest'))document.getElementById('view-pest').style.display = 'none';
+  if(document.getElementById('view-prod'))document.getElementById('view-prod').style.display = 'none';
   document.getElementById('view-list').style.display = 'none';
   document.getElementById('view-form').style.display = 'none';
   if(document.getElementById('view-daily'))document.getElementById('view-daily').style.display = 'none';
@@ -1570,6 +1581,7 @@ function renderDeliveryList() {
 function renderDeliveryForm(dform, dEditId) {
   currentView = 'delivery-form';
   if(document.getElementById('view-pest'))document.getElementById('view-pest').style.display = 'none';
+  if(document.getElementById('view-prod'))document.getElementById('view-prod').style.display = 'none';
   document.getElementById('view-list').style.display = 'none';
   document.getElementById('view-form').style.display = 'none';
   document.getElementById('view-manage').style.display = 'none';
@@ -1788,6 +1800,7 @@ function renderDeliveryForm(dform, dEditId) {
 function renderWetMeat() {
   currentView = 'wetmeat';
   if(document.getElementById('view-pest'))document.getElementById('view-pest').style.display = 'none';
+  if(document.getElementById('view-prod'))document.getElementById('view-prod').style.display = 'none';
   if(document.getElementById('view-daily'))document.getElementById('view-daily').style.display = 'none';
   document.getElementById('view-list').style.display = 'none';
   document.getElementById('view-form').style.display = 'none';
@@ -1868,6 +1881,7 @@ function renderWetMeat() {
 function renderManage() {
   currentView = 'manage';
   if(document.getElementById('view-pest'))document.getElementById('view-pest').style.display = 'none';
+  if(document.getElementById('view-prod'))document.getElementById('view-prod').style.display = 'none';
   if(document.getElementById('view-daily'))document.getElementById('view-daily').style.display = 'none';
   document.getElementById('view-list').style.display = 'none';
   document.getElementById('view-form').style.display = 'none';
@@ -1969,6 +1983,7 @@ function renderManage() {
 function renderList(mode) {
   currentView = mode === 'records' ? 'list-records' : 'list';
   if(document.getElementById('view-pest'))document.getElementById('view-pest').style.display = 'none';
+  if(document.getElementById('view-prod'))document.getElementById('view-prod').style.display = 'none';
   document.getElementById('view-form').style.display = 'none';
   document.getElementById('view-manage').style.display = 'none';
   if(document.getElementById('view-wetmeat'))document.getElementById('view-wetmeat').style.display = 'none';
@@ -2100,6 +2115,7 @@ function renderList(mode) {
 function renderForm() {
   currentView = 'form';
   if(document.getElementById('view-pest'))document.getElementById('view-pest').style.display = 'none';
+  if(document.getElementById('view-prod'))document.getElementById('view-prod').style.display = 'none';
   document.getElementById('view-list').style.display = 'none';
   document.getElementById('view-manage').style.display = 'none';
   const v = document.getElementById('view-form');
@@ -2922,6 +2938,535 @@ function renderPestForm() {
   });
   saveBar.appendChild(cancelBtn);
   vP.appendChild(saveBar);
+}
+
+// ── Production ────────────────────────────────────────────────────────────────
+let prodForm = null;
+let prodEditId = null;
+let prodStageEdit = null;
+
+function processCodeFromDate(dateStr) {
+  return (dateStr || today()).replace(/-/g, '');
+}
+
+function getSpeciesForBatch(batchCode) {
+  const intake = intakes.find(function(i){ return i.batchCode === batchCode; });
+  if (!intake || !intake.items || !intake.items[0]) return '';
+  const sp = intake.items[0].species;
+  return sp === 'Other' ? (intake.items[0].custom || 'Other') : sp;
+}
+
+function getFatPercentForSpecies(speciesName) {
+  if (!speciesName) return null;
+  return Object.prototype.hasOwnProperty.call(speciesFat, speciesName) ? speciesFat[speciesName] : null;
+}
+
+function runsForBatch(batchCode) {
+  return productionRecords.filter(function(r){ return r.batchCode === batchCode; });
+}
+
+function blankProductionRecord(batchCode) {
+  const speciesName = getSpeciesForBatch(batchCode);
+  return {
+    id: uid(),
+    processCode: processCodeFromDate(today()),
+    startDate: today(),
+    finishedDate: null,
+    batchCode: batchCode,
+    speciesName: speciesName,
+    fatPercent: getFatPercentForSpecies(speciesName),
+    status: 'in_progress',
+    stages: [],
+    runNumber: runsForBatch(batchCode).length + 1
+  };
+}
+
+function hideAllExceptProd() {
+  document.getElementById('view-list').style.display = 'none';
+  document.getElementById('view-form').style.display = 'none';
+  if(document.getElementById('view-daily'))document.getElementById('view-daily').style.display = 'none';
+  document.getElementById('view-manage').style.display = 'none';
+  document.getElementById('view-wetmeat').style.display = 'none';
+  document.getElementById('view-delivery').style.display = 'none';
+  if(document.getElementById('view-pest'))document.getElementById('view-pest').style.display = 'none';
+  document.getElementById('view-prod').style.display = 'block';
+}
+
+function renderProduction() {
+  currentView = 'prod';
+  hideAllExceptProd();
+  const v = document.getElementById('view-prod');
+  v.innerHTML = '';
+  renderTabs('prod');
+
+  const hdr = div('header-bar');
+  const hdrLeft = div('');
+  hdrLeft.appendChild(el('h2', {style:'font-size:18px;font-weight:600;margin:0;'}, 'Production runs'));
+  const inProg = productionRecords.filter(function(r){ return r.status === 'in_progress'; });
+  const fin = productionRecords.filter(function(r){ return r.status === 'finished'; });
+  hdrLeft.appendChild(p('muted', inProg.length + ' in progress · ' + fin.length + ' finished'));
+  hdr.appendChild(hdrLeft);
+  const newBtn = btn('btn-primary', '+ Start new run', startNewProductionRun);
+  hdr.appendChild(newBtn);
+  v.appendChild(hdr);
+
+  if (inProg.length === 0 && fin.length === 0) {
+    const empty = div('empty-state');
+    empty.appendChild(el('h3', {}, 'No production runs yet'));
+    empty.appendChild(p('', 'Start your first run when you defrost a batch of meat.'));
+    const b = btn('btn-primary big-btn', '+ Start new run', startNewProductionRun);
+    empty.appendChild(b);
+    v.appendChild(empty);
+    return;
+  }
+
+  if (inProg.length > 0) {
+    const sec = div('');
+    sec.appendChild(el('h3', {style:'font-size:14px;font-weight:600;color:#27500a;margin:1rem 0 8px;'}, 'In progress'));
+    inProg.sort(function(a,b){ return (b.startDate||'').localeCompare(a.startDate||''); }).forEach(function(r){
+      sec.appendChild(productionCardSummary(r));
+    });
+    v.appendChild(sec);
+  }
+
+  if (fin.length > 0) {
+    const linkBtn = document.createElement('button');
+    linkBtn.style.cssText = 'background:none;border:none;color:#888;font-size:12px;cursor:pointer;text-decoration:underline;display:block;margin:1.5rem auto 0;';
+    linkBtn.textContent = 'View finished runs (' + fin.length + ')';
+    linkBtn.addEventListener('click', renderProductionRecordsList);
+    v.appendChild(linkBtn);
+  }
+}
+
+function productionCardSummary(r) {
+  const card = div('card');
+  card.style.cssText = 'cursor:pointer;margin-bottom:10px;';
+  const top = div('row-sb');
+  top.style.marginBottom = '6px';
+  const left = div(''); left.style.flex = '1';
+  left.appendChild(el('span', {style:'font-size:15px;font-weight:600;color:#1a1a1a;'}, (r.speciesName || 'Run')));
+  left.appendChild(el('span', {className:'muted'}, ' · run ' + (r.runNumber || '?') + ' from ' + (r.batchCode || '?')));
+  top.appendChild(left);
+  const pillBg = r.status === 'finished' ? '#eaf3de' : '#faeeda';
+  const pillFg = r.status === 'finished' ? '#27500a' : '#633806';
+  top.appendChild(el('span', {style:'background:'+pillBg+';color:'+pillFg+';font-size:11px;padding:3px 10px;border-radius:8px;white-space:nowrap;'}, r.status === 'finished' ? 'Finished' : 'In progress'));
+  card.appendChild(top);
+  const stageCount = (r.stages || []).length;
+  card.appendChild(p('muted', 'Process ' + (r.processCode || '?') + ' · ' + stageCount + ' day' + (stageCount===1?'':'s') + ' worked'));
+  card.addEventListener('click', function(){ openProductionRun(r.id); });
+  return card;
+}
+
+function startNewProductionRun() {
+  hideAllExceptProd();
+  const v = document.getElementById('view-prod');
+  v.innerHTML = '';
+  renderTabs('prod');
+  const hdr = div('header-bar');
+  hdr.appendChild(el('h2', {style:'font-size:18px;font-weight:600;margin:0;'}, 'Start a new production run'));
+  const backBtn = btn('', '← Back', renderProduction);
+  hdr.appendChild(backBtn);
+  v.appendChild(hdr);
+
+  const card = div('card');
+  card.appendChild(p('', 'Which intake batch is this run from?'));
+  if (intakes.length === 0) {
+    card.appendChild(p('muted', 'No intake records yet — book the meat in first under Intake Records.'));
+    v.appendChild(card);
+    return;
+  }
+  const sortedIntakes = [...intakes].sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  const sel = document.createElement('select');
+  sel.style.cssText = 'width:100%;margin:8px 0 12px;';
+  const blank = document.createElement('option'); blank.value=''; blank.textContent='— pick a batch —';
+  sel.appendChild(blank);
+  sortedIntakes.forEach(function(i){
+    const sp = (i.items && i.items[0]) ? (i.items[0].species==='Other'?(i.items[0].custom||'Other'):i.items[0].species) : '';
+    const estName = getName(estates, i.estateId);
+    const op = document.createElement('option');
+    op.value = i.batchCode;
+    op.textContent = i.batchCode + ' · ' + sp + ' · ' + fmtDate(i.date) + (estName?(' · '+estName):'');
+    sel.appendChild(op);
+  });
+  card.appendChild(sel);
+
+  const startBtn = btn('btn-primary', 'Start run', function(){
+    if (!sel.value) { showToast('Pick a batch first'); return; }
+    const batchCode = sel.value;
+    const speciesName = getSpeciesForBatch(batchCode);
+    const fatPct = getFatPercentForSpecies(speciesName);
+    if (fatPct === null && speciesName) {
+      promptForFatPercent(speciesName, function(pct){
+        speciesFat[speciesName] = pct;
+        saveData();
+        actuallyStartRun(batchCode);
+      });
+    } else {
+      actuallyStartRun(batchCode);
+    }
+  });
+  card.appendChild(startBtn);
+  const cancelBtn = btn('', 'Cancel', renderProduction);
+  cancelBtn.style.marginLeft = '8px';
+  card.appendChild(cancelBtn);
+  v.appendChild(card);
+}
+
+function promptForFatPercent(speciesName, onSet) {
+  hideAllExceptProd();
+  const v = document.getElementById('view-prod');
+  v.innerHTML = '';
+  renderTabs('prod');
+  const hdr = div('header-bar');
+  hdr.appendChild(el('h2', {style:'font-size:18px;font-weight:600;margin:0;'}, 'Set fat % for ' + speciesName));
+  v.appendChild(hdr);
+  const card = div('card');
+  card.appendChild(p('', 'No fat % saved yet for ' + speciesName + '. What percentage of fat is in the finished mince for ' + speciesName + '?'));
+  card.appendChild(p('muted', 'For example: pheasant 20%, venison 25%. You only need to set this once per species — it gets remembered for next time.'));
+  const inp = input({type:'number', min:'1', max:'60', step:'1', value:'25'});
+  inp.style.cssText = 'width:120px;margin:8px 0 12px;';
+  card.appendChild(inp);
+  const saveBtn = btn('btn-primary', 'Save and continue', function(){
+    const val = parseFloat(inp.value);
+    if (isNaN(val) || val < 1 || val > 60) { showToast('Enter a value between 1 and 60'); return; }
+    onSet(val);
+  });
+  card.appendChild(saveBtn);
+  const cancelBtn = btn('', 'Cancel', renderProduction);
+  cancelBtn.style.marginLeft = '8px';
+  card.appendChild(cancelBtn);
+  v.appendChild(card);
+}
+
+function actuallyStartRun(batchCode) {
+  const r = blankProductionRecord(batchCode);
+  productionRecords.push(r);
+  saveData();
+  openProductionRun(r.id);
+}
+
+function openProductionRun(id) {
+  const r = productionRecords.find(function(x){ return x.id === id; });
+  if (!r) { renderProduction(); return; }
+  prodForm = JSON.parse(JSON.stringify(r));
+  prodEditId = id;
+  prodStageEdit = null;
+  renderProductionForm();
+}
+
+function renderProductionForm() {
+  if (!prodForm) { renderProduction(); return; }
+  hideAllExceptProd();
+  const v = document.getElementById('view-prod');
+  v.innerHTML = '';
+  renderTabs('prod');
+
+  if (prodStageEdit) {
+    renderStageForm();
+    return;
+  }
+
+  const hdr = div('header-bar');
+  hdr.appendChild(el('h2', {style:'font-size:18px;font-weight:600;margin:0;'}, prodForm.speciesName || 'Production run'));
+  const backBtn = btn('', '← Back', function(){ prodForm = null; prodEditId = null; prodStageEdit = null; renderProduction(); });
+  hdr.appendChild(backBtn);
+  v.appendChild(hdr);
+
+  const card = div('card');
+  const top = div('row-sb');
+  top.style.marginBottom = '12px';
+  const titleSide = div('');
+  titleSide.appendChild(el('p', {style:'font-size:13px;color:#888;margin:0 0 2px;'}, 'Run ' + (prodForm.runNumber || '?') + ' from this batch'));
+  titleSide.appendChild(el('p', {style:'font-size:16px;font-weight:600;margin:0;'}, prodForm.speciesName || ''));
+  top.appendChild(titleSide);
+  const pillBg = prodForm.status === 'finished' ? '#eaf3de' : '#faeeda';
+  const pillFg = prodForm.status === 'finished' ? '#27500a' : '#633806';
+  top.appendChild(el('span', {style:'background:'+pillBg+';color:'+pillFg+';font-size:12px;padding:4px 12px;border-radius:8px;white-space:nowrap;'}, prodForm.status === 'finished' ? 'Finished' : 'In progress'));
+  card.appendChild(top);
+
+  const codes = div('');
+  codes.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;';
+  const bcBox = div(''); bcBox.style.cssText = 'background:#f5f5f4;border-radius:6px;padding:10px 12px;';
+  bcBox.appendChild(el('p', {style:'font-size:11px;color:#888;margin:0 0 3px;'}, 'Batch code'));
+  bcBox.appendChild(el('p', {style:'font-family:monospace;font-size:16px;font-weight:500;margin:0;letter-spacing:1px;'}, prodForm.batchCode || '—'));
+  codes.appendChild(bcBox);
+  const pcBox = div(''); pcBox.style.cssText = 'background:#f5f5f4;border-radius:6px;padding:10px 12px;';
+  pcBox.appendChild(el('p', {style:'font-size:11px;color:#888;margin:0 0 3px;'}, 'Process code'));
+  pcBox.appendChild(el('p', {style:'font-family:monospace;font-size:16px;font-weight:500;color:#27500a;margin:0;letter-spacing:1px;'}, prodForm.processCode || '—'));
+  codes.appendChild(pcBox);
+  card.appendChild(codes);
+
+  card.appendChild(el('p', {style:'font-size:13px;font-weight:500;color:#27500a;margin:0 0 8px;'}, 'Days worked on this batch'));
+  const stagesContainer = div('');
+  stagesContainer.style.cssText = 'display:flex;flex-direction:column;gap:6px;margin-bottom:14px;';
+  if (!prodForm.stages || prodForm.stages.length === 0) {
+    stagesContainer.appendChild(p('muted', 'No days logged yet. Tap below to add your first.'));
+  } else {
+    prodForm.stages.forEach(function(s, idx){
+      stagesContainer.appendChild(stageRowSummary(s, idx));
+    });
+  }
+  card.appendChild(stagesContainer);
+
+  if (prodForm.status !== 'finished') {
+    const addBtn = btn('btn-primary', '+ Add today\'s stage', function(){
+      prodStageEdit = {picker: true};
+      renderProductionForm();
+    });
+    addBtn.style.marginRight = '8px';
+    card.appendChild(addBtn);
+    const finBtn = btn('', 'Mark batch finished', function(){
+      if (!confirm('Mark this batch finished? You can still view it after, but no more stages can be added.')) return;
+      prodForm.status = 'finished';
+      prodForm.finishedDate = today();
+      saveAndReturn();
+    });
+    card.appendChild(finBtn);
+  }
+  v.appendChild(card);
+
+  const delBar = div('');
+  delBar.style.cssText = 'margin-top:1.5rem;text-align:center;';
+  const delBtn = btn('btn-sm btn-danger', 'Delete this run', function(){
+    if (!confirm('Delete this entire production run? This cannot be undone.')) return;
+    productionRecords = productionRecords.filter(function(r){ return r.id !== prodEditId; });
+    saveData();
+    showToast('Run deleted');
+    prodForm = null; prodEditId = null;
+    renderProduction();
+  });
+  delBar.appendChild(delBtn);
+  v.appendChild(delBar);
+}
+
+function stageRowSummary(s, idx) {
+  const row = div('');
+  row.style.cssText = 'display:flex;align-items:flex-start;gap:10px;background:#f9fdf8;border:1px solid #d0e8c8;border-radius:8px;padding:10px 12px;';
+  const icon = {defrost:'❄️', mince:'🔪', stuff_hang:'🌭'}[s.type] || '•';
+  const typeName = {defrost:'Defrost', mince:'Prep, wash & mince', stuff_hang:'Stuffing & hanging'}[s.type] || s.type;
+  let summary = '';
+  if (s.type === 'defrost') summary = (s.meatKg ? s.meatKg + 'kg meat out' : '');
+  else if (s.type === 'mince') summary = (s.fatKg ? s.fatKg + 'kg fat · ' + (s.totalKg || '?') + 'kg total' : 'fat calculated');
+  else if (s.type === 'stuff_hang') summary = (s.count ? s.count + (s.unitGrams ? ' × ' + s.unitGrams + 'g' : ' salami') : '');
+  const main = div(''); main.style.flex = '1';
+  main.appendChild(el('p', {style:'font-size:13px;font-weight:500;margin:0 0 2px;'}, icon + ' ' + typeName));
+  main.appendChild(el('p', {style:'font-size:12px;color:#888;margin:0;'}, fmtDate(s.date) + (summary ? ' · ' + summary : '')));
+  if (s.notes) main.appendChild(el('p', {style:'font-size:12px;color:#444;margin:4px 0 0;font-style:italic;'}, '"' + s.notes + '"'));
+  row.appendChild(main);
+  if (prodForm.status !== 'finished') {
+    const rmBtn = btn('btn-sm btn-danger', '✕', function(){
+      if (!confirm('Remove this ' + typeName + ' stage?')) return;
+      prodForm.stages.splice(idx, 1);
+      saveAndStay();
+    });
+    rmBtn.style.cssText += ';padding:4px 8px;flex-shrink:0;';
+    row.appendChild(rmBtn);
+  }
+  return row;
+}
+
+function renderStageForm() {
+  const v = document.getElementById('view-prod');
+  v.innerHTML = '';
+  renderTabs('prod');
+  const hdr = div('header-bar');
+  hdr.appendChild(el('h2', {style:'font-size:18px;font-weight:600;margin:0;'}, 'Add today\'s stage'));
+  const backBtn = btn('', '← Back', function(){ prodStageEdit = null; renderProductionForm(); });
+  hdr.appendChild(backBtn);
+  v.appendChild(hdr);
+
+  if (prodStageEdit && prodStageEdit.picker) {
+    const card = div('card');
+    card.appendChild(p('', 'What type of day was today?'));
+    [['defrost','❄️ Defrost day','Took meat (or fat) out to defrost'],
+     ['mince','🔪 Prep, wash & mince day','Washed and minced — fat calculation appears here'],
+     ['stuff_hang','🌭 Stuffing & hanging day','Stuffed into skins and hung']
+    ].forEach(function(tr){
+      const t = tr[0], lbl = tr[1], desc = tr[2];
+      const tBtn = document.createElement('button');
+      tBtn.style.cssText = 'display:block;width:100%;text-align:left;margin-bottom:8px;padding:12px 14px;border:1px solid #d0e8c8;border-radius:8px;background:#fff;cursor:pointer;';
+      tBtn.innerHTML = '<p style="font-size:14px;font-weight:500;margin:0 0 2px;">' + lbl + '</p>' +
+                       '<p style="font-size:12px;color:#666;margin:0;">' + desc + '</p>';
+      tBtn.addEventListener('click', function(){
+        prodStageEdit = {type: t, date: today(), notes: ''};
+        renderProductionForm();
+      });
+      card.appendChild(tBtn);
+    });
+    v.appendChild(card);
+    return;
+  }
+
+  const t = prodStageEdit.type;
+  const card = div('card');
+  const typeName = {defrost:'Defrost day', mince:'Prep, wash & mince day', stuff_hang:'Stuffing & hanging day'}[t] || t;
+  card.appendChild(el('h3', {style:'font-size:16px;font-weight:600;margin:0 0 12px;'}, typeName));
+
+  const dateField = div('field');
+  dateField.appendChild(label('Date'));
+  const dateInp = input({type:'date', value: prodStageEdit.date || today()});
+  dateInp.addEventListener('change', function(e){ prodStageEdit.date = e.target.value; });
+  dateField.appendChild(dateInp);
+  card.appendChild(dateField);
+
+  if (t === 'defrost') {
+    const meatField = div('field'); meatField.style.marginTop = '12px';
+    meatField.appendChild(label('Meat quantity out of freezer (kg)'));
+    const meatInp = input({type:'number', min:'0', step:'0.1', value: prodStageEdit.meatKg || ''});
+    meatInp.placeholder = 'e.g. 30';
+    meatInp.addEventListener('input', function(e){ prodStageEdit.meatKg = parseFloat(e.target.value) || 0; });
+    meatField.appendChild(meatInp);
+    meatField.appendChild(p('muted', 'If today was just a fat-defrost top-up, leave this blank and put a note below.'));
+    card.appendChild(meatField);
+  } else if (t === 'mince') {
+    const defrostStages = (prodForm.stages || []).filter(function(s){ return s.type === 'defrost' && s.meatKg > 0; }).sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+    if (defrostStages.length === 0) {
+      const warn = div('');
+      warn.style.cssText = 'background:#faeeda;border:1px solid #f0d4a8;border-radius:8px;padding:12px 14px;margin-top:12px;';
+      warn.appendChild(p('', 'Add a Defrost day first (with the meat quantity), then come back to record the mince. The fat calculation needs to know how much meat you took out.'));
+      card.appendChild(warn);
+    } else {
+      const meatKg = defrostStages[0].meatKg;
+      const fatPct = prodForm.fatPercent || 25;
+      const fat = meatKg * (fatPct / 100);
+      const total = meatKg + fat;
+      const leanCompPct = total > 0 ? Math.round((meatKg / total) * 1000) / 10 : 100;
+      const fatCompPct = total > 0 ? Math.round((fat / total) * 1000) / 10 : 0;
+      prodStageEdit.meatKg = meatKg;
+      prodStageEdit.fatKg = Math.round(fat * 100) / 100;
+      prodStageEdit.totalKg = Math.round(total * 100) / 100;
+      prodStageEdit.fatPercent = fatPct;
+
+      const calcCard = div('');
+      calcCard.style.cssText = 'background:#f9fdf8;border:1px solid #d0e8c8;border-radius:8px;padding:14px 16px;margin-top:12px;';
+      calcCard.appendChild(el('p', {style:'font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px;'}, 'Fat calculation · ' + (prodForm.speciesName||'') + ' ' + fatPct + '%'));
+      const grid = div('');
+      grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;';
+      [['Meat (lean)', (Math.round(meatKg*100)/100) + ' kg'],
+       ['Add fat', prodStageEdit.fatKg + ' kg'],
+       ['Total mix', prodStageEdit.totalKg + ' kg']
+      ].forEach(function(pair){
+        const b = div('');
+        b.style.cssText = 'background:#fff;border-radius:6px;padding:8px 10px;text-align:center;';
+        b.appendChild(el('p', {style:'font-size:10px;color:#888;margin:0 0 2px;'}, pair[0]));
+        b.appendChild(el('p', {style:'font-size:14px;font-weight:600;margin:0;color:#1a1a1a;'}, pair[1]));
+        grid.appendChild(b);
+      });
+      calcCard.appendChild(grid);
+      calcCard.appendChild(el('p', {style:'font-size:11px;color:#888;margin:0 0 4px;'}, 'How lean the mix is'));
+      const bar = document.createElement('div');
+      bar.style.cssText = 'display:flex;width:100%;height:36px;border-radius:6px;overflow:hidden;';
+      const leanSeg = document.createElement('div');
+      leanSeg.style.cssText = 'background:#A32D2D;display:flex;align-items:center;justify-content:center;width:' + leanCompPct + '%;';
+      leanSeg.innerHTML = '<span style="color:#FCEBEB;font-size:12px;font-weight:500;white-space:nowrap;padding:0 6px;">Lean ' + (Math.round(meatKg*100)/100) + 'kg</span>';
+      bar.appendChild(leanSeg);
+      const fatSeg = document.createElement('div');
+      fatSeg.style.cssText = 'background:#FAC775;display:flex;align-items:center;justify-content:center;width:' + fatCompPct + '%;';
+      fatSeg.innerHTML = '<span style="color:#412402;font-size:12px;font-weight:500;white-space:nowrap;padding:0 6px;">Fat ' + prodStageEdit.fatKg + 'kg</span>';
+      bar.appendChild(fatSeg);
+      calcCard.appendChild(bar);
+      const pcts = div('');
+      pcts.style.cssText = 'display:flex;justify-content:space-between;font-size:10px;color:#888;margin-top:4px;';
+      pcts.appendChild(el('span', {}, Math.round(leanCompPct) + '% lean'));
+      pcts.appendChild(el('span', {}, Math.round(fatCompPct) + '% fat'));
+      calcCard.appendChild(pcts);
+      card.appendChild(calcCard);
+    }
+  } else if (t === 'stuff_hang') {
+    const countField = div('field'); countField.style.marginTop = '12px';
+    countField.appendChild(label('Number of salami made today'));
+    const countInp = input({type:'number', min:'0', step:'1', value: prodStageEdit.count || ''});
+    countInp.placeholder = 'e.g. 24';
+    countInp.addEventListener('input', function(e){ prodStageEdit.count = parseInt(e.target.value) || 0; });
+    countField.appendChild(countInp);
+    card.appendChild(countField);
+
+    const sizeField = div('field'); sizeField.style.marginTop = '12px';
+    sizeField.appendChild(label('Size of each (grams) — optional, varies by client'));
+    const sizeInp = input({type:'number', min:'0', step:'10', value: prodStageEdit.unitGrams || ''});
+    sizeInp.placeholder = 'e.g. 400';
+    sizeInp.addEventListener('input', function(e){ prodStageEdit.unitGrams = parseInt(e.target.value) || 0; });
+    sizeField.appendChild(sizeInp);
+    card.appendChild(sizeField);
+  }
+
+  const notesField = div('field'); notesField.style.marginTop = '12px';
+  notesField.appendChild(label('Notes (optional — what went well, what didn\'t)'));
+  const notesInp = document.createElement('textarea');
+  notesInp.rows = 3;
+  notesInp.value = prodStageEdit.notes || '';
+  notesInp.placeholder = 'e.g. "overfilled, bent mixer, stuffing pushed to tomorrow"';
+  notesInp.addEventListener('input', function(e){ prodStageEdit.notes = e.target.value; });
+  notesField.appendChild(notesInp);
+  card.appendChild(notesField);
+
+  v.appendChild(card);
+
+  const saveBar = div('save-bar');
+  const saveBtn = btn('btn-primary', 'Save stage', function(){
+    if (t === 'defrost' && (!prodStageEdit.meatKg || prodStageEdit.meatKg <= 0) && !prodStageEdit.notes) {
+      showToast('Enter the meat quantity or a note about what was defrosted'); return;
+    }
+    if (t === 'mince') {
+      const defrostStages = (prodForm.stages || []).filter(function(s){ return s.type === 'defrost' && s.meatKg > 0; });
+      if (defrostStages.length === 0) {
+        showToast('Add a Defrost day before saving a Mince stage'); return;
+      }
+    }
+    if (t === 'stuff_hang' && (!prodStageEdit.count || prodStageEdit.count <= 0)) {
+      showToast('Enter how many salami you made today'); return;
+    }
+    prodForm.stages = prodForm.stages || [];
+    const toSave = Object.assign({}, prodStageEdit);
+    delete toSave.picker;
+    prodForm.stages.push(toSave);
+    prodStageEdit = null;
+    saveAndStay();
+  });
+  saveBar.appendChild(saveBtn);
+  const cancelBtn = btn('', 'Cancel', function(){ prodStageEdit = null; renderProductionForm(); });
+  saveBar.appendChild(cancelBtn);
+  v.appendChild(saveBar);
+}
+
+function saveAndStay() {
+  if (!prodEditId) return;
+  productionRecords = productionRecords.map(function(r){ return r.id === prodEditId ? Object.assign({}, prodForm) : r; });
+  saveData();
+  showToast('Saved');
+  const fresh = productionRecords.find(function(r){ return r.id === prodEditId; });
+  if (fresh) prodForm = JSON.parse(JSON.stringify(fresh));
+  renderProductionForm();
+}
+
+function saveAndReturn() {
+  if (!prodEditId) { prodForm = null; renderProduction(); return; }
+  productionRecords = productionRecords.map(function(r){ return r.id === prodEditId ? Object.assign({}, prodForm) : r; });
+  saveData();
+  showToast('Saved');
+  prodForm = null; prodEditId = null; prodStageEdit = null;
+  renderProduction();
+}
+
+function renderProductionRecordsList() {
+  currentView = 'prod';
+  hideAllExceptProd();
+  const v = document.getElementById('view-prod');
+  v.innerHTML = '';
+  renderTabs('prod');
+  const hdr = div('header-bar');
+  hdr.appendChild(el('h2', {style:'font-size:18px;font-weight:600;margin:0;'}, 'Finished production runs'));
+  const backBtn = btn('', '← Back', renderProduction);
+  hdr.appendChild(backBtn);
+  v.appendChild(hdr);
+  const fin = productionRecords.filter(function(r){ return r.status === 'finished'; }).sort(function(a,b){ return (b.finishedDate||b.startDate||'').localeCompare(a.finishedDate||a.startDate||''); });
+  if (fin.length === 0) {
+    const empty = div('empty-state');
+    empty.appendChild(p('', 'No finished runs yet.'));
+    v.appendChild(empty);
+    return;
+  }
+  fin.forEach(function(r){ v.appendChild(productionCardSummary(r)); });
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
