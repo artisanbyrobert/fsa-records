@@ -1,0 +1,34 @@
+=== Run started 2026-05-30T07:51:26.700973 ===
+Python: 3.11.15 (main, Mar  3 2026, 16:10:12) [GCC 13.3.0]
+Working dir: /home/runner/work/fsa-records/fsa-records
+Script dir: /home/runner/work/fsa-records/fsa-records/scripts
+
+[2026-05-30 07:51:26] Script starting
+[2026-05-30 07:51:26] Pre-flight: checking env vars...
+[2026-05-30 07:51:26]   ok SUPABASE_URL present (40 chars)
+[2026-05-30 07:51:26]   ok SUPABASE_KEY present (208 chars)
+[2026-05-30 07:51:26]   ok DROPBOX_APP_KEY present (15 chars)
+[2026-05-30 07:51:26]   ok DROPBOX_APP_SECRET present (15 chars)
+[2026-05-30 07:51:26]   ok DROPBOX_REFRESH_TOKEN present (64 chars)
+[2026-05-30 07:51:26] Season code: 202526  →  filename: FSA_Records_202526.pdf
+[2026-05-30 07:51:26] Target filename: FSA_Records_202526.pdf
+[2026-05-30 07:51:26] Fetching from Supabase...
+[2026-05-30 07:51:26]   Fetching table: intakes
+[2026-05-30 07:51:27]     HTTP 200 (12404 bytes)
+[2026-05-30 07:51:27]   Fetching table: deliveries
+[2026-05-30 07:51:28]     HTTP 200 (9767 bytes)
+[2026-05-30 07:51:28]   Fetching table: app_config
+[2026-05-30 07:51:28]     HTTP 200 (1304 bytes)
+[2026-05-30 07:51:28]   Records: intakes=26, daily=7, deliveries=1, pest=2, prod=0
+[2026-05-30 07:51:28] Building Pest Control section (2 records)
+[2026-05-30 07:51:28] Building Production section (0 records)
+[2026-05-30 07:51:28] Building PDF (39 story elements)
+[2026-05-30 07:51:28] ok PDF generated: FSA_Records_202526.pdf (9417 bytes)
+[2026-05-30 07:51:28] Reading PDF for Dropbox upload...
+[2026-05-30 07:51:28] Refreshing Dropbox access token...
+[2026-05-30 07:51:28]   Dropbox token HTTP 200
+[2026-05-30 07:51:28]   ok token refreshed
+[2026-05-30 07:51:28] Uploading to Dropbox: /FSA forms and records for emilys charcuterie/automated intake records/FSA_Records_202526.pdf
+[2026-05-30 07:51:29]   Dropbox HTTP 200
+[2026-05-30 07:51:29] ok Uploaded to Dropbox: /FSA forms and records for emilys charcuterie/automated intake records/FSA_Records_202526.pdf
+[2026-05-30 07:51:29] === Run completed successfully ===
