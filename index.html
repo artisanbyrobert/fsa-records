@@ -150,6 +150,7 @@
   <div id="view-daily" style="display:none"></div>
   <div id="view-pest" style="display:none"></div>
   <div id="view-prod" style="display:none"></div>
+  <div id="view-clean" style="display:none"></div>
 </div>
 
 <script>
@@ -160,7 +161,7 @@ let sb = null;
 
 let species = ['Pheasant','Partridge','Rabbit','Hare','Venison','Mallard','Other'];
 let speciesFat = {Pheasant: 20, Partridge: 25, Venison: 25};
-let intakes = [], deliveries = [], dailyRecords = [], pestRecords = [], productionRecords = [], estates = [], processors = [], parts = [
+let intakes = [], deliveries = [], dailyRecords = [], pestRecords = [], productionRecords = [], periodicCleans = [], estates = [], processors = [], parts = [
   'Whole','Leg','Shoulder','Breast','Saddle','Haunch','Loin','Carcass','Mixed cuts'
 ];
 let currentView = 'list';
@@ -203,6 +204,7 @@ async function loadData() {
       dailyRecords = deliveryRows.filter(r => r.data._type === 'daily').map(r => r.data);
       pestRecords = deliveryRows.filter(r => r.data._type === 'pest').map(r => r.data);
       productionRecords = deliveryRows.filter(r => r.data._type === 'production').map(r => r.data);
+      periodicCleans = deliveryRows.filter(r => r.data._type === 'periodic_clean').map(r => r.data);
     }
 
     const {data: configRows} = await sb.from('app_config').select('*');
@@ -268,6 +270,9 @@ async function saveData() {
     }
     for (const r of productionRecords) {
       await sb.from('deliveries').upsert({id: 'prod_' + r.id, data: {...r, _type: 'production'}});
+    }
+    for (const r of periodicCleans) {
+      await sb.from('deliveries').upsert({id: 'clean_' + r.id, data: {...r, _type: 'periodic_clean'}});
     }
 
     showStatus('saved');
@@ -472,7 +477,7 @@ function renderTabs(activeTab) {
   bar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:0;margin-bottom:1.5rem;border-bottom:2px solid #e0e0dc;';
   const tabsLeft = div('row');
   tabsLeft.style.gap = '0';
-  const tabs = [['list','Intake records'],['daily','Daily Record'],['delivery','Finished Product'],['wetmeat','Wet Meat'],['pest','Pest Control'],['prod','Production'],['manage','Manage']];
+  const tabs = [['list','Intake records'],['daily','Daily Record'],['delivery','Finished Product'],['wetmeat','Wet Meat'],['pest','Pest Control'],['prod','Production'],['clean','Periodic Cleans'],['manage','Manage']];
   for (const [id, label] of tabs) {
     const b = btn(`tab-btn${activeTab===id?' active':''}`, label, () => {
       if (id === 'list') renderList();
@@ -481,6 +486,7 @@ function renderTabs(activeTab) {
       else if (id === 'wetmeat') renderWetMeat();
       else if (id === 'pest') renderPestControl();
       else if (id === 'prod') renderProduction();
+      else if (id === 'clean') renderPeriodicCleans();
       else renderManage();
     });
     tabsLeft.appendChild(b);
@@ -492,10 +498,16 @@ function renderTabs(activeTab) {
   v.appendChild(bar);
   const existingPanel = document.getElementById('tasks-panel-global');
   if (existingPanel) existingPanel.remove();
-  const allTodosGlobal = dailyRecords.reduce((acc, r) => acc.concat((r.todoList||[]).filter(t => !t.done)), []);
-  // Monthly pest control reminder
+  // Build outstanding tasks list — track parent record so we can mark done from here
+  const allTodosGlobal = [];
+  dailyRecords.forEach(r => {
+    (r.todoList||[]).filter(t => !t.done).forEach(t => {
+      allTodosGlobal.push({task: t, parentRecord: r});
+    });
+  });
+  // Monthly pest control reminder (no parent record — clicks through to pest tab)
   if (typeof pestControlDoneThisMonth === 'function' && !pestControlDoneThisMonth()) {
-    allTodosGlobal.unshift({text:'🐭 Monthly pest control check due', addedDate: today(), _pestReminder: true});
+    allTodosGlobal.unshift({task: {text:'🐭 Monthly pest control check due', addedDate: today(), _pestReminder: true}, parentRecord: null});
   }
   const globalPanel = document.createElement('div');
   globalPanel.id = 'tasks-panel-global';
@@ -505,14 +517,32 @@ function renderTabs(activeTab) {
   globalTitle.style.color = allTodosGlobal.length > 0 ? '#633806' : '#27500a';
   globalTitle.textContent = allTodosGlobal.length > 0 ? '⚠️ Outstanding tasks — ' + allTodosGlobal.length + ' to do' : '✓ No outstanding tasks';
   globalPanel.appendChild(globalTitle);
-  allTodosGlobal.slice(0, 5).forEach(task => {
+  allTodosGlobal.slice(0, 5).forEach(entry => {
+    const task = entry.task;
+    const parentRecord = entry.parentRecord;
     const taskRow = document.createElement('div');
-    taskRow.style.cssText = 'display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid #f0d4a8;' + (task._pestReminder ? 'cursor:pointer;' : '');
+    taskRow.style.cssText = 'display:flex;align-items:flex-start;gap:10px;padding:5px 0;border-bottom:1px solid #f0d4a8;' + (task._pestReminder ? 'cursor:pointer;' : '');
     if (task._pestReminder) taskRow.addEventListener('click', renderPestControl);
-    const circle = document.createElement('span'); circle.style.cssText = 'color:#d35400;flex-shrink:0;'; circle.textContent = '○';
+    // Real to-do tasks: clickable checkbox marks done + saves + refreshes
+    if (parentRecord) {
+      const chk = document.createElement('input');
+      chk.type = 'checkbox';
+      chk.style.cssText = 'width:20px;height:20px;accent-color:#3a6b2a;cursor:pointer;flex-shrink:0;margin-top:1px;';
+      chk.addEventListener('change', async () => {
+        task.done = true;
+        task.doneDate = today();
+        try { await saveData(); } catch(e) { console.warn('saveData failed:', e); }
+        renderTabs(activeTab);
+      });
+      taskRow.appendChild(chk);
+    } else {
+      // Pest reminder: keep circle
+      const circle = document.createElement('span'); circle.style.cssText = 'color:#d35400;flex-shrink:0;font-size:16px;line-height:1.2;'; circle.textContent = '○';
+      taskRow.appendChild(circle);
+    }
     const taskText = document.createElement('span'); taskText.style.cssText = 'font-size:13px;color:#633806;flex:1;'; taskText.textContent = task.text;
     const dateAdded = document.createElement('span'); dateAdded.style.cssText = 'font-size:10px;color:#aaa;white-space:nowrap;'; dateAdded.textContent = fmtDate(task.addedDate);
-    taskRow.appendChild(circle); taskRow.appendChild(taskText); taskRow.appendChild(dateAdded);
+    taskRow.appendChild(taskText); taskRow.appendChild(dateAdded);
     globalPanel.appendChild(taskRow);
   });
   if (allTodosGlobal.length > 5) {
@@ -725,6 +755,7 @@ function renderDailyRecordsList() {
   document.getElementById('view-daily').style.display = 'none';
   if(document.getElementById('view-pest'))document.getElementById('view-pest').style.display = 'none';
   if(document.getElementById('view-prod'))document.getElementById('view-prod').style.display = 'none';
+  if(document.getElementById('view-clean'))document.getElementById('view-clean').style.display = 'none';
   const listEl = document.getElementById('view-daily');
   if (!listEl) return;
   listEl.style.display = 'block'; listEl.innerHTML = '';
@@ -1275,54 +1306,6 @@ function renderStepReview(container) {
 
   buildNotesAndTodo(container);
 
-  if (dailyForm.todoList && dailyForm.todoList.length > 0) {
-    const todoSummaryCard = document.createElement('div');
-    todoSummaryCard.className = 'card';
-    const todoSummaryTitle = document.createElement('p');
-    todoSummaryTitle.style.cssText = 'font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;';
-    todoSummaryTitle.textContent = 'To-do list';
-    todoSummaryCard.appendChild(todoSummaryTitle);
-    const openTasks = dailyForm.todoList.filter(t => !t.done);
-    const doneTasks = dailyForm.todoList.filter(t => t.done);
-    openTasks.forEach(task => {
-      const taskRowEl = document.createElement('div');
-      taskRowEl.style.cssText = 'display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid #f5f5f2;';
-      const circleEl = document.createElement('span');
-      circleEl.style.cssText = 'color:#ddd;font-size:14px;flex-shrink:0;';
-      circleEl.textContent = '○';
-      const taskLblEl = document.createElement('span');
-      taskLblEl.style.cssText = 'font-size:13px;flex:1;';
-      taskLblEl.textContent = task.text;
-      const addedEl = document.createElement('span');
-      addedEl.style.cssText = 'font-size:10px;color:#aaa;white-space:nowrap;';
-      addedEl.textContent = 'Added ' + fmtDate(task.addedDate);
-      taskRowEl.appendChild(circleEl); taskRowEl.appendChild(taskLblEl); taskRowEl.appendChild(addedEl);
-      todoSummaryCard.appendChild(taskRowEl);
-    });
-    if (doneTasks.length > 0) {
-      const doneLblEl = document.createElement('p');
-      doneLblEl.style.cssText = 'font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:0.5px;margin:10px 0 6px;';
-      doneLblEl.textContent = 'Completed';
-      todoSummaryCard.appendChild(doneLblEl);
-      doneTasks.forEach(task => {
-        const taskRowEl = document.createElement('div');
-        taskRowEl.style.cssText = 'display:flex;align-items:flex-start;gap:8px;padding:4px 0;opacity:0.5;';
-        const tickEl = document.createElement('span');
-        tickEl.style.cssText = 'color:#3a6b2a;font-size:14px;flex-shrink:0;';
-        tickEl.textContent = '✓';
-        const taskLblEl = document.createElement('span');
-        taskLblEl.style.cssText = 'font-size:12px;flex:1;text-decoration:line-through;color:#888;';
-        taskLblEl.textContent = task.text;
-        const doneDateEl = document.createElement('span');
-        doneDateEl.style.cssText = 'font-size:10px;color:#aaa;white-space:nowrap;';
-        doneDateEl.textContent = 'Done ' + fmtDate(task.doneDate);
-        taskRowEl.appendChild(tickEl); taskRowEl.appendChild(taskLblEl); taskRowEl.appendChild(doneDateEl);
-        todoSummaryCard.appendChild(taskRowEl);
-      });
-    }
-    container.appendChild(todoSummaryCard);
-  }
-
   const saveBarEl = document.createElement('div');
   saveBarEl.className = 'save-bar';
   const backBtn2 = document.createElement('button');
@@ -1405,7 +1388,7 @@ function buildNotesAndTodo(container) {
       const taskRow = document.createElement('div');
       taskRow.style.cssText = 'display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0ee;';
       const taskChk = document.createElement('input'); taskChk.type = 'checkbox';
-      taskChk.style.cssText = 'width:18px;height:18px;accent-color:#3a6b2a;cursor:pointer;flex-shrink:0;margin-top:2px;';
+      taskChk.style.cssText = 'width:24px;height:24px;accent-color:#3a6b2a;cursor:pointer;flex-shrink:0;margin-top:2px;';
       taskChk.addEventListener('change', () => { task.done = true; task.doneDate = today(); refreshTodoShared(); });
       const taskTextEl = document.createElement('span');
       taskTextEl.style.cssText = 'font-size:13px;flex:1;line-height:1.4;';
@@ -1508,6 +1491,7 @@ function renderDeliveryList() {
   currentView = 'delivery';
   if(document.getElementById('view-pest'))document.getElementById('view-pest').style.display = 'none';
   if(document.getElementById('view-prod'))document.getElementById('view-prod').style.display = 'none';
+  if(document.getElementById('view-clean'))document.getElementById('view-clean').style.display = 'none';
   document.getElementById('view-list').style.display = 'none';
   document.getElementById('view-form').style.display = 'none';
   if(document.getElementById('view-daily'))document.getElementById('view-daily').style.display = 'none';
@@ -1582,6 +1566,7 @@ function renderDeliveryForm(dform, dEditId) {
   currentView = 'delivery-form';
   if(document.getElementById('view-pest'))document.getElementById('view-pest').style.display = 'none';
   if(document.getElementById('view-prod'))document.getElementById('view-prod').style.display = 'none';
+  if(document.getElementById('view-clean'))document.getElementById('view-clean').style.display = 'none';
   document.getElementById('view-list').style.display = 'none';
   document.getElementById('view-form').style.display = 'none';
   document.getElementById('view-manage').style.display = 'none';
@@ -1801,6 +1786,7 @@ function renderWetMeat() {
   currentView = 'wetmeat';
   if(document.getElementById('view-pest'))document.getElementById('view-pest').style.display = 'none';
   if(document.getElementById('view-prod'))document.getElementById('view-prod').style.display = 'none';
+  if(document.getElementById('view-clean'))document.getElementById('view-clean').style.display = 'none';
   if(document.getElementById('view-daily'))document.getElementById('view-daily').style.display = 'none';
   document.getElementById('view-list').style.display = 'none';
   document.getElementById('view-form').style.display = 'none';
@@ -1882,6 +1868,7 @@ function renderManage() {
   currentView = 'manage';
   if(document.getElementById('view-pest'))document.getElementById('view-pest').style.display = 'none';
   if(document.getElementById('view-prod'))document.getElementById('view-prod').style.display = 'none';
+  if(document.getElementById('view-clean'))document.getElementById('view-clean').style.display = 'none';
   if(document.getElementById('view-daily'))document.getElementById('view-daily').style.display = 'none';
   document.getElementById('view-list').style.display = 'none';
   document.getElementById('view-form').style.display = 'none';
@@ -1984,6 +1971,7 @@ function renderList(mode) {
   currentView = mode === 'records' ? 'list-records' : 'list';
   if(document.getElementById('view-pest'))document.getElementById('view-pest').style.display = 'none';
   if(document.getElementById('view-prod'))document.getElementById('view-prod').style.display = 'none';
+  if(document.getElementById('view-clean'))document.getElementById('view-clean').style.display = 'none';
   document.getElementById('view-form').style.display = 'none';
   document.getElementById('view-manage').style.display = 'none';
   if(document.getElementById('view-wetmeat'))document.getElementById('view-wetmeat').style.display = 'none';
@@ -2116,6 +2104,7 @@ function renderForm() {
   currentView = 'form';
   if(document.getElementById('view-pest'))document.getElementById('view-pest').style.display = 'none';
   if(document.getElementById('view-prod'))document.getElementById('view-prod').style.display = 'none';
+  if(document.getElementById('view-clean'))document.getElementById('view-clean').style.display = 'none';
   document.getElementById('view-list').style.display = 'none';
   document.getElementById('view-manage').style.display = 'none';
   const v = document.getElementById('view-form');
@@ -2989,6 +2978,7 @@ function hideAllExceptProd() {
   document.getElementById('view-wetmeat').style.display = 'none';
   document.getElementById('view-delivery').style.display = 'none';
   if(document.getElementById('view-pest'))document.getElementById('view-pest').style.display = 'none';
+  if(document.getElementById('view-clean'))document.getElementById('view-clean').style.display = 'none';
   document.getElementById('view-prod').style.display = 'block';
 }
 
@@ -3467,6 +3457,594 @@ function renderProductionRecordsList() {
     return;
   }
   fin.forEach(function(r){ v.appendChild(productionCardSummary(r)); });
+}
+
+// ── Periodic Cleans ───────────────────────────────────────────────────────────
+let cleanForm = null;
+let cleanEditId = null;
+let cleanRunMode = false;
+
+// Template library — each entry has title + standard SOP steps
+const CLEAN_TEMPLATES = {
+  mincer_full: {
+    title: 'Mincer full deep clean (incl. reboil)',
+    steps: MACHINE_STEPS.mincer.steps.slice(),
+    highlights: []
+  },
+  stuffer_full: {
+    title: 'Sausage stuffer full deep clean',
+    steps: MACHINE_STEPS.stuffer.steps.slice(),
+    highlights: []
+  },
+  plucker_full: {
+    title: 'Plucking machine deep clean',
+    steps: MACHINE_STEPS.plucker.steps.slice(),
+    highlights: []
+  },
+  floor_scrub: {
+    title: 'Floor scrub & mop',
+    steps: [
+      'Sweep all floors',
+      'Wash all floors with sanitiser, 30 sec contact',
+      'Lift and clean drain gullys',
+      'Remove and scrub drain sieve',
+      'Rinse drain gullys and sieve back into place',
+      'Final mop pass after drain clean'
+    ],
+    highlights: ['drain gullys', 'drain sieve']
+  },
+  touch_points: {
+    title: 'Touch points & sink surrounds',
+    steps: [
+      'Sink surround — plucking room',
+      'Sink surround — build room',
+      'Door handles all rooms',
+      'Light switches all rooms',
+      'Taps and faucets',
+      'Apron hooks and shelving'
+    ],
+    highlights: []
+  },
+  staple_machine: {
+    title: 'Staple machine citric acid clean (rust)',
+    steps: [
+      'Disassemble staple machine',
+      'Soak parts in citric acid solution',
+      'Scrub off rust stains with brush',
+      'Rinse thoroughly with hot water',
+      'Dry parts and reassemble',
+      'Test fire a staple to confirm working'
+    ],
+    highlights: []
+  },
+  closing: {
+    title: 'Closing tasks',
+    steps: [
+      'Switch off lights — main workshop',
+      'Switch off lights — plucking room',
+      'Switch off lights — build room',
+      'Switch off water heaters',
+      'Final pest check before locking up',
+      'Lock all doors'
+    ],
+    highlights: []
+  },
+  vac_label: {
+    title: 'Vac packing & labelling salami',
+    steps: [
+      'Identify finished salami batches ready to pack',
+      'Vac pack each unit to weight',
+      'Print batch labels (batch code, process code, date, weight)',
+      'Apply labels to vac packs',
+      'Store labelled packs in correct cold room'
+    ],
+    highlights: []
+  }
+};
+
+function blankCleanList() {
+  return {
+    id: uid(),
+    createdDate: today(),
+    forDate: today(),
+    staffName: '',
+    status: 'building',
+    jobs: [],
+    notes: ''
+  };
+}
+
+function nextFridayString() {
+  const d = new Date();
+  const day = d.getDay();
+  const daysToFri = (5 - day + 7) % 7;
+  d.setDate(d.getDate() + (daysToFri === 0 ? 7 : daysToFri));
+  return d.toISOString().split('T')[0];
+}
+
+function hideAllExceptClean() {
+  document.getElementById('view-list').style.display = 'none';
+  document.getElementById('view-form').style.display = 'none';
+  if(document.getElementById('view-daily'))document.getElementById('view-daily').style.display = 'none';
+  document.getElementById('view-manage').style.display = 'none';
+  document.getElementById('view-wetmeat').style.display = 'none';
+  document.getElementById('view-delivery').style.display = 'none';
+  if(document.getElementById('view-pest'))document.getElementById('view-pest').style.display = 'none';
+  if(document.getElementById('view-prod'))document.getElementById('view-prod').style.display = 'none';
+  document.getElementById('view-clean').style.display = 'block';
+}
+
+function renderPeriodicCleans() {
+  currentView = 'clean';
+  hideAllExceptClean();
+  const v = document.getElementById('view-clean');
+  v.innerHTML = '';
+  renderTabs('clean');
+
+  const hdr = div('header-bar');
+  const hdrLeft = div('');
+  hdrLeft.appendChild(el('h2', {style:'font-size:18px;font-weight:600;margin:0;'}, 'Periodic Cleans'));
+  const building = periodicCleans.filter(function(c){ return c.status === 'building'; });
+  const ready = periodicCleans.filter(function(c){ return c.status === 'ready' || c.status === 'in_progress'; });
+  const done = periodicCleans.filter(function(c){ return c.status === 'completed'; });
+  hdrLeft.appendChild(p('muted', building.length + ' building · ' + ready.length + ' ready/in progress · ' + done.length + ' completed'));
+  hdr.appendChild(hdrLeft);
+  const newBtn = btn('btn-primary', '+ New list', function(){
+    cleanForm = blankCleanList();
+    cleanForm.forDate = nextFridayString();
+    cleanEditId = null;
+    cleanRunMode = false;
+    renderCleanForm();
+  });
+  hdr.appendChild(newBtn);
+  v.appendChild(hdr);
+
+  if (periodicCleans.length === 0) {
+    const empty = div('empty-state');
+    empty.appendChild(el('h3', {}, 'No cleaning lists yet'));
+    empty.appendChild(p('', 'Start a new list for your staff member to work through.'));
+    const b = btn('btn-primary big-btn', '+ New cleaning list', function(){
+      cleanForm = blankCleanList();
+      cleanForm.forDate = nextFridayString();
+      cleanEditId = null;
+      cleanRunMode = false;
+      renderCleanForm();
+    });
+    empty.appendChild(b);
+    v.appendChild(empty);
+    return;
+  }
+
+  // Building (Robert side)
+  if (building.length > 0) {
+    const sec = div('');
+    sec.appendChild(el('h3', {style:'font-size:14px;font-weight:600;color:#27500a;margin:1rem 0 8px;'}, 'Building (you)'));
+    building.sort(function(a,b){ return (b.forDate||'').localeCompare(a.forDate||''); }).forEach(function(r){
+      sec.appendChild(cleanCardSummary(r));
+    });
+    v.appendChild(sec);
+  }
+  // Ready or in progress (staff side)
+  if (ready.length > 0) {
+    const sec = div('');
+    sec.appendChild(el('h3', {style:'font-size:14px;font-weight:600;color:#633806;margin:1.5rem 0 8px;'}, 'Ready for staff'));
+    ready.sort(function(a,b){ return (b.forDate||'').localeCompare(a.forDate||''); }).forEach(function(r){
+      sec.appendChild(cleanCardSummary(r));
+    });
+    v.appendChild(sec);
+  }
+  if (done.length > 0) {
+    const linkBtn = document.createElement('button');
+    linkBtn.style.cssText = 'background:none;border:none;color:#888;font-size:12px;cursor:pointer;text-decoration:underline;display:block;margin:1.5rem auto 0;';
+    linkBtn.textContent = 'View completed lists (' + done.length + ')';
+    linkBtn.addEventListener('click', renderCompletedCleansList);
+    v.appendChild(linkBtn);
+  }
+}
+
+function cleanCardSummary(r) {
+  const card = div('card');
+  card.style.cssText = 'cursor:pointer;margin-bottom:10px;';
+  const top = div('row-sb');
+  top.style.marginBottom = '6px';
+  const left = div(''); left.style.flex = '1';
+  left.appendChild(el('span', {style:'font-size:15px;font-weight:600;color:#1a1a1a;'}, 'For ' + fmtDate(r.forDate)));
+  if (r.staffName) left.appendChild(el('span', {className:'muted'}, ' · ' + r.staffName));
+  top.appendChild(left);
+  const statusMap = {building:['#faeeda','#633806','Building'], ready:['#e8f4e3','#27500a','Ready'], in_progress:['#fff8f0','#854f0b','In progress'], completed:['#eaf3de','#27500a','Completed']};
+  const sm = statusMap[r.status] || statusMap.building;
+  top.appendChild(el('span', {style:'background:'+sm[0]+';color:'+sm[1]+';font-size:11px;padding:3px 10px;border-radius:8px;white-space:nowrap;'}, sm[2]));
+  card.appendChild(top);
+  const total = (r.jobs || []).length;
+  const doneCount = (r.jobs || []).filter(function(j){ return j.done; }).length;
+  card.appendChild(p('muted', total + ' job' + (total===1?'':'s') + (total > 0 && r.status !== 'building' ? ' · ' + doneCount + '/' + total + ' done' : '')));
+  card.addEventListener('click', function(){ openCleanList(r.id); });
+  return card;
+}
+
+function openCleanList(id) {
+  const r = periodicCleans.find(function(x){ return x.id === id; });
+  if (!r) { renderPeriodicCleans(); return; }
+  cleanForm = JSON.parse(JSON.stringify(r));
+  cleanEditId = id;
+  // If status is ready or in_progress, default to RUN mode for staff. Building = build mode for Robert.
+  cleanRunMode = (r.status === 'ready' || r.status === 'in_progress');
+  renderCleanForm();
+}
+
+function renderCleanForm() {
+  if (!cleanForm) { renderPeriodicCleans(); return; }
+  hideAllExceptClean();
+  const v = document.getElementById('view-clean');
+  v.innerHTML = '';
+  renderTabs('clean');
+
+  if (cleanRunMode) {
+    renderCleanRunMode();
+    return;
+  }
+
+  // ── BUILD MODE (Robert) ─────────────────────────────────────────────────────
+  const hdr = div('header-bar');
+  hdr.appendChild(el('h2', {style:'font-size:18px;font-weight:600;margin:0;'}, cleanEditId ? 'Edit cleaning list' : 'Build cleaning list'));
+  const backBtn = btn('', '← Back', function(){ cleanForm = null; cleanEditId = null; renderPeriodicCleans(); });
+  hdr.appendChild(backBtn);
+  v.appendChild(hdr);
+
+  // Date + staff name card
+  const dateCard = div('card');
+  const dateGrid = div('grid2');
+  const forField = div('field');
+  forField.appendChild(label('Cleaning day (when she\'ll do it)'));
+  const forInp = input({type:'date', value: cleanForm.forDate || nextFridayString()});
+  forInp.addEventListener('change', function(e){ cleanForm.forDate = e.target.value; });
+  forField.appendChild(forInp);
+  dateGrid.appendChild(forField);
+  const staffField = div('field');
+  staffField.appendChild(label('Staff member name (optional)'));
+  const staffInp = input({type:'text', value: cleanForm.staffName || '', placeholder:'e.g. Mary'});
+  staffInp.addEventListener('input', function(e){ cleanForm.staffName = e.target.value; });
+  staffField.appendChild(staffInp);
+  dateGrid.appendChild(staffField);
+  dateCard.appendChild(dateGrid);
+  v.appendChild(dateCard);
+
+  // Jobs section
+  v.appendChild(p('section-title', 'Jobs on this list'));
+  const jobsContainer = div('');
+  v.appendChild(jobsContainer);
+
+  function renderJobs() {
+    jobsContainer.innerHTML = '';
+    if (!cleanForm.jobs || cleanForm.jobs.length === 0) {
+      const empty = div('card');
+      empty.style.cssText = 'text-align:center;padding:1.5rem;color:#888;';
+      empty.appendChild(p('', 'No jobs added yet. Use the buttons below.'));
+      jobsContainer.appendChild(empty);
+    }
+    (cleanForm.jobs || []).forEach(function(job, idx) {
+      const jCard = div('card');
+      const jTop = div('row-sb'); jTop.style.marginBottom = '8px';
+      const titleSide = div('');
+      titleSide.appendChild(el('span', {className:'muted'}, 'Job ' + (idx+1)));
+      titleSide.appendChild(el('p', {style:'font-size:14px;font-weight:600;margin:2px 0 0;'}, job.title));
+      jTop.appendChild(titleSide);
+      const rmBtn = btn('btn-sm btn-danger', '✕ Remove', function(){
+        cleanForm.jobs = cleanForm.jobs.filter(function(j){ return j.id !== job.id; });
+        renderJobs();
+      });
+      jTop.appendChild(rmBtn);
+      jCard.appendChild(jTop);
+
+      // Show subtasks (read-only here, just for reference)
+      const sub = div('');
+      sub.style.cssText = 'background:#f9fdf8;border-radius:6px;padding:8px 10px;font-size:12px;color:#666;';
+      sub.appendChild(el('p', {style:'font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#888;margin:0 0 6px;'}, job.subtasks.length + ' step' + (job.subtasks.length===1?'':'s')));
+      job.subtasks.forEach(function(st){
+        const row = document.createElement('p');
+        const isHL = (job.highlights || []).some(function(h){ return st.text.toLowerCase().includes(h.toLowerCase()); });
+        row.style.cssText = 'font-size:12px;margin:2px 0;color:' + (isHL ? '#a83400' : '#444') + ';' + (isHL ? 'font-weight:600;' : '');
+        row.textContent = '• ' + st.text + (isHL ? ' ⚠' : '');
+        sub.appendChild(row);
+      });
+      jCard.appendChild(sub);
+
+      // Add custom step
+      const addStepRow = div('row');
+      addStepRow.style.cssText = 'margin-top:8px;gap:6px;';
+      const stepInp = input({type:'text', placeholder:'Add a step to this job...', style:'flex:1;font-size:12px;padding:6px 10px;'});
+      const addStepBtn = btn('add-link', '+ Step', function(){
+        const text = stepInp.value.trim(); if (!text) return;
+        job.subtasks.push({id: uid(), text: text, done: false});
+        stepInp.value = '';
+        renderJobs();
+      });
+      stepInp.addEventListener('keydown', function(e){ if (e.key === 'Enter') addStepBtn.click(); });
+      addStepRow.appendChild(stepInp); addStepRow.appendChild(addStepBtn);
+      jCard.appendChild(addStepRow);
+
+      jobsContainer.appendChild(jCard);
+    });
+  }
+  renderJobs();
+
+  // Add job picker
+  v.appendChild(p('section-title', 'Add a job'));
+  const pickerCard = div('card');
+  const pickerRow = div('row'); pickerRow.style.gap = '8px';
+  const picker = document.createElement('select');
+  picker.style.cssText = 'flex:1;';
+  const blankOpt = document.createElement('option'); blankOpt.value=''; blankOpt.textContent='— pick from library —'; picker.appendChild(blankOpt);
+  Object.keys(CLEAN_TEMPLATES).forEach(function(key){
+    const op = document.createElement('option');
+    op.value = key;
+    op.textContent = CLEAN_TEMPLATES[key].title;
+    picker.appendChild(op);
+  });
+  const addFromLibBtn = btn('btn-primary', '+ Add', function(){
+    if (!picker.value) { showToast('Pick a job first'); return; }
+    const tpl = CLEAN_TEMPLATES[picker.value];
+    if (!tpl) return;
+    cleanForm.jobs = cleanForm.jobs || [];
+    cleanForm.jobs.push({
+      id: uid(),
+      title: tpl.title,
+      templateKey: picker.value,
+      highlights: (tpl.highlights || []).slice(),
+      subtasks: tpl.steps.map(function(s){ return {id: uid(), text: s, done: false}; }),
+      done: false
+    });
+    picker.value = '';
+    renderJobs();
+  });
+  pickerRow.appendChild(picker); pickerRow.appendChild(addFromLibBtn);
+  pickerCard.appendChild(pickerRow);
+
+  // Custom job
+  const customRow = div('row'); customRow.style.cssText = 'margin-top:10px;gap:8px;';
+  const customInp = input({type:'text', placeholder:'Or type a custom job title...', style:'flex:1;'});
+  const addCustomBtn = btn('add-link', '+ Custom', function(){
+    const title = customInp.value.trim(); if (!title) return;
+    cleanForm.jobs = cleanForm.jobs || [];
+    cleanForm.jobs.push({
+      id: uid(),
+      title: title,
+      templateKey: null,
+      highlights: [],
+      subtasks: [],
+      done: false
+    });
+    customInp.value = '';
+    renderJobs();
+  });
+  customInp.addEventListener('keydown', function(e){ if (e.key === 'Enter') addCustomBtn.click(); });
+  customRow.appendChild(customInp); customRow.appendChild(addCustomBtn);
+  pickerCard.appendChild(customRow);
+  v.appendChild(pickerCard);
+
+  // Notes
+  const notesCard = div('card');
+  notesCard.appendChild(label('Notes for staff (optional)'));
+  const notesInp = document.createElement('textarea');
+  notesInp.rows = 2; notesInp.value = cleanForm.notes || '';
+  notesInp.placeholder = 'Anything specific she should know about this clean...';
+  notesInp.addEventListener('input', function(e){ cleanForm.notes = e.target.value; });
+  notesCard.appendChild(notesInp);
+  v.appendChild(notesCard);
+
+  // Save bar
+  const saveBar = div('save-bar');
+  const saveDraftBtn = btn('', 'Save draft', function(){
+    if ((cleanForm.jobs || []).length === 0) { showToast('Add at least one job before saving'); return; }
+    cleanForm.status = 'building';
+    persistClean();
+    showToast('Draft saved');
+    renderPeriodicCleans();
+  });
+  const markReadyBtn = btn('btn-primary', 'Mark ready for staff', function(){
+    if ((cleanForm.jobs || []).length === 0) { showToast('Add at least one job first'); return; }
+    if (!confirm('Mark this list ready for staff? You can still edit it after.')) return;
+    cleanForm.status = 'ready';
+    persistClean();
+    showToast('List marked ready');
+    renderPeriodicCleans();
+  });
+  saveBar.appendChild(saveDraftBtn); saveBar.appendChild(markReadyBtn);
+  // Delete option (if editing existing)
+  if (cleanEditId) {
+    const delBtn = btn('btn-sm btn-danger', 'Delete list', function(){
+      if (!confirm('Delete this cleaning list? This cannot be undone.')) return;
+      periodicCleans = periodicCleans.filter(function(r){ return r.id !== cleanEditId; });
+      saveData();
+      showToast('List deleted');
+      cleanForm = null; cleanEditId = null;
+      renderPeriodicCleans();
+    });
+    delBtn.style.marginLeft = 'auto';
+    saveBar.appendChild(delBtn);
+  }
+  v.appendChild(saveBar);
+}
+
+function persistClean() {
+  const rec = Object.assign({}, cleanForm, {id: cleanEditId || cleanForm.id || uid()});
+  if (cleanEditId) {
+    periodicCleans = periodicCleans.map(function(r){ return r.id === cleanEditId ? rec : r; });
+  } else {
+    periodicCleans.push(rec);
+    cleanEditId = rec.id;
+  }
+  saveData();
+}
+
+function renderCleanRunMode() {
+  hideAllExceptClean();
+  const v = document.getElementById('view-clean');
+  v.innerHTML = '';
+  renderTabs('clean');
+
+  const hdr = div('header-bar');
+  hdr.appendChild(el('h2', {style:'font-size:18px;font-weight:600;margin:0;'}, 'Cleaning list' + (cleanForm.staffName ? ' · ' + cleanForm.staffName : '')));
+  const backBtn = btn('', '← Back', function(){ cleanForm = null; cleanEditId = null; cleanRunMode = false; renderPeriodicCleans(); });
+  hdr.appendChild(backBtn);
+  v.appendChild(hdr);
+
+  // Date banner
+  const banner = div('');
+  banner.style.cssText = 'background:#e8f4e3;border:1px solid #b8d9b0;border-radius:8px;padding:10px 14px;margin-bottom:1rem;';
+  banner.appendChild(el('p', {style:'font-size:15px;font-weight:600;color:#27500a;margin:0;'}, fmtDate(cleanForm.forDate)));
+  if (cleanForm.notes) {
+    banner.appendChild(el('p', {style:'font-size:12px;color:#666;margin:4px 0 0;font-style:italic;'}, '"' + cleanForm.notes + '"'));
+  }
+  v.appendChild(banner);
+
+  // Progress
+  const total = (cleanForm.jobs || []).length;
+  const doneCount = (cleanForm.jobs || []).filter(function(j){ return j.done; }).length;
+  const progressEl = document.createElement('p');
+  progressEl.style.cssText = 'font-size:13px;font-weight:500;color:#27500a;text-align:center;margin:0 0 1rem;';
+  progressEl.textContent = doneCount + ' of ' + total + ' jobs done';
+  v.appendChild(progressEl);
+
+  // Toggle build/run mode for Robert if he opened a ready list
+  const modeRow = div('');
+  modeRow.style.cssText = 'text-align:right;margin-bottom:8px;';
+  const editBtn = document.createElement('button');
+  editBtn.style.cssText = 'font-size:11px;color:#888;background:none;border:1px solid #ddd;border-radius:4px;padding:4px 10px;cursor:pointer;';
+  editBtn.textContent = '✎ Edit list';
+  editBtn.addEventListener('click', function(){
+    cleanRunMode = false;
+    renderCleanForm();
+  });
+  modeRow.appendChild(editBtn);
+  v.appendChild(modeRow);
+
+  // Jobs as collapsible headings
+  (cleanForm.jobs || []).forEach(function(job, idx) {
+    const jCard = div('card');
+    jCard.style.cssText = 'margin-bottom:8px;padding:0;overflow:hidden;' + (job.done ? 'background:#eaf3de;' : '');
+
+    // Heading row — big tick
+    const head = document.createElement('div');
+    head.style.cssText = 'display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;';
+    const tick = document.createElement('input');
+    tick.type = 'checkbox';
+    tick.checked = !!job.done;
+    tick.style.cssText = 'width:26px;height:26px;flex-shrink:0;accent-color:#3a6b2a;cursor:pointer;';
+    tick.addEventListener('change', function(e) {
+      job.done = e.target.checked;
+      // When heading is ticked, mark all subtasks as done (auto). Untick = unmark all.
+      (job.subtasks || []).forEach(function(st){ st.done = e.target.checked; });
+      if (cleanForm.status === 'ready') cleanForm.status = 'in_progress';
+      // Recalc completion
+      const allDone = (cleanForm.jobs || []).every(function(j){ return j.done; });
+      if (allDone) cleanForm.status = 'completed';
+      persistClean();
+      renderCleanRunMode();
+    });
+    tick.addEventListener('click', function(e){ e.stopPropagation(); });
+    head.appendChild(tick);
+    const titleSpan = document.createElement('span');
+    titleSpan.style.cssText = 'flex:1;font-size:15px;font-weight:600;color:' + (job.done ? '#888;text-decoration:line-through;' : '#1a1a1a;');
+    titleSpan.textContent = job.title;
+    head.appendChild(titleSpan);
+    const expandBtn = document.createElement('span');
+    expandBtn.style.cssText = 'font-size:11px;color:#888;flex-shrink:0;';
+    expandBtn.textContent = (job.subtasks || []).length > 0 ? 'Details ▼' : '';
+    head.appendChild(expandBtn);
+
+    // Detail panel — collapsed by default
+    const detail = document.createElement('div');
+    detail.style.cssText = 'display:none;background:#f9fdf8;border-top:1px solid #e0e0dc;padding:10px 16px 14px;';
+    (job.subtasks || []).forEach(function(st){
+      const stRow = div('');
+      stRow.style.cssText = 'display:flex;align-items:flex-start;gap:10px;padding:5px 0;';
+      const stChk = document.createElement('input');
+      stChk.type = 'checkbox';
+      stChk.checked = !!st.done;
+      stChk.style.cssText = 'width:18px;height:18px;flex-shrink:0;accent-color:#3a6b2a;cursor:pointer;margin-top:2px;';
+      stChk.addEventListener('change', function(e){
+        st.done = e.target.checked;
+        // If all subtasks done, auto-tick heading
+        const allSubDone = job.subtasks.every(function(x){ return x.done; });
+        job.done = allSubDone;
+        if (cleanForm.status === 'ready') cleanForm.status = 'in_progress';
+        const allDone = (cleanForm.jobs || []).every(function(j){ return j.done; });
+        if (allDone) cleanForm.status = 'completed';
+        persistClean();
+        renderCleanRunMode();
+      });
+      stChk.addEventListener('click', function(e){ e.stopPropagation(); });
+      const stTxt = document.createElement('span');
+      const isHL = (job.highlights || []).some(function(h){ return st.text.toLowerCase().includes(h.toLowerCase()); });
+      stTxt.style.cssText = 'font-size:13px;flex:1;color:' + (isHL ? '#a83400' : (st.done ? '#888;text-decoration:line-through' : '#1a1a1a')) + ';' + (isHL ? 'font-weight:600;' : '');
+      stTxt.textContent = st.text + (isHL ? ' ⚠' : '');
+      stRow.appendChild(stChk); stRow.appendChild(stTxt);
+      detail.appendChild(stRow);
+    });
+
+    head.addEventListener('click', function(e) {
+      if (e.target.tagName === 'INPUT') return;
+      if (detail.style.display === 'none') {
+        detail.style.display = 'block';
+        expandBtn.textContent = (job.subtasks || []).length > 0 ? 'Details ▲' : '';
+      } else {
+        detail.style.display = 'none';
+        expandBtn.textContent = (job.subtasks || []).length > 0 ? 'Details ▼' : '';
+      }
+    });
+
+    jCard.appendChild(head);
+    if ((job.subtasks || []).length > 0) jCard.appendChild(detail);
+    v.appendChild(jCard);
+  });
+
+  // Submit completed button
+  if (cleanForm.status !== 'completed') {
+    const submitBar = div('save-bar');
+    submitBar.style.marginTop = '1.5rem';
+    const submitBtn = btn('btn-primary', '✓ Submit as completed', function(){
+      const total = (cleanForm.jobs || []).length;
+      const doneCount = (cleanForm.jobs || []).filter(function(j){ return j.done; }).length;
+      if (doneCount < total) {
+        if (!confirm(doneCount + ' of ' + total + ' jobs ticked. Submit anyway?')) return;
+      }
+      cleanForm.status = 'completed';
+      cleanForm.completedDate = today();
+      persistClean();
+      showToast('Cleaning list completed');
+      cleanForm = null; cleanEditId = null; cleanRunMode = false;
+      renderPeriodicCleans();
+    });
+    submitBar.appendChild(submitBtn);
+    v.appendChild(submitBar);
+  } else {
+    const doneBanner = div('');
+    doneBanner.style.cssText = 'background:#eaf3de;border:1px solid #b8d9b0;border-radius:8px;padding:14px;margin-top:1.5rem;text-align:center;';
+    doneBanner.appendChild(el('p', {style:'font-size:14px;font-weight:600;color:#27500a;margin:0;'}, '✓ Completed' + (cleanForm.completedDate ? ' on ' + fmtDate(cleanForm.completedDate) : '')));
+    v.appendChild(doneBanner);
+  }
+}
+
+function renderCompletedCleansList() {
+  currentView = 'clean';
+  hideAllExceptClean();
+  const v = document.getElementById('view-clean');
+  v.innerHTML = '';
+  renderTabs('clean');
+  const hdr = div('header-bar');
+  hdr.appendChild(el('h2', {style:'font-size:18px;font-weight:600;margin:0;'}, 'Completed cleaning lists'));
+  const backBtn = btn('', '← Back', renderPeriodicCleans);
+  hdr.appendChild(backBtn);
+  v.appendChild(hdr);
+  const done = periodicCleans.filter(function(r){ return r.status === 'completed'; }).sort(function(a,b){ return (b.completedDate||b.forDate||'').localeCompare(a.completedDate||a.forDate||''); });
+  if (done.length === 0) {
+    const empty = div('empty-state');
+    empty.appendChild(p('', 'No completed lists yet.'));
+    v.appendChild(empty);
+    return;
+  }
+  done.forEach(function(r){ v.appendChild(cleanCardSummary(r)); });
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
