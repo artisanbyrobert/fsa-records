@@ -1,0 +1,68 @@
+name: FSA Nightly Report
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Artisan by Robert · UK2820 · FSA Compliance Records
+#
+#  Runs generate_report.py on schedule in GitHub Actions (cloud) instead of
+#  Robert's Windows PC. Closes the deployment loop:
+#    - Robert's PC no longer needs to be on
+#    - Claude has full API control to push fixes
+#    - Status reports auto-write to _status/ folder for Claude to fetch
+#
+#  Trigger times:
+#    - Every day at 23:00 UTC (00:00 BST midnight UK time)
+#    - Plus manual trigger via "Run workflow" button on GitHub Actions tab
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  schedule:
+    - cron: '0 23 * * *'   # 23:00 UTC = 00:00 BST (midnight UK)
+  workflow_dispatch:        # allow manual run from GitHub UI
+
+permissions:
+  contents: write           # needed for the script to push _status/ files back to the repo
+
+concurrency:
+  group: nightly-report     # prevent overlapping runs
+  cancel-in-progress: false
+
+jobs:
+  generate-pdf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install reportlab==4.* requests
+
+      - name: Run nightly report
+        env:
+          SUPABASE_URL:          ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY:          ${{ secrets.SUPABASE_KEY }}
+          DROPBOX_APP_KEY:       ${{ secrets.DROPBOX_APP_KEY }}
+          DROPBOX_APP_SECRET:    ${{ secrets.DROPBOX_APP_SECRET }}
+          DROPBOX_REFRESH_TOKEN: ${{ secrets.DROPBOX_REFRESH_TOKEN }}
+          GITHUB_TOKEN:          ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/generate_report.py
+
+      - name: Upload status + log as workflow artifact (backup)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: run-status-${{ github.run_number }}
+          path: |
+            scripts/run_status.txt
+            scripts/generate_report_log.txt
+          retention-days: 30
+          if-no-files-found: warn
