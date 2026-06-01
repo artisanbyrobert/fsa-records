@@ -467,6 +467,25 @@ if production_records:
             ct.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), AMBER), ('TEXTCOLOR', (0,0), (-1,0), colors.white), ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), ('FONTSIZE', (0,0), (-1,-1), 7), ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]), ('GRID', (0,0), (-1,-1), 0.3, colors.HexColor('#e0e0dc')), ('LEFTPADDING', (0,0), (-1,-1), 4), ('TOPPADDING', (0,0), (-1,-1), 3), ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('VALIGN', (0,0), (-1,-1), 'TOP')]))
             story.append(ct)
             story.append(Spacer(1, 2*mm))
+            # Per-child recipe ingredient breakdown (full traceability)
+            for c in children:
+                rcp = c.get('recipe') or {}
+                lines = rcp.get('lines', []) if isinstance(rcp, dict) else []
+                if lines:
+                    story.append(Paragraph('<b>Child ' + clean(str(c.get('code',''))) + ' — ' + clean(rcp.get('name','')) + '</b>', ParagraphStyle('rch', fontSize=8, fontName='Helvetica-Bold', textColor=GREEN, spaceAfter=2, spaceBefore=3, keepWithNext=1)))
+                    irows = [['Ingredient', 'Amount']]
+                    for ln in lines:
+                        amt = ln.get('amount')
+                        unit = ln.get('unit','') or 'g'
+                        if ln.get('type') == 'asneeded' or amt is None or amt == '':
+                            amt_str = 'as needed'
+                        else:
+                            amt_str = f"{amt} {unit}".strip()
+                        irows.append([clean(ln.get('name','')), amt_str])
+                    it = Table(irows, colWidths=[120*mm, 104*mm], repeatRows=1)
+                    it.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), LIGHT_GREEN), ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), ('FONTSIZE', (0,0), (-1,-1), 7), ('GRID', (0,0), (-1,-1), 0.3, colors.HexColor('#e0e0dc')), ('LEFTPADDING', (0,0), (-1,-1), 4), ('TOPPADDING', (0,0), (-1,-1), 2), ('BOTTOMPADDING', (0,0), (-1,-1), 2)]))
+                    story.append(it)
+                    story.append(Spacer(1, 2*mm))
         stages = rec.get('stages',[]) or []
         if stages:
             srows = [['Date', 'Stage', 'Details', 'Notes']]
