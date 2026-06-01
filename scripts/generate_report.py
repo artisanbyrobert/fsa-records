@@ -449,6 +449,24 @@ if production_records:
         if fat_pct: header += f" · fat {fat_pct}%"
         header += "</b>"
         story.append(Paragraph(header, ParagraphStyle('prh', fontSize=10, fontName='Helvetica-Bold', textColor=GREEN, spaceAfter=3, spaceBefore=6, keepWithNext=1)))
+        # Children (divisions) for this run
+        children = rec.get('children', []) or []
+        if children:
+            crows = [['Child', 'Meat', 'Fat', 'Total', 'Recipe']]
+            for c in children:
+                rcp = c.get('recipe') or {}
+                rcp_name = clean(rcp.get('name', '')) if isinstance(rcp, dict) else ''
+                crows.append([
+                    'Child ' + clean(str(c.get('code',''))),
+                    f"{c.get('meatKg','')}kg",
+                    f"{c.get('fatKg','')}kg",
+                    f"{c.get('totalKg','')}kg",
+                    rcp_name or '-'
+                ])
+            ct = Table(crows, colWidths=[45*mm, 25*mm, 25*mm, 25*mm, 104*mm], repeatRows=1)
+            ct.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), AMBER), ('TEXTCOLOR', (0,0), (-1,0), colors.white), ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), ('FONTSIZE', (0,0), (-1,-1), 7), ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]), ('GRID', (0,0), (-1,-1), 0.3, colors.HexColor('#e0e0dc')), ('LEFTPADDING', (0,0), (-1,-1), 4), ('TOPPADDING', (0,0), (-1,-1), 3), ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('VALIGN', (0,0), (-1,-1), 'TOP')]))
+            story.append(ct)
+            story.append(Spacer(1, 2*mm))
         stages = rec.get('stages',[]) or []
         if stages:
             srows = [['Date', 'Stage', 'Details', 'Notes']]
