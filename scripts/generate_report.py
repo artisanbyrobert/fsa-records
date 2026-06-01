@@ -290,10 +290,20 @@ AMBER = colors.HexColor('#854f0b')
 LIGHT_GREEN = colors.HexColor('#e8f4e3')
 LIGHT_GREY = colors.HexColor('#f5f5f2')
 h1 = ParagraphStyle('h1', fontSize=18, textColor=GREEN, fontName='Helvetica-Bold', spaceAfter=4)
-h2 = ParagraphStyle('h2', fontSize=13, textColor=GREEN, fontName='Helvetica-Bold', spaceAfter=4, spaceBefore=12)
+h2 = ParagraphStyle('h2', fontSize=13, textColor=GREEN, fontName='Helvetica-Bold', spaceAfter=4, spaceBefore=12, keepWithNext=1)
 small = ParagraphStyle('small', fontSize=9, textColor=colors.grey)
 
 story = []
+
+def add_section(title):
+    # Section heading + divider that stay glued to the data beneath them, so a
+    # heading is never stranded at the bottom of a page away from its table.
+    story.append(Spacer(1, 8*mm))
+    story.append(Paragraph(title, h2))
+    hr = HRFlowable(width='100%', thickness=0.5, color=GREEN, spaceAfter=6)
+    hr.keepWithNext = 1
+    story.append(hr)
+
 story.append(Spacer(1, 10*mm))
 story.append(Paragraph('Artisan by Robert', h1))
 story.append(Paragraph('FSA Compliance Records', ParagraphStyle('sub', fontSize=13, textColor=AMBER, fontName='Helvetica-Bold', spaceAfter=2)))
@@ -305,10 +315,8 @@ summary_data = [['Intake records', str(len(intakes))], ['Daily records', str(len
 summary_table = Table(summary_data, colWidths=[160*mm, 60*mm])
 summary_table.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), LIGHT_GREEN), ('FONTSIZE', (0,0), (-1,-1), 10), ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#b8d9b0')), ('LEFTPADDING', (0,0), (-1,-1), 8), ('TOPPADDING', (0,0), (-1,-1), 6), ('BOTTOMPADDING', (0,0), (-1,-1), 6)]))
 story.append(summary_table)
-story.append(Spacer(1, 8*mm))
 
-story.append(Paragraph('Intake Records', h2))
-story.append(HRFlowable(width='100%', thickness=0.5, color=GREEN, spaceAfter=6))
+add_section('Intake Records')
 intake_cell = ParagraphStyle('icell', fontSize=7, leading=10)
 intake_hdr = ParagraphStyle('ihdr', fontSize=7, textColor=colors.white, fontName='Helvetica-Bold')
 if intakes:
@@ -327,15 +335,13 @@ if intakes:
             Paragraph(clean(species), intake_cell),
             Paragraph(items_str, intake_cell)
         ])
-    t = Table(rows, colWidths=[30*mm, 20*mm, 40*mm, 22*mm, 115*mm])
+    t = Table(rows, colWidths=[30*mm, 20*mm, 40*mm, 22*mm, 115*mm], repeatRows=1)
     t.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), GREEN), ('FONTSIZE', (0,0), (-1,-1), 7), ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]), ('GRID', (0,0), (-1,-1), 0.3, colors.HexColor('#e0e0dc')), ('LEFTPADDING', (0,0), (-1,-1), 4), ('TOPPADDING', (0,0), (-1,-1), 4), ('BOTTOMPADDING', (0,0), (-1,-1), 4), ('VALIGN', (0,0), (-1,-1), 'TOP')]))
     story.append(t)
 else:
     story.append(Paragraph('No intake records found.', small))
 
-story.append(Spacer(1, 8*mm))
-story.append(Paragraph('Daily Records', h2))
-story.append(HRFlowable(width='100%', thickness=0.5, color=GREEN, spaceAfter=6))
+add_section('Daily Records')
 cell_style = ParagraphStyle('cell', fontSize=7, leading=10)
 header_style = ParagraphStyle('hdr', fontSize=7, textColor=colors.white, fontName='Helvetica-Bold')
 if daily_records:
@@ -350,20 +356,18 @@ if daily_records:
             Paragraph(notes_content, cell_style),
             Paragraph(tasks_content, cell_style)
         ])
-    t = Table(rows, colWidths=[20*mm, 38*mm, 85*mm, 84*mm])
+    t = Table(rows, colWidths=[20*mm, 38*mm, 85*mm, 84*mm], repeatRows=1)
     t.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), GREEN), ('FONTSIZE', (0,0), (-1,-1), 7), ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]), ('GRID', (0,0), (-1,-1), 0.3, colors.HexColor('#e0e0dc')), ('LEFTPADDING', (0,0), (-1,-1), 4), ('TOPPADDING', (0,0), (-1,-1), 4), ('BOTTOMPADDING', (0,0), (-1,-1), 4), ('VALIGN', (0,0), (-1,-1), 'TOP')]))
     story.append(t)
 else:
     story.append(Paragraph('No daily records found.', small))
 
-story.append(Spacer(1, 8*mm))
-story.append(Paragraph('Finished Product / Delivery Records', h2))
-story.append(HRFlowable(width='100%', thickness=0.5, color=GREEN, spaceAfter=6))
+add_section('Finished Product / Delivery Records')
 if deliveries:
     rows = [['Date', 'Batch', 'Destination', 'Notes']]
     for rec in sorted(deliveries, key=lambda x: x.get('date',''), reverse=True):
         rows.append([rec.get('date',''), rec.get('batchCode',''), rec.get('destination', rec.get('processor','')), rec.get('notes','')[:60]])
-    t = Table(rows, colWidths=[20*mm, 45*mm, 72*mm, 90*mm])
+    t = Table(rows, colWidths=[20*mm, 45*mm, 72*mm, 90*mm], repeatRows=1)
     t.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), GREEN), ('TEXTCOLOR', (0,0), (-1,0), colors.white), ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), ('FONTSIZE', (0,0), (-1,-1), 8), ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]), ('GRID', (0,0), (-1,-1), 0.3, colors.HexColor('#e0e0dc')), ('LEFTPADDING', (0,0), (-1,-1), 4), ('TOPPADDING', (0,0), (-1,-1), 4), ('BOTTOMPADDING', (0,0), (-1,-1), 4), ('VALIGN', (0,0), (-1,-1), 'TOP')]))
     story.append(t)
 else:
@@ -371,9 +375,7 @@ else:
 
 # ── PEST CONTROL SECTION ──────────────────────────────────────────────────────
 _log(f"Building Pest Control section ({len(pest_records)} records)")
-story.append(Spacer(1, 8*mm))
-story.append(Paragraph('Pest Control Records', h2))
-story.append(HRFlowable(width='100%', thickness=0.5, color=GREEN, spaceAfter=6))
+add_section('Pest Control Records')
 
 # Standing reference info
 ref_style = ParagraphStyle('ref', fontSize=8, textColor=colors.HexColor('#444'), leading=11, spaceAfter=4)
@@ -386,14 +388,14 @@ story.append(Spacer(1, 4*mm))
 if pest_records:
     for rec in sorted(pest_records, key=lambda x: x.get('date',''), reverse=True):
         date_str = rec.get('date','')
-        story.append(Paragraph(f'<b>Check date: {date_str}</b>', ParagraphStyle('pdh', fontSize=10, fontName='Helvetica-Bold', textColor=GREEN, spaceAfter=3, spaceBefore=6)))
+        story.append(Paragraph(f'<b>Check date: {date_str}</b>', ParagraphStyle('pdh', fontSize=10, fontName='Helvetica-Bold', textColor=GREEN, spaceAfter=3, spaceBefore=6, keepWithNext=1)))
         # Stations table
         stations = rec.get('stations', []) or []
         if stations:
             srows = [['#', 'Location', 'Status', 'Notes']]
             for i, s in enumerate(stations):
                 srows.append([str(i+1), clean(s.get('name','')), clean(s.get('status','')), clean(s.get('notes',''))[:60]])
-            st = Table(srows, colWidths=[12*mm, 75*mm, 30*mm, 100*mm])
+            st = Table(srows, colWidths=[12*mm, 75*mm, 30*mm, 100*mm], repeatRows=1)
             st.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), GREEN), ('TEXTCOLOR', (0,0), (-1,0), colors.white), ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), ('FONTSIZE', (0,0), (-1,-1), 7), ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]), ('GRID', (0,0), (-1,-1), 0.3, colors.HexColor('#e0e0dc')), ('LEFTPADDING', (0,0), (-1,-1), 4), ('TOPPADDING', (0,0), (-1,-1), 3), ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('VALIGN', (0,0), (-1,-1), 'TOP')]))
             story.append(st)
         # Insectocutors
@@ -405,7 +407,7 @@ if pest_records:
                     irows.append([clean(loc), clean(data.get('sticky','')), clean(data.get('cleanout','')), '✓' if data.get('lamp') else '–', '✓' if data.get('starter') else '–', clean(data.get('notes',''))[:50]])
             if len(irows) > 1:
                 story.append(Spacer(1, 2*mm))
-                it = Table(irows, colWidths=[35*mm, 25*mm, 25*mm, 15*mm, 18*mm, 99*mm])
+                it = Table(irows, colWidths=[35*mm, 25*mm, 25*mm, 15*mm, 18*mm, 99*mm], repeatRows=1)
                 it.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), GREEN), ('TEXTCOLOR', (0,0), (-1,0), colors.white), ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), ('FONTSIZE', (0,0), (-1,-1), 7), ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]), ('GRID', (0,0), (-1,-1), 0.3, colors.HexColor('#e0e0dc')), ('LEFTPADDING', (0,0), (-1,-1), 4), ('TOPPADDING', (0,0), (-1,-1), 3), ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('VALIGN', (0,0), (-1,-1), 'TOP')]))
                 story.append(it)
         gn = rec.get('generalNotes','') or rec.get('notes','')
@@ -416,21 +418,19 @@ else:
 
 # ── PRODUCTION SECTION ────────────────────────────────────────────────────────
 _log(f"Building Production section ({len(production_records)} records)")
-story.append(Spacer(1, 8*mm))
-story.append(Paragraph('Production Records', h2))
-story.append(HRFlowable(width='100%', thickness=0.5, color=GREEN, spaceAfter=6))
+add_section('Production Records')
 
 if production_records:
     for rec in sorted(production_records, key=lambda x: x.get('startDate', x.get('processCode','')), reverse=True):
         proc = rec.get('processCode','—')
         batch = rec.get('batchCode','—')
-        species = rec.get('species','')
+        species = rec.get('speciesName','') or rec.get('species','')
         status = rec.get('status','in_progress')
-        fat_pct = rec.get('fatPct','')
+        fat_pct = rec.get('fatPercent','') or rec.get('fatPct','')
         header = f"<b>{clean(species)} · Batch {clean(batch)} · Process {proc} · {status}"
         if fat_pct: header += f" · fat {fat_pct}%"
         header += "</b>"
-        story.append(Paragraph(header, ParagraphStyle('prh', fontSize=10, fontName='Helvetica-Bold', textColor=GREEN, spaceAfter=3, spaceBefore=6)))
+        story.append(Paragraph(header, ParagraphStyle('prh', fontSize=10, fontName='Helvetica-Bold', textColor=GREEN, spaceAfter=3, spaceBefore=6, keepWithNext=1)))
         stages = rec.get('stages',[]) or []
         if stages:
             srows = [['Date', 'Stage', 'Details', 'Notes']]
@@ -451,7 +451,7 @@ if production_records:
                     ug = st_rec.get('unitGrams','')
                     detail = f"{n} x {ug}g" if ug else f"{n} salami"
                 srows.append([dstr, stage.replace('_',' ').title(), detail, clean(st_rec.get('notes',''))[:60]])
-            pt = Table(srows, colWidths=[22*mm, 32*mm, 60*mm, 110*mm])
+            pt = Table(srows, colWidths=[22*mm, 32*mm, 60*mm, 110*mm], repeatRows=1)
             pt.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), GREEN), ('TEXTCOLOR', (0,0), (-1,0), colors.white), ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), ('FONTSIZE', (0,0), (-1,-1), 7), ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]), ('GRID', (0,0), (-1,-1), 0.3, colors.HexColor('#e0e0dc')), ('LEFTPADDING', (0,0), (-1,-1), 4), ('TOPPADDING', (0,0), (-1,-1), 3), ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('VALIGN', (0,0), (-1,-1), 'TOP')]))
             story.append(pt)
 else:
