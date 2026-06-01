@@ -3186,6 +3186,21 @@ function renderProductionForm() {
   codes.appendChild(pcBox);
   card.appendChild(codes);
 
+  // Children (divisions) — created by the Fat calculator
+  if (prodForm.children && prodForm.children.length > 0) {
+    card.appendChild(el('p', {style:'font-size:13px;font-weight:500;color:#27500a;margin:0 0 8px;'}, 'Children in this run (' + prodForm.children.length + ')'));
+    const kidsWrap = div(''); kidsWrap.style.cssText = 'display:flex;flex-direction:column;gap:6px;margin-bottom:14px;';
+    prodForm.children.forEach(function(c){
+      const row = div(''); row.style.cssText = 'background:#f9fdf8;border:1px solid #d0e8c8;border-radius:8px;padding:10px 12px;';
+      row.appendChild(el('p', {style:'font-size:13px;font-weight:600;margin:0 0 2px;'}, 'Child ' + c.code));
+      const bits = [c.meatKg + 'kg meat + ' + c.fatKg + 'kg fat = ' + c.totalKg + 'kg'];
+      if (c.recipe && c.recipe.name) bits.push(c.recipe.name);
+      row.appendChild(el('p', {style:'font-size:12px;color:#666;margin:0;'}, bits.join(' · ')));
+      kidsWrap.appendChild(row);
+    });
+    card.appendChild(kidsWrap);
+  }
+
   card.appendChild(el('p', {style:'font-size:13px;font-weight:500;color:#27500a;margin:0 0 8px;'}, 'Days worked on this batch'));
   const stagesContainer = div('');
   stagesContainer.style.cssText = 'display:flex;flex-direction:column;gap:6px;margin-bottom:14px;';
@@ -3322,11 +3337,12 @@ function renderStageForm() {
       prodStageEdit.meatKg = defs.length ? defs[0].meatKg : 0;
     }
     card.appendChild(p('muted', 'Fat is added as a % of the meat. Example: 10kg meat + 20% = 2kg fat = 12kg total.'));
+    if (prodStageEdit.childCount == null) prodStageEdit.childCount = 1;
 
     const meatField = div('field'); meatField.style.marginTop = '12px';
     meatField.appendChild(label('Meat weight (kg)'));
     const meatInp = input({type:'number', min:'0', step:'0.1', value: prodStageEdit.meatKg || ''});
-    meatInp.placeholder = 'e.g. 10';
+    meatInp.placeholder = 'e.g. 20';
     meatInp.style.cssText = 'width:140px;';
     card.appendChild(meatField); meatField.appendChild(meatInp);
 
@@ -3336,14 +3352,23 @@ function renderStageForm() {
     pctInp.style.cssText = 'width:140px;';
     card.appendChild(pctField); pctField.appendChild(pctInp);
 
+    const childField = div('field'); childField.style.marginTop = '12px';
+    childField.appendChild(label('Divide into how many children? (each its own flavour)'));
+    const childInp = input({type:'number', min:'1', max:'12', step:'1', value: prodStageEdit.childCount});
+    childInp.style.cssText = 'width:140px;';
+    card.appendChild(childField); childField.appendChild(childInp);
+    childField.appendChild(p('muted', 'The mixer works best at 20kg or under per child. They become Child ' + (prodForm.batchCode||'') + 'A, B, C…'));
+
     const resultHolder = div(''); resultHolder.style.marginTop = '14px';
     card.appendChild(resultHolder);
 
     function recomputeFat() {
       const m = parseFloat(meatInp.value) || 0;
       const pct = parseFloat(pctInp.value);
+      let n = parseInt(childInp.value) || 1; if (n < 1) n = 1;
       prodStageEdit.meatKg = m;
       prodStageEdit.fatPercent = isNaN(pct) ? null : pct;
+      prodStageEdit.childCount = n;
       resultHolder.innerHTML = '';
       if (!m || m <= 0 || isNaN(pct) || pct <= 0) {
         prodStageEdit.fatKg = 0; prodStageEdit.totalKg = 0;
@@ -3357,7 +3382,7 @@ function renderStageForm() {
       const fatCompPct = total > 0 ? Math.round((fat/total)*1000)/10 : 0;
       const cc = div('');
       cc.style.cssText = 'background:#f9fdf8;border:1px solid #d0e8c8;border-radius:8px;padding:14px 16px;';
-      cc.appendChild(el('p', {style:'font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px;'}, 'Add ' + pct + '% fat to the meat'));
+      cc.appendChild(el('p', {style:'font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px;'}, 'Whole run · add ' + pct + '% fat to the meat'));
       const grid = div(''); grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;';
       [['Meat (lean)', m + ' kg'], ['Add fat', fat + ' kg'], ['Total mix', total + ' kg']].forEach(function(pair){
         const b = div(''); b.style.cssText = 'background:#fff;border-radius:6px;padding:8px 10px;text-align:center;';
@@ -3374,9 +3399,30 @@ function renderStageForm() {
       fs2.innerHTML = '<span style="color:#412402;font-size:12px;font-weight:500;white-space:nowrap;padding:0 6px;">Fat ' + fat + 'kg</span>';
       bar.appendChild(ls); bar.appendChild(fs2); cc.appendChild(bar);
       resultHolder.appendChild(cc);
+
+      // Per-child breakdown
+      if (n > 1) {
+        const childMeat = Math.round((m / n) * 100) / 100;
+        const childFat = Math.round((fat / n) * 100) / 100;
+        const childTotal = Math.round((total / n) * 100) / 100;
+        const kids = div(''); kids.style.cssText = 'background:#fff;border:1px solid #d0e8c8;border-radius:8px;padding:14px 16px;margin-top:10px;';
+        kids.appendChild(el('p', {style:'font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px;'}, 'Each of the ' + n + ' children'));
+        const krow = div(''); krow.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;';
+        [['Meat each', childMeat + ' kg'], ['Fat each', childFat + ' kg'], ['Total each', childTotal + ' kg']].forEach(function(pair){
+          const b = div(''); b.style.cssText = 'background:#f9fdf8;border-radius:6px;padding:8px 10px;text-align:center;';
+          b.appendChild(el('p', {style:'font-size:10px;color:#888;margin:0 0 2px;'}, pair[0]));
+          b.appendChild(el('p', {style:'font-size:14px;font-weight:600;margin:0;color:#27500a;'}, pair[1]));
+          krow.appendChild(b);
+        });
+        kids.appendChild(krow);
+        const letters = []; for (let i=0;i<n;i++) letters.push((prodForm.batchCode||'') + String.fromCharCode(65+i));
+        kids.appendChild(el('p', {style:'font-size:12px;color:#444;margin:10px 0 0;'}, 'Children: ' + letters.map(function(c){return 'Child ' + c;}).join(', ')));
+        resultHolder.appendChild(kids);
+      }
     }
     meatInp.addEventListener('input', recomputeFat);
     pctInp.addEventListener('input', recomputeFat);
+    childInp.addEventListener('input', recomputeFat);
     recomputeFat();
   } else if (t === 'saltcalc') {
     // Salt calculator stage. Pulls the batch's declared total (meat + fat) from the latest
@@ -3484,6 +3530,28 @@ function renderStageForm() {
     const toSave = Object.assign({}, prodStageEdit);
     delete toSave.picker;
     prodForm.stages.push(toSave);
+    // Fat calculator declares the children (divisions) for this run.
+    if (t === 'fatcalc') {
+      const n = toSave.childCount || 1;
+      const m = toSave.meatKg || 0, fat = toSave.fatKg || 0, total = toSave.totalKg || 0;
+      const childMeat = Math.round((m / n) * 100) / 100;
+      const childFat = Math.round((fat / n) * 100) / 100;
+      const childTotal = Math.round((total / n) * 100) / 100;
+      const existing = prodForm.children || [];
+      const kids = [];
+      for (let i = 0; i < n; i++) {
+        const letter = String.fromCharCode(65 + i);
+        const prev = existing.find(function(c){ return c.letter === letter; }) || {};
+        kids.push({
+          letter: letter,
+          code: (prodForm.batchCode || '') + letter,
+          meatKg: childMeat, fatKg: childFat, totalKg: childTotal,
+          recipe: prev.recipe || null, saltGrams: prev.saltGrams, saltPercent: prev.saltPercent,
+          minced: prev.minced || false, stuffed: prev.stuffed || null
+        });
+      }
+      prodForm.children = kids;
+    }
     prodStageEdit = null;
     saveAndStay();
   });
