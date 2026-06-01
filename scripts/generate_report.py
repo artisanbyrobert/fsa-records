@@ -392,6 +392,7 @@ if pest_records:
         # Stations table
         stations = rec.get('stations', []) or []
         if stations:
+            story.append(Paragraph('<b>Rat Bait</b>', ParagraphStyle('rbh', fontSize=9, fontName='Helvetica-Bold', textColor=GREEN, spaceAfter=2, spaceBefore=4, keepWithNext=1)))
             srows = [['#', 'Location', 'Status', 'Notes']]
             for i, s in enumerate(stations):
                 srows.append([str(i+1), clean(s.get('name','')), clean(s.get('status','')), clean(s.get('notes',''))[:60]])
@@ -401,12 +402,25 @@ if pest_records:
         # Insectocutors
         insects = rec.get('insectocutors', {}) or {}
         if insects:
+            def _tick(val):
+                # True/'true'/'yes' -> check; False/None/'' -> dash; any other text shown as-is
+                if isinstance(val, bool):
+                    return '✓' if val else '–'
+                s = str(val).strip()
+                if s == '' or s is None:
+                    return '–'
+                if s.lower() in ('true', 'yes', 'done', 'changed', 'y'):
+                    return '✓'
+                if s.lower() in ('false', 'no', 'n'):
+                    return '–'
+                return clean(s)
             irows = [['Location', 'Sticky', 'Cleanout', 'Lamp', 'Starter', 'Notes']]
             for loc, data in insects.items():
                 if isinstance(data, dict):
-                    irows.append([clean(loc), clean(data.get('sticky','')), clean(data.get('cleanout','')), '✓' if data.get('lamp') else '–', '✓' if data.get('starter') else '–', clean(data.get('notes',''))[:50]])
+                    irows.append([clean(loc), _tick(data.get('sticky','')), _tick(data.get('cleanout','')), '✓' if data.get('lamp') else '–', '✓' if data.get('starter') else '–', clean(data.get('notes',''))[:50]])
             if len(irows) > 1:
                 story.append(Spacer(1, 2*mm))
+                story.append(Paragraph('<b>Insectocutors</b>', ParagraphStyle('insh', fontSize=9, fontName='Helvetica-Bold', textColor=GREEN, spaceAfter=2, spaceBefore=4, keepWithNext=1)))
                 it = Table(irows, colWidths=[35*mm, 25*mm, 25*mm, 15*mm, 18*mm, 99*mm], repeatRows=1)
                 it.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), GREEN), ('TEXTCOLOR', (0,0), (-1,0), colors.white), ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), ('FONTSIZE', (0,0), (-1,-1), 7), ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]), ('GRID', (0,0), (-1,-1), 0.3, colors.HexColor('#e0e0dc')), ('LEFTPADDING', (0,0), (-1,-1), 4), ('TOPPADDING', (0,0), (-1,-1), 3), ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('VALIGN', (0,0), (-1,-1), 'TOP')]))
                 story.append(it)
@@ -423,6 +437,10 @@ add_section('Production Records')
 if production_records:
     for rec in sorted(production_records, key=lambda x: x.get('startDate', x.get('processCode','')), reverse=True):
         proc = rec.get('processCode','—')
+        # If the process code is a YYYYMMDD date, show it as DD/MM/YYYY (nicer on the audit doc)
+        proc_str = str(proc)
+        if proc_str.isdigit() and len(proc_str) == 8:
+            proc = f"{proc_str[6:8]}/{proc_str[4:6]}/{proc_str[0:4]}"
         batch = rec.get('batchCode','—')
         species = rec.get('speciesName','') or rec.get('species','')
         status = rec.get('status','in_progress')
