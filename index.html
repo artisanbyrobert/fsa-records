@@ -151,6 +151,7 @@
   <div id="view-pest" style="display:none"></div>
   <div id="view-prod" style="display:none"></div>
   <div id="view-clean" style="display:none"></div>
+  <div id="view-fatcalc" style="display:none"></div>
 </div>
 
 <script>
@@ -473,11 +474,12 @@ function makeDropdown(container, labelText, entities, selectedId, onSelect, onAd
 function renderTabs(activeTab) {
   const v = document.getElementById('view-tabs');
   v.innerHTML = '';
+  if (activeTab !== 'fatcalc') { const _fc = document.getElementById('view-fatcalc'); if (_fc) _fc.style.display = 'none'; }
   const bar = div('tab-bar');
   bar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:0;margin-bottom:1.5rem;border-bottom:2px solid #e0e0dc;';
   const tabsLeft = div('row');
   tabsLeft.style.gap = '0';
-  const tabs = [['list','Intake records'],['daily','Daily Record'],['delivery','Finished Product'],['wetmeat','Wet Meat'],['pest','Pest Control'],['prod','Production'],['clean','Periodic Cleans'],['manage','Manage']];
+  const tabs = [['list','Intake records'],['daily','Daily Record'],['delivery','Finished Product'],['wetmeat','Wet Meat'],['pest','Pest Control'],['prod','Production'],['clean','Periodic Cleans'],['fatcalc','🧮 Fat Calc'],['manage','Manage']];
   for (const [id, label] of tabs) {
     const b = btn(`tab-btn${activeTab===id?' active':''}`, label, () => {
       if (id === 'list') renderList();
@@ -487,6 +489,7 @@ function renderTabs(activeTab) {
       else if (id === 'pest') renderPestControl();
       else if (id === 'prod') renderProduction();
       else if (id === 'clean') renderPeriodicCleans();
+      else if (id === 'fatcalc') renderFatCalc();
       else renderManage();
     });
     tabsLeft.appendChild(b);
@@ -3111,8 +3114,8 @@ function promptForFatPercent(speciesName, onSet) {
   hdr.appendChild(el('h2', {style:'font-size:18px;font-weight:600;margin:0;'}, 'Set fat % for ' + speciesName));
   v.appendChild(hdr);
   const card = div('card');
-  card.appendChild(p('', 'No fat % saved yet for ' + speciesName + '. What percentage of fat is in the finished mince for ' + speciesName + '?'));
-  card.appendChild(p('muted', 'For example: pheasant 20%, venison 25%. You only need to set this once per species — it gets remembered for next time.'));
+  card.appendChild(p('', 'No fat % saved yet for ' + speciesName + '. How much fat do you add to the meat, as a % of the meat weight?'));
+  card.appendChild(p('muted', 'For example, 20% means 2kg of fat added to every 10kg of meat. You only set this once for ' + speciesName + ' — it gets remembered next time.'));
   const inp = input({type:'number', min:'1', max:'60', step:'1', value:'25'});
   inp.style.cssText = 'width:120px;margin:8px 0 12px;';
   card.appendChild(inp);
@@ -3142,6 +3145,146 @@ function openProductionRun(id) {
   prodEditId = id;
   prodStageEdit = null;
   renderProductionForm();
+}
+
+// ── Standalone Fat Calculator ──────────────────────────────────────────────
+// CONTRACT
+//   Purpose: independent fat calc, not tied to the mince day. Type a meat
+//            weight + fat % (pre-filled per species, editable) and see how much
+//            fat to add. Fat = % OF THE MEAT (10kg + 20% = 2kg fat = 12kg total).
+//   Optional save: appends today as a worked day (a 'mince' stage carrying the
+//            calc figures) to a chosen in-progress production run, so it shows
+//            under "Days worked on this batch" and flows into the nightly PDF.
+//   Reads:  speciesFat, productionRecords. Writes: productionRecords (+ saveData).
+//   Success: result card updates live; Save only fires on button press.
+let fatCalcState = { meatKg: 0, species: '', fatPct: null };
+
+function renderFatCalc() {
+  currentView = 'fatcalc';
+  ['view-list','view-form','view-manage','view-wetmeat','view-delivery','view-daily','view-pest','view-prod','view-clean'].forEach(function(id){ var e=document.getElementById(id); if(e) e.style.display='none'; });
+  const v = document.getElementById('view-fatcalc');
+  v.style.display = 'block';
+  v.innerHTML = '';
+  renderTabs('fatcalc');
+
+  const hdr = div('header-bar');
+  hdr.appendChild(el('h2', {style:'font-size:18px;font-weight:600;margin:0;'}, '🧮 Fat Calculator'));
+  v.appendChild(hdr);
+
+  const card = div('card');
+  card.appendChild(p('muted', 'Fat is added as a % of the meat. Example: 10kg meat + 20% = 2kg fat = 12kg total (before salt & spices).'));
+
+  const spField = div('field'); spField.style.marginTop = '12px';
+  spField.appendChild(label('Species (sets the usual fat %)'));
+  const spOpts = [['','— pick (optional) —']].concat(Object.keys(speciesFat).map(function(s){ return [s,s]; }));
+  const spSel = select(spOpts, fatCalcState.species, function(val){
+    fatCalcState.species = val;
+    const known = getFatPercentForSpecies(val);
+    if (val && known !== null) { fatCalcState.fatPct = known; if (fatInp) fatInp.value = known; }
+    recompute();
+  });
+  spSel.style.cssText = 'width:100%;margin-top:4px;';
+  spField.appendChild(spSel);
+  card.appendChild(spField);
+
+  const meatField = div('field'); meatField.style.marginTop = '12px';
+  meatField.appendChild(label('Meat weight (kg)'));
+  const meatInp = input({type:'number', min:'0', step:'0.1', value: fatCalcState.meatKg || ''});
+  meatInp.placeholder = 'e.g. 10';
+  meatInp.style.cssText = 'width:140px;';
+  meatInp.addEventListener('input', function(e){ fatCalcState.meatKg = parseFloat(e.target.value) || 0; recompute(); });
+  meatField.appendChild(meatInp);
+  card.appendChild(meatField);
+
+  const fatField = div('field'); fatField.style.marginTop = '12px';
+  fatField.appendChild(label('Fat to add (% of the meat)'));
+  const fatInp = input({type:'number', min:'1', max:'60', step:'1', value: (fatCalcState.fatPct!=null?fatCalcState.fatPct:'')});
+  fatInp.placeholder = 'e.g. 20';
+  fatInp.style.cssText = 'width:140px;';
+  fatInp.addEventListener('input', function(e){ const x = parseFloat(e.target.value); fatCalcState.fatPct = isNaN(x)?null:x; recompute(); });
+  fatField.appendChild(fatInp);
+  card.appendChild(fatField);
+
+  const resultHolder = div(''); resultHolder.style.marginTop = '14px';
+  card.appendChild(resultHolder);
+  v.appendChild(card);
+
+  const saveCard = div('card');
+  saveCard.appendChild(el('p', {style:'font-size:14px;font-weight:600;margin:0 0 6px;'}, 'Save to a batch (optional)'));
+  const inProg = productionRecords.filter(function(r){ return r.status === 'in_progress'; });
+  if (inProg.length === 0) {
+    saveCard.appendChild(p('muted', 'No production runs open right now. Start one in the Production tab if you want to save this into "Days worked on this batch".'));
+  } else {
+    saveCard.appendChild(p('muted', 'Adds today as a worked day (with this fat calculation) to the batch you pick.'));
+    const runOpts = [['','— pick a batch —']].concat(inProg.sort(function(a,b){ return (b.startDate||'').localeCompare(a.startDate||''); }).map(function(r){
+      return [r.id, r.batchCode + ' · ' + (r.speciesName||'') + ' · run ' + (r.runNumber||1)];
+    }));
+    let chosenRunId = '';
+    const runSel = select(runOpts, '', function(val){ chosenRunId = val; });
+    runSel.style.cssText = 'width:100%;margin:4px 0 12px;';
+    saveCard.appendChild(runSel);
+    const saveBtn = btn('btn-primary', 'Save to this batch', function(){
+      if (!chosenRunId) { showToast('Pick a batch first'); return; }
+      if (!fatCalcState.meatKg || fatCalcState.meatKg <= 0) { showToast('Enter a meat weight first'); return; }
+      if (fatCalcState.fatPct == null || fatCalcState.fatPct <= 0) { showToast('Enter a fat % first'); return; }
+      const meat = Math.round(fatCalcState.meatKg*100)/100;
+      const fat = Math.round(fatCalcState.meatKg * (fatCalcState.fatPct/100) * 100) / 100;
+      const total = Math.round((fatCalcState.meatKg + fat) * 100) / 100;
+      const rec = productionRecords.find(function(r){ return r.id === chosenRunId; });
+      if (!rec) { showToast('Batch not found'); return; }
+      rec.stages = rec.stages || [];
+      rec.stages.push({
+        type: 'mince', date: today(),
+        meatKg: meat, fatKg: fat, totalKg: total, fatPercent: fatCalcState.fatPct,
+        fromCalc: true,
+        notes: 'Fat calculator: ' + (fatCalcState.species||rec.speciesName||'') + ' ' + fatCalcState.fatPct + '% — ' + meat + 'kg meat + ' + fat + 'kg fat = ' + total + 'kg total'
+      });
+      saveData();
+      showToast('Saved to ' + rec.batchCode);
+    });
+    saveCard.appendChild(saveBtn);
+  }
+  v.appendChild(saveCard);
+
+  function recompute() {
+    resultHolder.innerHTML = '';
+    const m = fatCalcState.meatKg, pct = fatCalcState.fatPct;
+    if (!m || m <= 0 || pct == null || pct <= 0) {
+      resultHolder.appendChild(p('muted', 'Enter a meat weight and fat % to see the result.'));
+      return;
+    }
+    const fat = Math.round(m * (pct/100) * 100) / 100;
+    const total = Math.round((m + fat) * 100) / 100;
+    const leanCompPct = total > 0 ? Math.round((m/total)*1000)/10 : 100;
+    const fatCompPct = total > 0 ? Math.round((fat/total)*1000)/10 : 0;
+    const calcCard = div('');
+    calcCard.style.cssText = 'background:#f9fdf8;border:1px solid #d0e8c8;border-radius:8px;padding:14px 16px;';
+    calcCard.appendChild(el('p', {style:'font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px;'}, 'Add ' + pct + '% fat to the meat' + (fatCalcState.species?(' · '+fatCalcState.species):'')));
+    const grid = div(''); grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;';
+    [['Meat (lean)', m + ' kg'], ['Add fat', fat + ' kg'], ['Total mix', total + ' kg']].forEach(function(pair){
+      const b = div(''); b.style.cssText = 'background:#fff;border-radius:6px;padding:8px 10px;text-align:center;';
+      b.appendChild(el('p', {style:'font-size:10px;color:#888;margin:0 0 2px;'}, pair[0]));
+      b.appendChild(el('p', {style:'font-size:14px;font-weight:600;margin:0;color:#1a1a1a;'}, pair[1]));
+      grid.appendChild(b);
+    });
+    calcCard.appendChild(grid);
+    calcCard.appendChild(el('p', {style:'font-size:11px;color:#888;margin:0 0 4px;'}, 'Finished mince (lean vs fat)'));
+    const bar = document.createElement('div'); bar.style.cssText = 'display:flex;width:100%;height:36px;border-radius:6px;overflow:hidden;';
+    const leanSeg = document.createElement('div'); leanSeg.style.cssText = 'background:#A32D2D;display:flex;align-items:center;justify-content:center;width:' + leanCompPct + '%;';
+    leanSeg.innerHTML = '<span style="color:#FCEBEB;font-size:12px;font-weight:500;white-space:nowrap;padding:0 6px;">Lean ' + m + 'kg</span>';
+    bar.appendChild(leanSeg);
+    const fatSeg = document.createElement('div'); fatSeg.style.cssText = 'background:#FAC775;display:flex;align-items:center;justify-content:center;width:' + fatCompPct + '%;';
+    fatSeg.innerHTML = '<span style="color:#412402;font-size:12px;font-weight:500;white-space:nowrap;padding:0 6px;">Fat ' + fat + 'kg</span>';
+    bar.appendChild(fatSeg);
+    calcCard.appendChild(bar);
+    const pcts = div(''); pcts.style.cssText = 'display:flex;justify-content:space-between;font-size:10px;color:#888;margin-top:4px;';
+    pcts.appendChild(el('span', {}, Math.round(leanCompPct) + '% lean'));
+    pcts.appendChild(el('span', {}, Math.round(fatCompPct) + '% fat'));
+    calcCard.appendChild(pcts);
+    resultHolder.appendChild(calcCard);
+  }
+
+  recompute();
 }
 
 function renderProductionForm() {
@@ -3329,7 +3472,7 @@ function renderStageForm() {
 
       const calcCard = div('');
       calcCard.style.cssText = 'background:#f9fdf8;border:1px solid #d0e8c8;border-radius:8px;padding:14px 16px;margin-top:12px;';
-      calcCard.appendChild(el('p', {style:'font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px;'}, 'Fat calculation · ' + (prodForm.speciesName||'') + ' ' + fatPct + '%'));
+      calcCard.appendChild(el('p', {style:'font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px;'}, 'Fat calculation · ' + (prodForm.speciesName||'') + ' — add ' + fatPct + '% fat to the meat'));
       const grid = div('');
       grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;';
       [['Meat (lean)', (Math.round(meatKg*100)/100) + ' kg'],
