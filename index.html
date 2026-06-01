@@ -161,6 +161,45 @@ let sb = null;
 
 let species = ['Pheasant','Partridge','Rabbit','Hare','Venison','Mallard','Other'];
 let speciesFat = {Pheasant: 20, Partridge: 25, Venison: 25};
+// Recipe library. Ingredient types: 'pct' (% of total mix), 'perkg' (g per kg of total),
+// 'fixed' (set amount), 'asneeded' (no weight — e.g. alcohol wash, wine).
+// Every line is editable when applied to a child; these are the starting points.
+const STANDARD_RECIPE_LINES = [
+  {name: 'Salt', type: 'pct', value: 2.5, unit: 'g'},
+  {name: 'Sugar', type: 'fixed', value: 50, unit: 'g'},
+  {name: 'Paprika', type: 'perkg', value: 5, unit: 'g'},
+  {name: 'Flora Italiana enzyme', type: 'fixed', value: 1, unit: 'scoop'}
+];
+let recipeLibrary = [
+  {id: 'rcp_gbp', name: 'Garlic & Black Pepper', ingredients: [
+    {name: 'Salt', type: 'pct', value: 2.5, unit: 'g'},
+    {name: 'Sugar', type: 'fixed', value: 50, unit: 'g'},
+    {name: 'Paprika', type: 'perkg', value: 5, unit: 'g'},
+    {name: 'Flora Italiana enzyme', type: 'fixed', value: 1, unit: 'scoop'},
+    {name: 'Black pepper', type: 'perkg', value: 6.67, unit: 'g'},
+    {name: 'Fresh garlic cloves', type: 'perkg', value: 14.67, unit: 'g'},
+    {name: 'Alcohol wash', type: 'asneeded', value: 0, unit: ''}
+  ]},
+  {id: 'rcp_cf', name: 'Coriander & Fennel', ingredients: [
+    {name: 'Salt', type: 'pct', value: 2.5, unit: 'g'},
+    {name: 'Sugar', type: 'fixed', value: 50, unit: 'g'},
+    {name: 'Paprika', type: 'perkg', value: 5, unit: 'g'},
+    {name: 'Flora Italiana enzyme', type: 'fixed', value: 1, unit: 'scoop'},
+    {name: 'Black pepper', type: 'perkg', value: 3.33, unit: 'g'},
+    {name: 'Fennel seeds', type: 'perkg', value: 5, unit: 'g'},
+    {name: 'Coriander seeds', type: 'perkg', value: 5, unit: 'g'},
+    {name: 'Alcohol wash', type: 'asneeded', value: 0, unit: ''}
+  ]},
+  {id: 'rcp_chorizo', name: 'Chorizo', ingredients: [
+    {name: 'Salt', type: 'pct', value: 2.5, unit: 'g'},
+    {name: 'Sugar', type: 'fixed', value: 50, unit: 'g'},
+    {name: 'Paprika', type: 'perkg', value: 11.45, unit: 'g'},
+    {name: 'Flora Italiana enzyme', type: 'fixed', value: 1, unit: 'scoop'},
+    {name: 'Chilli', type: 'perkg', value: 4.64, unit: 'g'},
+    {name: 'Coriander', type: 'perkg', value: 7.64, unit: 'g'},
+    {name: 'Wine', type: 'asneeded', value: 0, unit: ''}
+  ]}
+];
 let intakes = [], deliveries = [], dailyRecords = [], pestRecords = [], productionRecords = [], periodicCleans = [], estates = [], processors = [], parts = [
   'Whole','Leg','Shoulder','Breast','Saddle','Haunch','Loin','Carcass','Mixed cuts'
 ];
@@ -215,6 +254,7 @@ async function loadData() {
         if (row.key === 'parts' && row.data.length) parts = row.data;
         if (row.key === 'species' && row.data.length) species = row.data;
         if (row.key === 'speciesFat' && row.data) speciesFat = Object.assign(speciesFat, row.data);
+        if (row.key === 'recipeLibrary' && row.data && row.data.length) recipeLibrary = row.data;
       }
     }
 
@@ -262,6 +302,7 @@ async function saveData() {
     await sb.from('app_config').upsert({key: 'parts', data: parts});
     await sb.from('app_config').upsert({key: 'species', data: species});
     await sb.from('app_config').upsert({key: 'speciesFat', data: speciesFat});
+    await sb.from('app_config').upsert({key: 'recipeLibrary', data: recipeLibrary});
     for (const dr of dailyRecords) {
       await sb.from('deliveries').upsert({id: 'daily_' + dr.id, data: {...dr, _type: 'daily'}});
     }
@@ -3247,12 +3288,12 @@ function renderProductionForm() {
 function stageRowSummary(s, idx) {
   const row = div('');
   row.style.cssText = 'display:flex;align-items:flex-start;gap:10px;background:#f9fdf8;border:1px solid #d0e8c8;border-radius:8px;padding:10px 12px;';
-  const icon = {defrost:'❄️', fatcalc:'🧮', saltcalc:'🧂', mince:'🔪', stuff_hang:'🌭'}[s.type] || '•';
-  const typeName = {defrost:'Defrost', fatcalc:'Fat calculator', saltcalc:'Salt calculator', mince:'Prep, wash & mince', stuff_hang:'Stuffing & hanging'}[s.type] || s.type;
+  const icon = {defrost:'❄️', fatcalc:'🧮', recipe:'📋', mince:'🔪', stuff_hang:'🌭'}[s.type] || '•';
+  const typeName = {defrost:'Defrost', fatcalc:'Fat calculator', recipe:'Recipe', mince:'Prep, wash & mince', stuff_hang:'Stuffing & hanging'}[s.type] || s.type;
   let summary = '';
   if (s.type === 'defrost') summary = (s.meatKg ? s.meatKg + 'kg meat out' : '');
   else if (s.type === 'fatcalc') summary = (s.totalKg ? s.meatKg + 'kg meat + ' + s.fatKg + 'kg fat = ' + s.totalKg + 'kg (' + s.fatPercent + '%)' : '');
-  else if (s.type === 'saltcalc') summary = (s.saltGrams ? s.saltGrams + 'g salt (' + s.saltPercent + '% of ' + s.totalKg + 'kg)' : '');
+  else if (s.type === 'recipe') summary = (s.recipeName ? s.recipeName + (s.childLetter ? ' → Child ' + (prodForm.batchCode||'') + s.childLetter : '') : '');
   else if (s.type === 'mince') summary = (s.meatKg ? s.meatKg + 'kg minced' : 'minced');
   else if (s.type === 'stuff_hang') summary = (s.count ? s.count + (s.unitGrams ? ' × ' + s.unitGrams + 'g' : ' salami') : '');
   const main = div(''); main.style.flex = '1';
@@ -3287,7 +3328,7 @@ function renderStageForm() {
     card.appendChild(p('', 'What type of day was today?'));
     [['defrost','❄️ Defrost day','Took meat (or fat) out to defrost'],
      ['fatcalc','🧮 Fat calculator','Work out the fat to add (meat + fat = total mix)'],
-     ['saltcalc','🧂 Salt calculator','Work out the salt for the batch (default 2.5%)'],
+     ['recipe','📋 Recipe','Build or load a recipe for a child (salt, spices, scaled to weight)'],
      ['mince','🔪 Prep, wash & mince day','Washed and minced the batch'],
      ['stuff_hang','🌭 Stuffing & hanging day','Stuffed into skins and hung']
     ].forEach(function(tr){
@@ -3308,7 +3349,7 @@ function renderStageForm() {
 
   const t = prodStageEdit.type;
   const card = div('card');
-  const typeName = {defrost:'Defrost day', fatcalc:'Fat calculator', saltcalc:'Salt calculator', mince:'Prep, wash & mince day', stuff_hang:'Stuffing & hanging day'}[t] || t;
+  const typeName = {defrost:'Defrost day', fatcalc:'Fat calculator', recipe:'Recipe', mince:'Prep, wash & mince day', stuff_hang:'Stuffing & hanging day'}[t] || t;
   card.appendChild(el('h3', {style:'font-size:16px;font-weight:600;margin:0 0 12px;'}, typeName));
 
   const dateField = div('field');
@@ -3424,56 +3465,116 @@ function renderStageForm() {
     pctInp.addEventListener('input', recomputeFat);
     childInp.addEventListener('input', recomputeFat);
     recomputeFat();
-  } else if (t === 'saltcalc') {
-    // Salt calculator stage. Pulls the batch's declared total (meat + fat) from the latest
-    // Fat calculator stage; salt = total x % (default 2.5%, editable for salty recipes).
-    const fatStages = (prodForm.stages || []).filter(function(s){ return s.type === 'fatcalc' && s.totalKg > 0; }).sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
-    const pulledTotal = fatStages.length ? fatStages[0].totalKg : 0;
-    if (prodStageEdit.saltPercent == null) prodStageEdit.saltPercent = 2.5;
-    if (prodStageEdit.totalKg == null) prodStageEdit.totalKg = pulledTotal;
-
-    if (pulledTotal > 0) {
-      card.appendChild(p('muted', 'Total mix from the Fat calculator: ' + pulledTotal + ' kg (meat + fat). Salt is worked out from this.'));
+  } else if (t === 'recipe') {
+    // Recipe stage. Pick a child, load from library or build fresh; lines scale to the
+    // child's total mix (meat+fat). Every gram is editable. Salt is line 1.
+    const children = prodForm.children || [];
+    if (children.length === 0) {
+      const warn = div('');
+      warn.style.cssText = 'background:#faeeda;border:1px solid #f0d4a8;border-radius:8px;padding:12px 14px;margin-top:12px;';
+      warn.appendChild(p('', 'No children yet. Do the Fat calculator first and set how many children this run divides into — then build a recipe for each child.'));
+      card.appendChild(warn);
     } else {
-      card.appendChild(p('muted', 'No Fat calculator saved on this batch yet. Do the Fat calculator first, or type the total mix (meat + fat) below.'));
-      const tField = div('field'); tField.style.marginTop = '12px';
-      tField.appendChild(label('Total mix (meat + fat) in kg'));
-      const tInp = input({type:'number', min:'0', step:'0.1', value: prodStageEdit.totalKg || ''});
-      tInp.placeholder = 'e.g. 12';
-      tInp.style.cssText = 'width:140px;';
-      card.appendChild(tField); tField.appendChild(tInp);
-      tInp.addEventListener('input', function(e){ prodStageEdit.totalKg = parseFloat(e.target.value) || 0; recomputeSalt(); });
-    }
+      if (prodStageEdit.childLetter == null) prodStageEdit.childLetter = children[0].letter;
+      if (prodStageEdit.lines == null) prodStageEdit.lines = STANDARD_RECIPE_LINES.map(function(l){ return Object.assign({}, l); });
 
-    const pctField = div('field'); pctField.style.marginTop = '12px';
-    pctField.appendChild(label('Salt % (default 2.5% — drop it if the recipe has salty ingredients)'));
-    const pctInp = input({type:'number', min:'0', max:'10', step:'0.1', value: prodStageEdit.saltPercent});
-    pctInp.style.cssText = 'width:140px;';
-    card.appendChild(pctField); pctField.appendChild(pctInp);
-    pctInp.addEventListener('input', function(e){ prodStageEdit.saltPercent = parseFloat(e.target.value); recomputeSalt(); });
+      // Child picker
+      const cf = div('field'); cf.style.marginTop = '12px';
+      cf.appendChild(label('Which child is this recipe for?'));
+      const cSel = select(children.map(function(c){ return [c.letter, 'Child ' + c.code + ' (' + c.totalKg + 'kg)']; }), prodStageEdit.childLetter, function(val){
+        prodStageEdit.childLetter = val;
+        // if that child already has a saved recipe, load its lines
+        const ch = children.find(function(c){ return c.letter === val; });
+        if (ch && ch.recipe && ch.recipe.lines) { prodStageEdit.lines = ch.recipe.lines.map(function(l){ return Object.assign({}, l); }); prodStageEdit.recipeName = ch.recipe.name; }
+        renderStageForm();
+      });
+      cSel.style.cssText = 'width:100%;margin-top:4px;';
+      cf.appendChild(cSel); card.appendChild(cf);
 
-    const resultHolder = div(''); resultHolder.style.marginTop = '14px';
-    card.appendChild(resultHolder);
+      // Library loader
+      const lf = div('field'); lf.style.marginTop = '12px';
+      lf.appendChild(label('Load a recipe from the library (or build fresh below)'));
+      const libOpts = [['','— build fresh —']].concat(recipeLibrary.map(function(r){ return [r.id, r.name]; }));
+      const lSel = select(libOpts, '', function(val){
+        if (!val) return;
+        const r = recipeLibrary.find(function(x){ return x.id === val; });
+        if (r) { prodStageEdit.lines = r.ingredients.map(function(l){ return Object.assign({}, l); }); prodStageEdit.recipeName = r.name; renderStageForm(); }
+      });
+      lSel.style.cssText = 'width:100%;margin-top:4px;';
+      lf.appendChild(lSel); card.appendChild(lf);
 
-    function recomputeSalt() {
-      const total = prodStageEdit.totalKg || 0;
-      const pct = prodStageEdit.saltPercent;
-      resultHolder.innerHTML = '';
-      if (!total || total <= 0 || isNaN(pct) || pct <= 0) {
-        prodStageEdit.saltGrams = 0;
-        resultHolder.appendChild(p('muted', 'Need a total mix and a salt % to work out the salt.'));
-        return;
+      // Recipe name
+      const nf = div('field'); nf.style.marginTop = '12px';
+      nf.appendChild(label('Recipe name'));
+      const nInp = input({type:'text', value: prodStageEdit.recipeName || ''});
+      nInp.placeholder = 'e.g. Garlic & Black Pepper';
+      nInp.style.cssText = 'width:100%;';
+      nInp.addEventListener('input', function(e){ prodStageEdit.recipeName = e.target.value; });
+      nf.appendChild(nInp); card.appendChild(nf);
+
+      const child = children.find(function(c){ return c.letter === prodStageEdit.childLetter; }) || children[0];
+      const childTotal = child.totalKg || 0;
+
+      // Ingredient table — suggested grams (editable)
+      card.appendChild(el('p', {style:'font-size:13px;font-weight:600;color:#27500a;margin:14px 0 6px;'}, 'Ingredients for Child ' + child.code + ' (' + childTotal + 'kg mix)'));
+      card.appendChild(p('muted', 'The app suggests an amount; type over it any time (colour, species, taste).'));
+      const tbl = div(''); tbl.style.cssText = 'display:flex;flex-direction:column;gap:6px;margin-top:8px;';
+
+      function suggestG(line) {
+        if (line.type === 'pct') return Math.round(childTotal * 1000 * (line.value/100));
+        if (line.type === 'perkg') return Math.round(childTotal * line.value);
+        if (line.type === 'fixed') return line.value;
+        return null; // asneeded
       }
-      const saltG = Math.round(total * 1000 * (pct/100));
-      prodStageEdit.saltGrams = saltG;
-      const cc = div('');
-      cc.style.cssText = 'background:#f9fdf8;border:1px solid #d0e8c8;border-radius:8px;padding:14px 16px;';
-      cc.appendChild(el('p', {style:'font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 8px;'}, pct + '% salt of ' + total + 'kg total mix'));
-      cc.appendChild(el('p', {style:'font-size:22px;font-weight:700;margin:0;color:#27500a;'}, 'Add ' + saltG + ' g salt'));
-      cc.appendChild(el('p', {style:'font-size:12px;color:#666;margin:4px 0 0;'}, '(' + (Math.round(saltG/10)/100) + ' kg)'));
-      resultHolder.appendChild(cc);
+
+      prodStageEdit.lines.forEach(function(line, idx){
+        if (line.amount == null) line.amount = suggestG(line); // seed editable amount once
+        const row = div(''); row.style.cssText = 'display:flex;align-items:center;gap:8px;background:#f9fdf8;border:1px solid #d0e8c8;border-radius:8px;padding:8px 10px;';
+        const nm = el('span', {style:'flex:1;font-size:14px;'}, line.name);
+        row.appendChild(nm);
+        if (line.type === 'asneeded') {
+          row.appendChild(el('span', {style:'font-size:13px;color:#888;'}, 'as needed'));
+        } else {
+          const amtInp = input({type:'number', min:'0', step:'1', value: (line.amount != null ? line.amount : '')});
+          amtInp.style.cssText = 'width:80px;text-align:right;';
+          amtInp.addEventListener('input', function(e){ line.amount = e.target.value === '' ? null : parseFloat(e.target.value); });
+          row.appendChild(amtInp);
+          row.appendChild(el('span', {style:'font-size:13px;color:#888;width:40px;'}, line.unit || 'g'));
+        }
+        // remove button (not for the 4 standard lines)
+        if (idx >= 4) {
+          const rm = el('button', {style:'background:none;border:none;color:#a32d2d;cursor:pointer;font-size:16px;'}, '×');
+          rm.addEventListener('click', function(){ prodStageEdit.lines.splice(idx,1); renderStageForm(); });
+          row.appendChild(rm);
+        }
+        tbl.appendChild(row);
+      });
+      card.appendChild(tbl);
+
+      // Add ingredient
+      const addBtn = btn('btn-secondary', '+ Add ingredient', function(){
+        prodStageEdit.lines.push({name:'New ingredient', type:'fixed', value:0, unit:'g', amount:0});
+        renderStageForm();
+      });
+      addBtn.style.cssText = 'margin-top:10px;background:#eef5ea;color:#27500a;border:1px solid #d0e8c8;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:14px;';
+      card.appendChild(addBtn);
+
+      // Save to library
+      const saveLibWrap = div(''); saveLibWrap.style.cssText = 'margin-top:12px;';
+      const saveLibBtn = btn('', 'Save this as a library recipe', function(){
+        const nm = (prodStageEdit.recipeName || '').trim();
+        if (!nm) { showToast('Give the recipe a name first'); return; }
+        const existing = recipeLibrary.find(function(r){ return r.name.toLowerCase() === nm.toLowerCase(); });
+        const ingredients = prodStageEdit.lines.map(function(l){ return {name:l.name, type:l.type, value:l.value, unit:l.unit}; });
+        if (existing) { existing.ingredients = ingredients; }
+        else { recipeLibrary.push({id:'rcp_'+Date.now(), name:nm, ingredients:ingredients}); }
+        saveData();
+        showToast('Saved "' + nm + '" to the library');
+      });
+      saveLibBtn.style.cssText = 'background:none;border:1px solid #bbb;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:13px;color:#555;';
+      saveLibWrap.appendChild(saveLibBtn);
+      card.appendChild(saveLibWrap);
     }
-    recomputeSalt();
   } else if (t === 'mince') {
     const meatField = div('field'); meatField.style.marginTop = '12px';
     meatField.appendChild(label('Meat minced today (kg) — optional'));
@@ -3520,8 +3621,9 @@ function renderStageForm() {
     if (t === 'fatcalc' && (!prodStageEdit.meatKg || prodStageEdit.meatKg <= 0 || !prodStageEdit.fatPercent || prodStageEdit.fatPercent <= 0)) {
       showToast('Enter a meat weight and fat % first'); return;
     }
-    if (t === 'saltcalc' && (!prodStageEdit.totalKg || prodStageEdit.totalKg <= 0 || !prodStageEdit.saltPercent || prodStageEdit.saltPercent <= 0)) {
-      showToast('Need a total mix and a salt % first'); return;
+    if (t === 'recipe') {
+      if (!prodForm.children || prodForm.children.length === 0) { showToast('Do the Fat calculator first to create children'); return; }
+      if (!prodStageEdit.recipeName || !prodStageEdit.recipeName.trim()) { showToast('Give the recipe a name'); return; }
     }
     if (t === 'stuff_hang' && (!prodStageEdit.count || prodStageEdit.count <= 0)) {
       showToast('Enter how many salami you made today'); return;
@@ -3529,6 +3631,7 @@ function renderStageForm() {
     prodForm.stages = prodForm.stages || [];
     const toSave = Object.assign({}, prodStageEdit);
     delete toSave.picker;
+    if (!toSave.savedAt) toSave.savedAt = new Date().toISOString();  // real moment saved, for audit (separate from chosen date)
     prodForm.stages.push(toSave);
     // Fat calculator declares the children (divisions) for this run.
     if (t === 'fatcalc') {
@@ -3551,6 +3654,18 @@ function renderStageForm() {
         });
       }
       prodForm.children = kids;
+    }
+    if (t === 'recipe' && prodForm.children) {
+      const ch = prodForm.children.find(function(c){ return c.letter === toSave.childLetter; });
+      if (ch) {
+        // store recipe with the final (possibly edited) amounts and the ratio definitions
+        ch.recipe = {
+          name: toSave.recipeName,
+          lines: (toSave.lines || []).map(function(l){ return {name:l.name, type:l.type, value:l.value, unit:l.unit, amount:l.amount}; })
+        };
+        const saltLine = (toSave.lines || []).find(function(l){ return l.name && l.name.toLowerCase() === 'salt'; });
+        if (saltLine) { ch.saltGrams = saltLine.amount; }
+      }
     }
     prodStageEdit = null;
     saveAndStay();
