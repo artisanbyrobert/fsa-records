@@ -255,6 +255,16 @@ for row in config_raw:
                         estates[eid] = ename
 print(f"Estates loaded: {len(estates)} — {estates}")
 
+general_tasks = []
+for row in config_raw:
+    if row.get('key') == 'generalTasks':
+        d = row.get('data')
+        if isinstance(d, str):
+            try: d = json.loads(d)
+            except: d = []
+        if isinstance(d, list):
+            general_tasks = d
+
 def get_estate(rec):
     # Try direct estate name first
     name = rec.get('estate','') or rec.get('estateName','')
@@ -361,6 +371,20 @@ if daily_records:
     story.append(t)
 else:
     story.append(Paragraph('No daily records found.', small))
+
+# General quick-capture tasks (not tied to a record)
+_open_general = [t for t in general_tasks if not t.get('done')]
+_done_general = [t for t in general_tasks if t.get('done')]
+if _open_general or _done_general:
+    add_section('General Tasks')
+    grows = [['Task', 'Added', 'Status']]
+    for t in _open_general:
+        grows.append([clean(t.get('text','')), clean(str(t.get('addedDate',''))), 'Open'])
+    for t in _done_general:
+        grows.append([clean(t.get('text','')), clean(str(t.get('addedDate',''))), 'Done ' + clean(str(t.get('doneDate','')))])
+    gt = Table(grows, colWidths=[130*mm, 45*mm, 49*mm], repeatRows=1)
+    gt.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), GREEN), ('TEXTCOLOR', (0,0), (-1,0), colors.white), ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), ('FONTSIZE', (0,0), (-1,-1), 7), ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]), ('GRID', (0,0), (-1,-1), 0.3, colors.HexColor('#e0e0dc')), ('LEFTPADDING', (0,0), (-1,-1), 4), ('TOPPADDING', (0,0), (-1,-1), 3), ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('VALIGN', (0,0), (-1,-1), 'TOP')]))
+    story.append(gt)
 
 add_section('Finished Product / Delivery Records')
 if deliveries:
