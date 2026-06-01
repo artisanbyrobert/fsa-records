@@ -473,7 +473,7 @@ if production_records:
                 lines = rcp.get('lines', []) if isinstance(rcp, dict) else []
                 if lines:
                     story.append(Paragraph('<b>Child ' + clean(str(c.get('code',''))) + ' — ' + clean(rcp.get('name','')) + '</b>', ParagraphStyle('rch', fontSize=8, fontName='Helvetica-Bold', textColor=GREEN, spaceAfter=2, spaceBefore=3, keepWithNext=1)))
-                    irows = [['Ingredient', 'Amount']]
+                    irows = [['Ingredient', 'Amount', 'Added']]
                     for ln in lines:
                         amt = ln.get('amount')
                         unit = ln.get('unit','') or 'g'
@@ -481,8 +481,9 @@ if production_records:
                             amt_str = 'as needed'
                         else:
                             amt_str = f"{amt} {unit}".strip()
-                        irows.append([clean(ln.get('name','')), amt_str])
-                    it = Table(irows, colWidths=[120*mm, 104*mm], repeatRows=1)
+                        added = clean(str(ln.get('addedDate',''))) or '-'
+                        irows.append([clean(ln.get('name','')), amt_str, added])
+                    it = Table(irows, colWidths=[110*mm, 64*mm, 50*mm], repeatRows=1)
                     it.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), LIGHT_GREEN), ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), ('FONTSIZE', (0,0), (-1,-1), 7), ('GRID', (0,0), (-1,-1), 0.3, colors.HexColor('#e0e0dc')), ('LEFTPADDING', (0,0), (-1,-1), 4), ('TOPPADDING', (0,0), (-1,-1), 2), ('BOTTOMPADDING', (0,0), (-1,-1), 2)]))
                     story.append(it)
                     story.append(Spacer(1, 2*mm))
