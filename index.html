@@ -2974,6 +2974,7 @@ function renderPestForm() {
 let prodForm = null;
 let prodEditId = null;
 let prodStageEdit = null;
+let makeChildLetter = null;
 
 function processCodeFromDate(dateStr) {
   return (dateStr || today()).replace(/-/g, '');
@@ -3185,6 +3186,59 @@ function openProductionRun(id) {
   renderProductionForm();
 }
 
+// ── Make mode: big-button butchery checklist for one child ─────────────────
+// Tick each ingredient as it goes in; untick to undo. Each tick stamps its date
+// (so a 2-day mix shows when each item went in). State saved on the child.
+function renderMakeMode() {
+  const v = document.getElementById('view-prod');
+  v.innerHTML = '';
+  const child = (prodForm.children || []).find(function(c){ return c.letter === makeChildLetter; });
+  if (!child || !child.recipe || !child.recipe.lines) { makeChildLetter = null; renderProductionForm(); return; }
+
+  const hdr = div('header-bar');
+  hdr.appendChild(el('h2', {style:'font-size:20px;font-weight:700;margin:0;'}, 'Make: Child ' + child.code));
+  const back = btn('', '← Back', function(){ makeChildLetter = null; renderProductionForm(); });
+  back.style.cssText = 'background:#fff;border:1px solid #ccc;border-radius:8px;padding:8px 14px;cursor:pointer;';
+  hdr.appendChild(back);
+  v.appendChild(hdr);
+
+  const sub = div(''); sub.style.cssText = 'margin:4px 0 16px;';
+  sub.appendChild(el('p', {style:'font-size:16px;font-weight:600;color:#27500a;margin:0;'}, (child.recipe.name || 'Recipe') + ' · ' + child.totalKg + 'kg mix'));
+  const done = (child.recipe.lines||[]).filter(function(l){ return l.addedDate; }).length;
+  sub.appendChild(el('p', {style:'font-size:14px;color:#666;margin:2px 0 0;'}, done + ' of ' + child.recipe.lines.length + ' added · tap each ingredient as it goes in'));
+  v.appendChild(sub);
+
+  const list = div(''); list.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
+  child.recipe.lines.forEach(function(line){
+    const isAdded = !!line.addedDate;
+    const amtStr = (line.type === 'asneeded' || line.amount == null || line.amount === '') ? 'as needed' : (line.amount + ' ' + (line.unit || 'g'));
+    const b = el('button', {});
+    b.style.cssText = 'display:flex;align-items:center;gap:14px;width:100%;text-align:left;border-radius:12px;padding:18px 18px;font-size:18px;cursor:pointer;border:2px solid ' +
+      (isAdded ? '#27500a' : '#d0e8c8') + ';background:' + (isAdded ? '#eaf3e4' : '#fff') + ';';
+    const tick = el('span', {style:'font-size:26px;width:32px;flex-shrink:0;color:' + (isAdded ? '#27500a' : '#bbb') + ';'}, isAdded ? '☑' : '☐');
+    const nameWrap = div(''); nameWrap.style.cssText = 'flex:1;';
+    nameWrap.appendChild(el('span', {style:'font-weight:600;' + (isAdded ? 'text-decoration:line-through;color:#7a8a72;' : '')}, line.name));
+    if (isAdded) nameWrap.appendChild(el('span', {style:'display:block;font-size:12px;color:#888;margin-top:2px;'}, 'added ' + line.addedDate));
+    const amt = el('span', {style:'font-size:18px;font-weight:700;color:' + (isAdded ? '#7a8a72' : '#1a1a1a') + ';flex-shrink:0;'}, amtStr);
+    b.appendChild(tick); b.appendChild(nameWrap); b.appendChild(amt);
+    b.addEventListener('click', function(){
+      if (line.addedDate) { delete line.addedDate; }
+      else { line.addedDate = today(); }
+      saveData();
+      renderMakeMode();
+    });
+    list.appendChild(b);
+  });
+  v.appendChild(list);
+
+  const allDone = (child.recipe.lines||[]).every(function(l){ return l.addedDate; });
+  if (allDone) {
+    const banner = div(''); banner.style.cssText = 'margin-top:16px;background:#27500a;color:#fff;border-radius:12px;padding:16px;text-align:center;font-size:17px;font-weight:600;';
+    banner.appendChild(el('span', {}, '✓ All ingredients added to Child ' + child.code));
+    v.appendChild(banner);
+  }
+}
+
 function renderProductionForm() {
   if (!prodForm) { renderProduction(); return; }
   hideAllExceptProd();
@@ -3236,7 +3290,18 @@ function renderProductionForm() {
       row.appendChild(el('p', {style:'font-size:13px;font-weight:600;margin:0 0 2px;'}, 'Child ' + c.code));
       const bits = [c.meatKg + 'kg meat + ' + c.fatKg + 'kg fat = ' + c.totalKg + 'kg'];
       if (c.recipe && c.recipe.name) bits.push(c.recipe.name);
-      row.appendChild(el('p', {style:'font-size:12px;color:#666;margin:0;'}, bits.join(' · ')));
+      row.appendChild(el('p', {style:'font-size:12px;color:#666;margin:0 0 6px;'}, bits.join(' · ')));
+      if (c.recipe && c.recipe.lines && c.recipe.lines.length) {
+        const ticked = (c.recipe.lines || []).filter(function(l){ return l.addedDate; }).length;
+        const totalLines = c.recipe.lines.length;
+        const allDone = ticked === totalLines;
+        const mk = el('button', {style:'background:' + (allDone ? '#27500a' : '#3a6b2a') + ';color:#fff;border:none;border-radius:8px;padding:10px 16px;font-size:15px;font-weight:600;cursor:pointer;width:100%;'},
+          (allDone ? '✓ All added — view checklist' : '▶ Make / check off (' + ticked + ' of ' + totalLines + ' added)'));
+        mk.addEventListener('click', function(){ makeChildLetter = c.letter; renderMakeMode(); });
+        row.appendChild(mk);
+      } else {
+        row.appendChild(p('muted', 'Add a recipe for this child first (📋 Recipe stage).'));
+      }
       kidsWrap.appendChild(row);
     });
     card.appendChild(kidsWrap);
