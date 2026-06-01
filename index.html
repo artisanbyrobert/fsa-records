@@ -203,6 +203,7 @@ let recipeLibrary = [
 let intakes = [], deliveries = [], dailyRecords = [], pestRecords = [], productionRecords = [], periodicCleans = [], estates = [], processors = [], parts = [
   'Whole','Leg','Shoulder','Breast','Saddle','Haunch','Loin','Carcass','Mixed cuts'
 ];
+let generalTasks = [];  // loose quick-capture tasks, not tied to any record
 let currentView = 'list';
 let editId = null;
 let form = null;
@@ -255,6 +256,7 @@ async function loadData() {
         if (row.key === 'species' && row.data.length) species = row.data;
         if (row.key === 'speciesFat' && row.data) speciesFat = Object.assign(speciesFat, row.data);
         if (row.key === 'recipeLibrary' && row.data && row.data.length) recipeLibrary = row.data;
+        if (row.key === 'generalTasks' && row.data) generalTasks = row.data;
       }
     }
 
@@ -303,6 +305,7 @@ async function saveData() {
     await sb.from('app_config').upsert({key: 'species', data: species});
     await sb.from('app_config').upsert({key: 'speciesFat', data: speciesFat});
     await sb.from('app_config').upsert({key: 'recipeLibrary', data: recipeLibrary});
+    await sb.from('app_config').upsert({key: 'generalTasks', data: generalTasks});
     for (const dr of dailyRecords) {
       await sb.from('deliveries').upsert({id: 'daily_' + dr.id, data: {...dr, _type: 'daily'}});
     }
@@ -546,6 +549,10 @@ function renderTabs(activeTab) {
       allTodosGlobal.push({task: t, parentRecord: r});
     });
   });
+  // Loose quick-capture tasks (no parent record)
+  generalTasks.filter(t => !t.done).forEach(t => {
+    allTodosGlobal.push({task: t, parentRecord: null, isGeneral: true});
+  });
   // Monthly pest control reminder (no parent record — clicks through to pest tab)
   if (typeof pestControlDoneThisMonth === 'function' && !pestControlDoneThisMonth()) {
     allTodosGlobal.unshift({task: {text:'🐭 Monthly pest control check due', addedDate: today(), _pestReminder: true}, parentRecord: null});
@@ -565,7 +572,7 @@ function renderTabs(activeTab) {
     taskRow.style.cssText = 'display:flex;align-items:flex-start;gap:10px;padding:5px 0;border-bottom:1px solid #f0d4a8;' + (task._pestReminder ? 'cursor:pointer;' : '');
     if (task._pestReminder) taskRow.addEventListener('click', renderPestControl);
     // Real to-do tasks: clickable checkbox marks done + saves + refreshes
-    if (parentRecord) {
+    if (parentRecord || entry.isGeneral) {
       const chk = document.createElement('input');
       chk.type = 'checkbox';
       chk.style.cssText = 'width:20px;height:20px;accent-color:#3a6b2a;cursor:pointer;flex-shrink:0;margin-top:1px;';
@@ -590,6 +597,27 @@ function renderTabs(activeTab) {
     const moreEl = document.createElement('p'); moreEl.style.cssText = 'font-size:11px;color:#aaa;margin-top:6px;text-align:center;'; moreEl.textContent = '+ ' + (allTodosGlobal.length - 5) + ' more';
     globalPanel.appendChild(moreEl);
   }
+  // Quick "+ Add task" — works from any tab, no work session needed
+  const addWrap = document.createElement('div'); addWrap.style.cssText = 'display:flex;gap:8px;margin-top:10px;';
+  const addInput = document.createElement('input');
+  addInput.type = 'text';
+  addInput.placeholder = 'Add a task…';
+  addInput.style.cssText = 'flex:1;padding:8px 10px;font-size:14px;border:1px solid #e0c9a0;border-radius:6px;';
+  const addBtn = document.createElement('button');
+  addBtn.textContent = '+ Add';
+  addBtn.style.cssText = 'background:#3a6b2a;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:600;cursor:pointer;flex-shrink:0;';
+  async function addQuickTask() {
+    const text = addInput.value.trim();
+    if (!text) return;
+    generalTasks.push({id: 'gt_' + Date.now(), text: text, addedDate: today(), done: false});
+    addInput.value = '';
+    try { await saveData(); } catch(e) { console.warn('saveData failed:', e); }
+    renderTabs(activeTab);
+  }
+  addBtn.addEventListener('click', addQuickTask);
+  addInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); addQuickTask(); } });
+  addWrap.appendChild(addInput); addWrap.appendChild(addBtn);
+  globalPanel.appendChild(addWrap);
   v.appendChild(globalPanel);
 }
 
