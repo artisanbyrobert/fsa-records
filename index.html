@@ -549,7 +549,7 @@ function renderTabs(activeTab) {
       allTodosGlobal.push({task: t, parentRecord: r});
     });
   });
-  // Loose quick-capture tasks (no parent record)
+  // Loose quick-capture tasks (no parent record). kind: 'fsa' (default) or 'app'
   generalTasks.filter(t => !t.done).forEach(t => {
     allTodosGlobal.push({task: t, parentRecord: null, isGeneral: true});
   });
@@ -565,13 +565,16 @@ function renderTabs(activeTab) {
   globalTitle.style.color = allTodosGlobal.length > 0 ? '#633806' : '#27500a';
   globalTitle.textContent = allTodosGlobal.length > 0 ? '⚠️ Outstanding tasks — ' + allTodosGlobal.length + ' to do' : '✓ No outstanding tasks';
   globalPanel.appendChild(globalTitle);
-  allTodosGlobal.slice(0, 5).forEach(entry => {
+  // Scrollable list — shows ALL tasks, scrolls if long
+  const listWrap = document.createElement('div');
+  listWrap.style.cssText = 'max-height:240px;overflow-y:auto;';
+  allTodosGlobal.forEach(entry => {
     const task = entry.task;
     const parentRecord = entry.parentRecord;
+    const isApp = entry.isGeneral && task.kind === 'app';
     const taskRow = document.createElement('div');
     taskRow.style.cssText = 'display:flex;align-items:flex-start;gap:10px;padding:5px 0;border-bottom:1px solid #f0d4a8;' + (task._pestReminder ? 'cursor:pointer;' : '');
     if (task._pestReminder) taskRow.addEventListener('click', renderPestControl);
-    // Real to-do tasks: clickable checkbox marks done + saves + refreshes
     if (parentRecord || entry.isGeneral) {
       const chk = document.createElement('input');
       chk.type = 'checkbox';
@@ -584,21 +587,41 @@ function renderTabs(activeTab) {
       });
       taskRow.appendChild(chk);
     } else {
-      // Pest reminder: keep circle
       const circle = document.createElement('span'); circle.style.cssText = 'color:#d35400;flex-shrink:0;font-size:16px;line-height:1.2;'; circle.textContent = '○';
       taskRow.appendChild(circle);
     }
-    const taskText = document.createElement('span'); taskText.style.cssText = 'font-size:13px;color:#633806;flex:1;'; taskText.textContent = task.text;
+    const taskText = document.createElement('span'); taskText.style.cssText = 'font-size:13px;color:' + (isApp ? '#5566aa' : '#633806') + ';flex:1;';
+    taskText.textContent = (isApp ? '🔧 ' : '') + task.text;
+    taskRow.appendChild(taskText);
+    // Re-tag button for general tasks (move FSA <-> App)
+    if (entry.isGeneral && !task._pestReminder) {
+      const tag = document.createElement('button');
+      tag.textContent = isApp ? 'App note' : 'FSA';
+      tag.title = 'Tap to switch — App notes are kept out of the FSA PDF';
+      tag.style.cssText = 'flex-shrink:0;font-size:10px;border:1px solid ' + (isApp ? '#5566aa' : '#3a6b2a') + ';color:' + (isApp ? '#5566aa' : '#3a6b2a') + ';background:#fff;border-radius:10px;padding:2px 8px;cursor:pointer;';
+      tag.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        task.kind = isApp ? 'fsa' : 'app';
+        try { await saveData(); } catch(err) { console.warn('saveData failed:', err); }
+        renderTabs(activeTab);
+      });
+      taskRow.appendChild(tag);
+    }
     const dateAdded = document.createElement('span'); dateAdded.style.cssText = 'font-size:10px;color:#aaa;white-space:nowrap;'; dateAdded.textContent = fmtDate(task.addedDate);
-    taskRow.appendChild(taskText); taskRow.appendChild(dateAdded);
-    globalPanel.appendChild(taskRow);
+    taskRow.appendChild(dateAdded);
+    listWrap.appendChild(taskRow);
   });
-  if (allTodosGlobal.length > 5) {
-    const moreEl = document.createElement('p'); moreEl.style.cssText = 'font-size:11px;color:#aaa;margin-top:6px;text-align:center;'; moreEl.textContent = '+ ' + (allTodosGlobal.length - 5) + ' more';
-    globalPanel.appendChild(moreEl);
-  }
-  // Quick "+ Add task" — works from any tab, no work session needed
-  const addWrap = document.createElement('div'); addWrap.style.cssText = 'display:flex;gap:8px;margin-top:10px;';
+  globalPanel.appendChild(listWrap);
+  // Quick add — with FSA / App note toggle. Works from any tab.
+  if (!window._quickAddKind) window._quickAddKind = 'fsa';
+  const addWrap = document.createElement('div'); addWrap.style.cssText = 'display:flex;gap:8px;margin-top:10px;align-items:center;';
+  const kindBtn = document.createElement('button');
+  function kindLabel(){ return window._quickAddKind === 'app' ? '🔧 App note' : 'FSA task'; }
+  kindBtn.textContent = kindLabel();
+  kindBtn.title = 'Tap to switch. App notes stay out of the FSA PDF.';
+  function styleKind(){ const app = window._quickAddKind==='app'; kindBtn.style.cssText = 'flex-shrink:0;font-size:12px;border:1px solid ' + (app?'#5566aa':'#3a6b2a') + ';color:' + (app?'#5566aa':'#3a6b2a') + ';background:#fff;border-radius:6px;padding:8px 10px;cursor:pointer;'; }
+  styleKind();
+  kindBtn.addEventListener('click', function(){ window._quickAddKind = window._quickAddKind==='app'?'fsa':'app'; kindBtn.textContent = kindLabel(); styleKind(); });
   const addInput = document.createElement('input');
   addInput.type = 'text';
   addInput.placeholder = 'Add a task…';
@@ -609,14 +632,14 @@ function renderTabs(activeTab) {
   async function addQuickTask() {
     const text = addInput.value.trim();
     if (!text) return;
-    generalTasks.push({id: 'gt_' + Date.now(), text: text, addedDate: today(), done: false});
+    generalTasks.push({id: 'gt_' + Date.now(), text: text, addedDate: today(), done: false, kind: window._quickAddKind});
     addInput.value = '';
     try { await saveData(); } catch(e) { console.warn('saveData failed:', e); }
     renderTabs(activeTab);
   }
   addBtn.addEventListener('click', addQuickTask);
   addInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); addQuickTask(); } });
-  addWrap.appendChild(addInput); addWrap.appendChild(addBtn);
+  addWrap.appendChild(kindBtn); addWrap.appendChild(addInput); addWrap.appendChild(addBtn);
   globalPanel.appendChild(addWrap);
   v.appendChild(globalPanel);
 }
