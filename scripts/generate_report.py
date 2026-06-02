@@ -292,7 +292,9 @@ from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, PageBreak, KeepTogether
+from reportlab.graphics.shapes import Drawing, Rect, Circle, Line, String
+from reportlab.graphics import renderPDF
 
 doc = SimpleDocTemplate(filename, pagesize=landscape(A4), rightMargin=15*mm, leftMargin=15*mm, topMargin=15*mm, bottomMargin=15*mm)
 GREEN = colors.HexColor('#3a6b2a')
@@ -300,21 +302,25 @@ AMBER = colors.HexColor('#854f0b')
 LIGHT_GREEN = colors.HexColor('#e8f4e3')
 LIGHT_GREY = colors.HexColor('#f5f5f2')
 h1 = ParagraphStyle('h1', fontSize=18, textColor=GREEN, fontName='Helvetica-Bold', spaceAfter=4)
-h2 = ParagraphStyle('h2', fontSize=13, textColor=GREEN, fontName='Helvetica-Bold', spaceAfter=4, spaceBefore=12, keepWithNext=1)
+h2 = ParagraphStyle('h2', fontSize=15, textColor=GREEN, fontName='Helvetica-Bold', spaceAfter=4, spaceBefore=4, keepWithNext=1)
 small = ParagraphStyle('small', fontSize=9, textColor=colors.grey)
+desc_style = ParagraphStyle('desc', fontSize=9, textColor=colors.HexColor('#666'), spaceAfter=8, leading=12)
 
 story = []
+_first_section = [True]
 
-def add_section(title):
-    # Section heading + divider that stay glued to the data beneath them, so a
-    # heading is never stranded at the bottom of a page away from its table.
-    story.append(Spacer(1, 8*mm))
+def add_section(title, description=None, new_page=True):
+    # Each major section starts on its own page and grows downward over the season.
+    # An optional description explains what the section records.
+    if new_page and not _first_section[0]:
+        story.append(PageBreak())
+    _first_section[0] = False
     story.append(Paragraph(title, h2))
-    hr = HRFlowable(width='100%', thickness=0.5, color=GREEN, spaceAfter=6)
+    hr = HRFlowable(width='100%', thickness=1, color=GREEN, spaceAfter=6)
     hr.keepWithNext = 1
     story.append(hr)
-
-story.append(Spacer(1, 10*mm))
+    if description:
+        story.append(Paragraph(description, desc_style))
 story.append(Paragraph('Artisan by Robert', h1))
 story.append(Paragraph('FSA Compliance Records', ParagraphStyle('sub', fontSize=13, textColor=AMBER, fontName='Helvetica-Bold', spaceAfter=2)))
 story.append(Paragraph(f'FSA Licence: UK2820    Hook, Hampshire RG29 1HT', small))
@@ -325,8 +331,11 @@ summary_data = [['Intake records', str(len(intakes))], ['Daily records', str(len
 summary_table = Table(summary_data, colWidths=[160*mm, 60*mm])
 summary_table.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), LIGHT_GREEN), ('FONTSIZE', (0,0), (-1,-1), 10), ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#b8d9b0')), ('LEFTPADDING', (0,0), (-1,-1), 8), ('TOPPADDING', (0,0), (-1,-1), 6), ('BOTTOMPADDING', (0,0), (-1,-1), 6)]))
 story.append(summary_table)
+story.append(PageBreak())
 
-add_section('Intake Records')
+add_section('Intake Records',
+    'All raw meat brought in, by batch. Each batch carries its season code, intake date, source estate, species and weights. This is the start of the traceability chain — every finished product traces back to a batch here.',
+    new_page=False)
 intake_cell = ParagraphStyle('icell', fontSize=7, leading=10)
 intake_hdr = ParagraphStyle('ihdr', fontSize=7, textColor=colors.white, fontName='Helvetica-Bold')
 if intakes:
@@ -351,7 +360,8 @@ if intakes:
 else:
     story.append(Paragraph('No intake records found.', small))
 
-add_section('Daily Records')
+add_section('Daily Records',
+    'Day-by-day log of monitoring, walkabouts and ad-hoc work. Each row is one day: the type of day, free-text notes on what was observed or done, and any outstanding tasks raised that day. Newest first.')
 cell_style = ParagraphStyle('cell', fontSize=7, leading=10)
 header_style = ParagraphStyle('hdr', fontSize=7, textColor=colors.white, fontName='Helvetica-Bold')
 if daily_records:
@@ -376,7 +386,8 @@ else:
 _open_general = [t for t in general_tasks if not t.get('done') and t.get('kind') != 'app']
 _done_general = [t for t in general_tasks if t.get('done') and t.get('kind') != 'app']
 if _open_general or _done_general:
-    add_section('General Tasks')
+    add_section('General Tasks',
+        'Quick-capture jobs not tied to a specific day or batch (e.g. supplies to order). Open tasks are outstanding; done tasks show the date completed. App-development notes are excluded from this record.')
     grows = [['Task', 'Added', 'Status']]
     for t in _open_general:
         grows.append([clean(t.get('text','')), clean(str(t.get('addedDate',''))), 'Open'])
@@ -386,7 +397,8 @@ if _open_general or _done_general:
     gt.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), GREEN), ('TEXTCOLOR', (0,0), (-1,0), colors.white), ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), ('FONTSIZE', (0,0), (-1,-1), 7), ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]), ('GRID', (0,0), (-1,-1), 0.3, colors.HexColor('#e0e0dc')), ('LEFTPADDING', (0,0), (-1,-1), 4), ('TOPPADDING', (0,0), (-1,-1), 3), ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('VALIGN', (0,0), (-1,-1), 'TOP')]))
     story.append(gt)
 
-add_section('Finished Product / Delivery Records')
+add_section('Finished Product / Delivery Records',
+    'Finished salami, prosciutto and other products dispatched, by batch and destination. Completes the traceability chain from intake through production to the customer.')
 if deliveries:
     rows = [['Date', 'Batch', 'Destination', 'Notes']]
     for rec in sorted(deliveries, key=lambda x: x.get('date',''), reverse=True):
@@ -399,7 +411,8 @@ else:
 
 # ── PEST CONTROL SECTION ──────────────────────────────────────────────────────
 _log(f"Building Pest Control section ({len(pest_records)} records)")
-add_section('Pest Control Records')
+add_section('Pest Control Records',
+    'Rodenticide details, the bait-station map, monthly bait-station checks, and insectocutor (fly-killer) checks. Insectocutor checks are shown as a matrix — one row per check date — so the record grows cleanly over the season.')
 
 # Standing reference info
 ref_style = ParagraphStyle('ref', fontSize=8, textColor=colors.HexColor('#444'), leading=11, spaceAfter=4)
@@ -409,54 +422,182 @@ station_lines = '  •  '.join([f'{i+1}: {n}' for i, n in enumerate(station_name
 story.append(Paragraph(f'<b>Bait stations:</b> {station_lines}', ref_style))
 story.append(Spacer(1, 4*mm))
 
+# ── Bait station map (drawn) ──────────────────────────────────────────────────
+def build_bait_map():
+    # Workshop layout, scaled to fit the page. Mirrors the in-app SVG map.
+    sc = 0.62  # scale factor
+    W, H = 680*sc, 620*sc
+    d = Drawing(W, H)
+    def sx(x): return x*sc
+    def sy(y): return H - y*sc  # flip Y (reportlab origin bottom-left)
+    rust = colors.HexColor('#d35400'); rustedge = colors.HexColor('#a04200')
+    grey = colors.HexColor('#888888'); dark = colors.HexColor('#1a1a1a'); mid = colors.HexColor('#444444')
+    def box(x,y,w,h):
+        d.add(Rect(sx(x), sy(y+h), w*sc, h*sc, strokeColor=grey, strokeWidth=0.8, fillColor=None))
+    def txt(x,y,s,size=11,col=mid,anchor='start',bold=False):
+        st = String(sx(x), sy(y), s, fontSize=size*sc*1.4, fillColor=col, textAnchor=anchor)
+        st.fontName = 'Helvetica-Bold' if bold else 'Helvetica'
+        d.add(st)
+    def station(x,y,num):
+        d.add(Circle(sx(x), sy(y), 14*sc, fillColor=rust, strokeColor=rustedge, strokeWidth=1))
+        s = String(sx(x), sy(y)-4*sc, str(num), fontSize=13*sc*1.4, fillColor=colors.white, textAnchor='middle'); s.fontName='Helvetica-Bold'; d.add(s)
+    def lead(x1,y1,x2,y2):
+        d.add(Line(sx(x1), sy(y1), sx(x2), sy(y2), strokeColor=colors.HexColor('#aaaaaa'), strokeWidth=0.5, strokeDashArray=[2,2]))
+    # outer
+    txt(60,28,'Bait station map',14,dark,bold=True)
+    txt(620,28,'Revised 28 Oct 2024',11,grey,anchor='end')
+    box(240,78,200,56); txt(340,107,'Sawmill',13,dark,'middle',True)
+    station(340,170,1); lead(354,170,448,186); txt(454,190,'Under alu roof sheet',11,mid)
+    box(50,220,580,370); txt(62,238,'Main workshop',11,grey)
+    box(82,265,64,22); txt(114,280,'Vice',11,mid,'middle')
+    station(114,322,7); lead(128,322,198,322); txt(204,326,'Under vice',11,mid)
+    box(390,262,160,78); txt(470,306,'Tractor',13,dark,'middle',True)
+    d.add(Line(sx(82),sy(372),sx(600),sy(372),strokeColor=grey,strokeWidth=1)); txt(86,365,'Workbench',10,grey)
+    box(82,394,108,36); txt(150,416,'Red cabinet',11,mid,'middle')
+    station(105,412,2); lead(119,412,220,412); txt(226,416,'By red cabinet',11,mid)
+    station(588,390,3); lead(588,404,588,428); txt(588,442,'Behind bench',11,mid,'middle')
+    d.add(Line(sx(82),sy(490),sx(600),sy(490),strokeColor=grey,strokeWidth=1)); txt(86,483,'Workbench',10,grey)
+    box(82,512,78,30); txt(121,530,'Smoker',11,mid,'middle')
+    station(188,527,4); lead(202,527,232,527); txt(238,531,'By smoker',11,mid)
+    box(320,528,110,58); txt(375,559,'Boiler tank',11,mid,'middle')
+    station(375,510,5); lead(375,496,498,470); txt(504,474,'Under saw bench',11,mid)
+    d.add(Line(sx(600),sy(490),sx(600),sy(570),strokeColor=grey,strokeWidth=1,strokeDashArray=[4,3])); txt(610,478,'French doors',10,grey)
+    station(572,540,6); lead(572,554,572,578); txt(572,592,'By french doors',11,mid,'middle')
+    return d
+
+story.append(Paragraph('<b>Bait station map</b> — workshop layout (revised 28 Oct 2024)', ParagraphStyle('bmh', fontSize=9, fontName='Helvetica-Bold', textColor=GREEN, spaceAfter=4)))
+try:
+    story.append(build_bait_map())
+except Exception as _e:
+    _log(f"bait map draw failed: {_e}")
+story.append(Spacer(1, 6*mm))
+
+# Rat bait checks — keep per-date detail (status varies per check)
 if pest_records:
+    story.append(Paragraph('<b>Bait Station Checks</b>', ParagraphStyle('rbh', fontSize=10, fontName='Helvetica-Bold', textColor=GREEN, spaceAfter=4, spaceBefore=2)))
     for rec in sorted(pest_records, key=lambda x: x.get('date',''), reverse=True):
         date_str = rec.get('date','')
-        story.append(Paragraph(f'<b>Check date: {date_str}</b>', ParagraphStyle('pdh', fontSize=10, fontName='Helvetica-Bold', textColor=GREEN, spaceAfter=3, spaceBefore=6, keepWithNext=1)))
-        # Stations table
         stations = rec.get('stations', []) or []
         if stations:
-            story.append(Paragraph('<b>Rat Bait</b>', ParagraphStyle('rbh', fontSize=9, fontName='Helvetica-Bold', textColor=GREEN, spaceAfter=2, spaceBefore=4, keepWithNext=1)))
+            story.append(Paragraph(f'Check date: {date_str}', ParagraphStyle('pdh', fontSize=9, fontName='Helvetica-Bold', textColor=colors.HexColor('#444'), spaceAfter=2, spaceBefore=4, keepWithNext=1)))
             srows = [['#', 'Location', 'Status', 'Notes']]
             for i, s in enumerate(stations):
                 srows.append([str(i+1), clean(s.get('name','')), clean(s.get('status','')), clean(s.get('notes',''))[:60]])
-            st = Table(srows, colWidths=[12*mm, 75*mm, 30*mm, 100*mm], repeatRows=1)
+            st = Table(srows, colWidths=[12*mm, 75*mm, 35*mm, 145*mm], repeatRows=1)
             st.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), GREEN), ('TEXTCOLOR', (0,0), (-1,0), colors.white), ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), ('FONTSIZE', (0,0), (-1,-1), 7), ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]), ('GRID', (0,0), (-1,-1), 0.3, colors.HexColor('#e0e0dc')), ('LEFTPADDING', (0,0), (-1,-1), 4), ('TOPPADDING', (0,0), (-1,-1), 3), ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('VALIGN', (0,0), (-1,-1), 'TOP')]))
             story.append(st)
-        # Insectocutors
-        insects = rec.get('insectocutors', {}) or {}
-        if insects:
-            def _tick(val):
-                # True/'true'/'yes' -> check; False/None/'' -> dash; any other text shown as-is
-                if isinstance(val, bool):
-                    return '✓' if val else '–'
-                s = str(val).strip()
-                if s == '' or s is None:
-                    return '–'
-                if s.lower() in ('true', 'yes', 'done', 'changed', 'y'):
-                    return '✓'
-                if s.lower() in ('false', 'no', 'n'):
-                    return '–'
-                return clean(s)
-            irows = [['Location', 'Sticky', 'Cleanout', 'Lamp', 'Starter', 'Notes']]
-            for loc, data in insects.items():
+
+    # Insectocutor checks as a date-row matrix
+    def _itick(val):
+        if isinstance(val, bool): return '✓' if val else '–'
+        s = str(val).strip().lower()
+        if s in ('true','yes','done','changed','y'): return '✓'
+        if s in ('false','no','n','',): return '–'
+        return clean(str(val))
+    # collect locations seen across all records (stable column order)
+    ins_locs = []
+    for rec in pest_records:
+        for loc in (rec.get('insectocutors', {}) or {}).keys():
+            if loc not in ins_locs: ins_locs.append(loc)
+    if ins_locs:
+        story.append(Spacer(1, 4*mm))
+        story.append(Paragraph('<b>Insectocutor Checks</b> — one row per check date; for each unit: Sticky / Cleanout / Lamp / Starter', ParagraphStyle('insh', fontSize=9, fontName='Helvetica-Bold', textColor=GREEN, spaceAfter=4, spaceBefore=2)))
+        hdr_style = ParagraphStyle('ih', fontSize=6, textColor=colors.white, fontName='Helvetica-Bold', leading=7)
+        # build two-row header: location spanning 4 sub-columns each
+        sub = ['St','Cl','La','Sr']
+        header = [Paragraph('Date', hdr_style)]
+        for loc in ins_locs:
+            header.append(Paragraph(clean(loc) + '<br/>St·Cl·La·Sr', hdr_style))
+        irows = [header]
+        cell2 = ParagraphStyle('ic', fontSize=7, leading=8, alignment=1)
+        for rec in sorted(pest_records, key=lambda x: x.get('date',''), reverse=True):
+            ins = rec.get('insectocutors', {}) or {}
+            if not ins: continue
+            row = [Paragraph(clean(rec.get('date','')), ParagraphStyle('id', fontSize=7, leading=8))]
+            for loc in ins_locs:
+                data = ins.get(loc, {})
                 if isinstance(data, dict):
-                    irows.append([clean(loc), _tick(data.get('sticky','')), _tick(data.get('cleanout','')), '✓' if data.get('lamp') else '–', '✓' if data.get('starter') else '–', clean(data.get('notes',''))[:50]])
-            if len(irows) > 1:
-                story.append(Spacer(1, 2*mm))
-                story.append(Paragraph('<b>Insectocutors</b>', ParagraphStyle('insh', fontSize=9, fontName='Helvetica-Bold', textColor=GREEN, spaceAfter=2, spaceBefore=4, keepWithNext=1)))
-                it = Table(irows, colWidths=[35*mm, 25*mm, 25*mm, 15*mm, 18*mm, 99*mm], repeatRows=1)
-                it.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), GREEN), ('TEXTCOLOR', (0,0), (-1,0), colors.white), ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), ('FONTSIZE', (0,0), (-1,-1), 7), ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]), ('GRID', (0,0), (-1,-1), 0.3, colors.HexColor('#e0e0dc')), ('LEFTPADDING', (0,0), (-1,-1), 4), ('TOPPADDING', (0,0), (-1,-1), 3), ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('VALIGN', (0,0), (-1,-1), 'TOP')]))
-                story.append(it)
-        gn = rec.get('generalNotes','') or rec.get('notes','')
-        if gn:
-            story.append(Paragraph(f'<i>Notes: {clean(gn)[:200]}</i>', small))
+                    cell = ' '.join([_itick(data.get('sticky','')), _itick(data.get('cleanout','')), '✓' if data.get('lamp') else '–', '✓' if data.get('starter') else '–'])
+                else:
+                    cell = '– – – –'
+                row.append(Paragraph(cell, cell2))
+            irows.append(row)
+        nloc = len(ins_locs)
+        date_w = 22*mm; loc_w = (267*mm - date_w) / nloc
+        it = Table(irows, colWidths=[date_w] + [loc_w]*nloc, repeatRows=1)
+        it.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), GREEN), ('FONTSIZE', (0,0), (-1,-1), 6), ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]), ('GRID', (0,0), (-1,-1), 0.3, colors.HexColor('#e0e0dc')), ('LEFTPADDING', (0,0), (-1,-1), 2), ('RIGHTPADDING', (0,0), (-1,-1), 2), ('TOPPADDING', (0,0), (-1,-1), 3), ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('VALIGN', (0,0), (-1,-1), 'MIDDLE')]))
+        story.append(it)
+        story.append(Paragraph('St = sticky board · Cl = cleanout · La = lamp · Sr = starter. ✓ done · – not done/not recorded.', small))
 else:
     story.append(Paragraph('No pest control checks recorded yet.', small))
 
+# ── MINCE-DAY HYGIENE MATRICES ────────────────────────────────────────────────
+# Gather every mince day across all production runs and present opening / closing
+# checks as date-row matrices (one column per fixed check). Designed to grow to
+# 365 rows over a season; the column header repeats on each new page.
+def _gather_mince_days():
+    days = []
+    for rec in production_records:
+        batch = rec.get('batchCode', '')
+        for st in (rec.get('stages', []) or []):
+            if st.get('type') == 'mince':
+                days.append((st.get('date', ''), batch, st))
+    days.sort(key=lambda x: x[0], reverse=True)
+    return days
+
+def _check_matrix(days, key, fixed_labels, section_title, section_desc):
+    add_section(section_title, section_desc)
+    if not days:
+        story.append(Paragraph('No mince days recorded yet.', small))
+        return
+    # Use a stable column order from the fixed label list; shorten labels for headers
+    hdr_style = ParagraphStyle('mxh', fontSize=6, textColor=colors.white, fontName='Helvetica-Bold', leading=7)
+    cell_style2 = ParagraphStyle('mxc', fontSize=7, leading=8)
+    header = [Paragraph('Date', hdr_style), Paragraph('Batch', hdr_style)] + [Paragraph(clean(lbl), hdr_style) for lbl in fixed_labels]
+    rows = [header]
+    for dt, batch, st in days:
+        items = {i.get('text',''): i.get('done') for i in (st.get(key, []) or [])}
+        row = [Paragraph(clean(dt), cell_style2), Paragraph(clean(batch), cell_style2)]
+        for lbl in fixed_labels:
+            done = items.get(lbl)
+            mark = '✓' if done else ('✗' if done is False else '–')
+            row.append(Paragraph(mark, ParagraphStyle('mk', fontSize=8, alignment=1, textColor=(GREEN if done else (colors.HexColor('#a32d2d') if done is False else colors.grey)))))
+        rows.append(row)
+    n = len(fixed_labels)
+    date_w, batch_w = 20*mm, 26*mm
+    avail = 267*mm - date_w - batch_w
+    col_w = [date_w, batch_w] + [avail / n] * n
+    t = Table(rows, colWidths=col_w, repeatRows=1)
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), GREEN), ('FONTSIZE', (0,0), (-1,-1), 6),
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]),
+        ('GRID', (0,0), (-1,-1), 0.3, colors.HexColor('#e0e0dc')),
+        ('LEFTPADDING', (0,0), (-1,-1), 2), ('RIGHTPADDING', (0,0), (-1,-1), 2),
+        ('TOPPADDING', (0,0), (-1,-1), 3), ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE')]))
+    story.append(t)
+
+_mince_days = _gather_mince_days()
+# Derive the fixed label sets from the data (fall back to first day's labels)
+_open_labels = []
+_close_labels = []
+for _, _, _st in _mince_days:
+    for i in (_st.get('opening', []) or []):
+        if i.get('text') and i['text'] not in _open_labels: _open_labels.append(i['text'])
+    for i in (_st.get('closing', []) or []):
+        if i.get('text') and i['text'] not in _close_labels: _close_labels.append(i['text'])
+
+_check_matrix(_mince_days, 'opening', _open_labels,
+    'Mince Day — Opening Checks',
+    'Start-of-day hygiene and equipment checks for every mince day. Each row is one mince day; a tick confirms the step was done, a cross means it was skipped that day. New page continues with the same column headers.')
+_check_matrix(_mince_days, 'closing', _close_labels,
+    'Mince Day — Closing Checks',
+    'End-of-day clean-down and shutdown checks for every mince day (3-stage clean, UV cabinet, heaters off, etc.). Each row is one mince day; tick = done, cross = skipped.')
+
 # ── PRODUCTION SECTION ────────────────────────────────────────────────────────
 _log(f"Building Production section ({len(production_records)} records)")
-add_section('Production Records')
+add_section('Production Records',
+    'Each production run from a batch: the children (divisions) it was split into, each child\'s recipe with ingredient amounts and the date each was added, and the day-by-day stages worked (defrost, fat calc, recipe, mince, stuffing). This is the full make-record for traceability.')
 
 if production_records:
     for rec in sorted(production_records, key=lambda x: x.get('startDate', x.get('processCode','')), reverse=True):
