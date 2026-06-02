@@ -373,8 +373,8 @@ else:
     story.append(Paragraph('No daily records found.', small))
 
 # General quick-capture tasks (not tied to a record)
-_open_general = [t for t in general_tasks if not t.get('done')]
-_done_general = [t for t in general_tasks if t.get('done')]
+_open_general = [t for t in general_tasks if not t.get('done') and t.get('kind') != 'app']
+_done_general = [t for t in general_tasks if t.get('done') and t.get('kind') != 'app']
 if _open_general or _done_general:
     add_section('General Tasks')
     grows = [['Task', 'Added', 'Status']]
