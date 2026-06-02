@@ -288,6 +288,12 @@ def clean(text):
     text = text.encode('ascii', 'ignore').decode('ascii')
     return text.strip()
 
+def prettify_name(raw):
+    # Turn a raw id like 'build_room' / 'plucking-room' into 'Build Room'.
+    if not raw: return ''
+    s = str(raw).replace('_', ' ').replace('-', ' ').strip()
+    return ' '.join(w.capitalize() for w in s.split())
+
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
@@ -507,7 +513,7 @@ if pest_records:
         sub = ['St','Cl','La','Sr']
         header = [Paragraph('Date', hdr_style)]
         for loc in ins_locs:
-            header.append(Paragraph(clean(loc) + '<br/>St·Cl·La·Sr', hdr_style))
+            header.append(Paragraph(clean(prettify_name(loc)) + '<br/>St·Cl·La·Sr', hdr_style))
         irows = [header]
         cell2 = ParagraphStyle('ic', fontSize=7, leading=8, alignment=1)
         for rec in sorted(pest_records, key=lambda x: x.get('date',''), reverse=True):
@@ -600,7 +606,11 @@ add_section('Production Records',
     'Each production run from a batch: the children (divisions) it was split into, each child\'s recipe with ingredient amounts and the date each was added, and the day-by-day stages worked (defrost, fat calc, recipe, mince, stuffing). This is the full make-record for traceability.')
 
 if production_records:
+    _prod_first = True
     for rec in sorted(production_records, key=lambda x: x.get('startDate', x.get('processCode','')), reverse=True):
+        if not _prod_first:
+            story.append(PageBreak())
+        _prod_first = False
         proc = rec.get('processCode','—')
         # If the process code is a YYYYMMDD date, show it as DD/MM/YYYY (nicer on the audit doc)
         proc_str = str(proc)
