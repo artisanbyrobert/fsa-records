@@ -533,20 +533,38 @@ if production_records:
                     tk = st_rec.get('totalKg','')
                     detail = f"{sg}g salt ({sp}% of {tk}kg mix)" if sg else ''
                 elif stage == 'mince':
-                    mk = st_rec.get('meatKg','')
-                    # legacy rows may still carry fat; show it if present, else just the mince
-                    fk = st_rec.get('fatKg','')
-                    tk = st_rec.get('totalKg','')
-                    if fk and tk:
-                        detail = f"meat {mk}kg + fat {fk}kg = {tk}kg total"
+                    cw = st_rec.get('childWork', {}) or {}
+                    if cw:
+                        parts = []
+                        for letter in sorted(cw.keys()):
+                            w = cw[letter]
+                            steps = []
+                            if w.get('minced'): steps.append('minced')
+                            if w.get('salted'): steps.append(f"salt {w.get('saltGrams','')}g")
+                            if w.get('mixed'): steps.append('mixed')
+                            parts.append(f"{letter}: {', '.join(steps) if steps else 'pending'}")
+                        # flag any skipped hygiene checks for the audit trail
+                        skipped = [o.get('text','') for o in (st_rec.get('opening',[]) or []) if not o.get('done')]
+                        skipped += [c.get('text','') for c in (st_rec.get('closing',[]) or []) if not c.get('done')]
+                        detail = ' · '.join(parts)
+                        if not st_rec.get('prepDone'): detail = 'PREP NOT TICKED · ' + detail
+                        if skipped: detail += ' · SKIPPED: ' + '; '.join(skipped)
                     else:
-                        detail = f"meat {mk}kg minced" if mk else 'minced'
+                        # legacy mince rows
+                        mk = st_rec.get('meatKg','')
+                        fk = st_rec.get('fatKg','')
+                        tk = st_rec.get('totalKg','')
+                        if fk and tk:
+                            detail = f"meat {mk}kg + fat {fk}kg = {tk}kg total"
+                        else:
+                            detail = f"meat {mk}kg minced" if mk else 'minced'
                 elif stage == 'stuff_hang':
                     n = st_rec.get('count','')
                     ug = st_rec.get('unitGrams','')
                     detail = f"{n} x {ug}g" if ug else f"{n} salami"
-                stage_label = {'fatcalc':'Fat Calculator','saltcalc':'Salt Calculator','stuff_hang':'Stuffing & Hanging','mince':'Prep, Wash & Mince','defrost':'Defrost'}.get(stage, stage.replace('_',' ').title())
-                srows.append([dstr, stage_label, detail, clean(st_rec.get('notes',''))[:60]])
+                stage_label = {'fatcalc':'Fat Calculator','saltcalc':'Salt Calculator','stuff_hang':'Stuffing & Hanging','mince':'Mince Day','defrost':'Defrost'}.get(stage, stage.replace('_',' ').title())
+                detail_cell = Paragraph(clean(detail), ParagraphStyle('sdc', fontSize=7, leading=9)) if detail else ''
+                srows.append([dstr, stage_label, detail_cell, clean(st_rec.get('notes',''))[:60]])
             pt = Table(srows, colWidths=[22*mm, 32*mm, 60*mm, 110*mm], repeatRows=1)
             pt.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), GREEN), ('TEXTCOLOR', (0,0), (-1,0), colors.white), ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), ('FONTSIZE', (0,0), (-1,-1), 7), ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]), ('GRID', (0,0), (-1,-1), 0.3, colors.HexColor('#e0e0dc')), ('LEFTPADDING', (0,0), (-1,-1), 4), ('TOPPADDING', (0,0), (-1,-1), 3), ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('VALIGN', (0,0), (-1,-1), 'TOP')]))
             story.append(pt)
