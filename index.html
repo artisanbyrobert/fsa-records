@@ -170,6 +170,35 @@ const STANDARD_RECIPE_LINES = [
   {name: 'Paprika', type: 'perkg', value: 5, unit: 'g'},
   {name: 'Flora Italiana enzyme', type: 'fixed', value: 1, unit: 'scoop'}
 ];
+// Mince-day hygiene checklists — pre-ticked, untick to record a skip.
+const MINCE_OPENING_CHECKS = [
+  'Switch on water heaters',
+  'Enough soap, paper towels, hand wash working',
+  'Sanitise (Ensure, 30s contact, air dry): door handles',
+  'Sanitise: sinks',
+  'Sanitise: table top',
+  'Sanitise: equipment',
+  'Sanitise: boards',
+  'Sanitise: knives',
+  'Sanitise: trays',
+  'Sanitise: any other equipment being used'
+];
+const MINCE_CLOSING_CHECKS = [
+  '3-stage clean (hot soapy → rinse → ESTEEM 30s → wipe → Ensure 30s → air dry): door handles',
+  '3-stage clean: sinks',
+  '3-stage clean: table top',
+  '3-stage clean: equipment',
+  '3-stage clean: boards',
+  '3-stage clean: knives',
+  '3-stage clean: trays',
+  '3-stage clean: walls + any other equipment used',
+  'Cleaning cloths to washing machine 90° wash',
+  'Mop floor',
+  'Knives into UV cabinet, spray alcohol sanitiser',
+  'Set UV timer: 1 session 120 mins, leave overnight',
+  'Wear & tear check — preventative maintenance',
+  'Check water heaters switched off'
+];
 let recipeLibrary = [
   {id: 'rcp_gbp', name: 'Garlic & Black Pepper', ingredients: [
     {name: 'Salt', type: 'pct', value: 2.5, unit: 'g'},
@@ -3410,7 +3439,7 @@ function stageRowSummary(s, idx) {
   if (s.type === 'defrost') summary = (s.meatKg ? s.meatKg + 'kg meat out' : '');
   else if (s.type === 'fatcalc') summary = (s.totalKg ? s.meatKg + 'kg meat + ' + s.fatKg + 'kg fat = ' + s.totalKg + 'kg (' + s.fatPercent + '%)' : '');
   else if (s.type === 'recipe') summary = (s.recipeName ? s.recipeName + (s.childLetter ? ' → Child ' + (prodForm.batchCode||'') + s.childLetter : '') : '');
-  else if (s.type === 'mince') summary = (s.meatKg ? s.meatKg + 'kg minced' : 'minced');
+  else if (s.type === 'mince') { const cw = s.childWork || {}; const n = Object.keys(cw).length; const mixed = Object.keys(cw).filter(function(k){return cw[k].mixed;}).length; summary = n ? (mixed + ' of ' + n + ' children mixed') : 'mince day'; }
   else if (s.type === 'stuff_hang') summary = (s.count ? s.count + (s.unitGrams ? ' × ' + s.unitGrams + 'g' : ' salami') : '');
   const main = div(''); main.style.flex = '1';
   main.appendChild(el('p', {style:'font-size:13px;font-weight:500;margin:0 0 2px;'}, icon + ' ' + typeName));
@@ -3692,14 +3721,79 @@ function renderStageForm() {
       card.appendChild(saveLibWrap);
     }
   } else if (t === 'mince') {
-    const meatField = div('field'); meatField.style.marginTop = '12px';
-    meatField.appendChild(label('Meat minced today (kg) — optional'));
-    const meatInp = input({type:'number', min:'0', step:'0.1', value: prodStageEdit.meatKg || ''});
-    meatInp.placeholder = 'e.g. 22';
-    meatInp.addEventListener('input', function(e){ prodStageEdit.meatKg = parseFloat(e.target.value) || 0; });
-    meatField.appendChild(meatInp);
-    meatField.appendChild(p('muted', 'Fat is now worked out in the Fat calculator. This day just records the mince.'));
-    card.appendChild(meatField);
+    // Full mince day: opening checks -> prep -> each child (mince/salt/mix) -> closing checks.
+    const children = prodForm.children || [];
+    if (!prodStageEdit.opening) prodStageEdit.opening = MINCE_OPENING_CHECKS.map(function(x){ return {text:x, done:true}; });
+    if (!prodStageEdit.closing) prodStageEdit.closing = MINCE_CLOSING_CHECKS.map(function(x){ return {text:x, done:true}; });
+    if (prodStageEdit.prepDone == null) prodStageEdit.prepDone = false;
+    if (!prodStageEdit.childWork) {
+      prodStageEdit.childWork = {};
+      children.forEach(function(c){ prodStageEdit.childWork[c.letter] = {minced:false, saltGrams: Math.round((c.totalKg||0)*1000*0.025), salted:false, mixed:false}; });
+    }
+
+    function checkList(title, arr) {
+      card.appendChild(el('p', {style:'font-size:14px;font-weight:600;color:#27500a;margin:14px 0 6px;'}, title));
+      card.appendChild(p('muted', 'Pre-ticked — untick anything you skipped.'));
+      const wrap = div(''); wrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
+      arr.forEach(function(item){
+        const row = el('button', {});
+        row.style.cssText = 'display:flex;align-items:center;gap:10px;width:100%;text-align:left;border-radius:8px;padding:10px 12px;font-size:14px;cursor:pointer;border:1px solid ' + (item.done?'#27500a':'#e0c9a0') + ';background:' + (item.done?'#eaf3e4':'#fff8f0') + ';';
+        row.appendChild(el('span', {style:'font-size:20px;flex-shrink:0;color:' + (item.done?'#27500a':'#bbb') + ';'}, item.done?'☑':'☐'));
+        row.appendChild(el('span', {style:'flex:1;' + (item.done?'color:#3a6b2a;':'color:#633806;')}, item.text));
+        row.addEventListener('click', function(){ item.done = !item.done; renderStageForm(); });
+        wrap.appendChild(row);
+      });
+      card.appendChild(wrap);
+    }
+
+    checkList('1 · Opening checks', prodStageEdit.opening);
+
+    card.appendChild(el('p', {style:'font-size:14px;font-weight:600;color:#27500a;margin:16px 0 6px;'}, '2 · Prep'));
+    const prepRow = el('button', {});
+    prepRow.style.cssText = 'display:flex;align-items:center;gap:10px;width:100%;text-align:left;border-radius:8px;padding:12px;font-size:14px;cursor:pointer;border:1px solid ' + (prodStageEdit.prepDone?'#27500a':'#e0c9a0') + ';background:' + (prodStageEdit.prepDone?'#eaf3e4':'#fff8f0') + ';';
+    prepRow.appendChild(el('span', {style:'font-size:20px;color:' + (prodStageEdit.prepDone?'#27500a':'#bbb') + ';'}, prodStageEdit.prepDone?'☑':'☐'));
+    prepRow.appendChild(el('span', {style:'flex:1;'}, 'Open packs · wash meat + fat in alcohol · drain'));
+    prepRow.addEventListener('click', function(){ prodStageEdit.prepDone = !prodStageEdit.prepDone; renderStageForm(); });
+    card.appendChild(prepRow);
+
+    card.appendChild(el('p', {style:'font-size:14px;font-weight:600;color:#27500a;margin:16px 0 6px;'}, '3 · Mince each child'));
+    if (children.length === 0) {
+      const warn = div(''); warn.style.cssText = 'background:#faeeda;border:1px solid #f0d4a8;border-radius:8px;padding:12px 14px;';
+      warn.appendChild(p('', 'No children yet. Do the Fat calculator first to create them, then come back to mince.'));
+      card.appendChild(warn);
+    } else {
+      children.forEach(function(c){
+        const cw = prodStageEdit.childWork[c.letter] || (prodStageEdit.childWork[c.letter] = {minced:false, saltGrams: Math.round((c.totalKg||0)*1000*0.025), salted:false, mixed:false});
+        const box = div(''); box.style.cssText = 'border:1px solid #d0e8c8;border-radius:10px;padding:12px 14px;margin-bottom:10px;background:#f9fdf8;';
+        box.appendChild(el('p', {style:'font-size:14px;font-weight:600;margin:0 0 8px;'}, 'Child ' + c.code + ' · ' + (c.totalKg||0) + 'kg' + (c.recipe&&c.recipe.name?(' · '+c.recipe.name):'')));
+        function stepRow(labelTxt, key) {
+          const r = el('button', {});
+          r.style.cssText = 'display:flex;align-items:center;gap:10px;width:100%;text-align:left;border-radius:8px;padding:10px 12px;margin-bottom:6px;font-size:14px;cursor:pointer;border:2px solid ' + (cw[key]?'#27500a':'#d0e8c8') + ';background:' + (cw[key]?'#eaf3e4':'#fff') + ';';
+          r.appendChild(el('span', {style:'font-size:20px;color:' + (cw[key]?'#27500a':'#bbb') + ';'}, cw[key]?'☑':'☐'));
+          r.appendChild(el('span', {style:'flex:1;font-weight:500;'}, labelTxt));
+          r.addEventListener('click', function(){ cw[key] = !cw[key]; renderStageForm(); });
+          return r;
+        }
+        box.appendChild(stepRow('Minced', 'minced'));
+        const saltWrap = div(''); saltWrap.style.cssText = 'display:flex;align-items:center;gap:10px;border:2px solid ' + (cw.salted?'#27500a':'#d0e8c8') + ';border-radius:8px;padding:8px 12px;margin-bottom:6px;background:' + (cw.salted?'#eaf3e4':'#fff') + ';';
+        const saltTick = el('button', {style:'background:none;border:none;cursor:pointer;font-size:20px;color:' + (cw.salted?'#27500a':'#bbb') + ';flex-shrink:0;'}, cw.salted?'☑':'☐');
+        saltTick.addEventListener('click', function(){ cw.salted = !cw.salted; renderStageForm(); });
+        saltWrap.appendChild(saltTick);
+        saltWrap.appendChild(el('span', {style:'flex:1;font-weight:500;'}, 'Salt (2.5%)'));
+        const saltInp = input({type:'number', min:'0', step:'1', value: cw.saltGrams || ''});
+        saltInp.style.cssText = 'width:80px;text-align:right;';
+        saltInp.addEventListener('input', function(e){ cw.saltGrams = e.target.value===''?0:parseFloat(e.target.value); });
+        saltWrap.appendChild(saltInp);
+        saltWrap.appendChild(el('span', {style:'color:#888;width:20px;'}, 'g'));
+        box.appendChild(saltWrap);
+        box.appendChild(stepRow('Mixed (meat + fat + salt)', 'mixed'));
+        card.appendChild(box);
+      });
+      card.appendChild(p('muted', 'The salt you set here saves onto each child and shows already ticked when you add the rest of the recipe next session.'));
+    }
+
+    checkList('4 · Closing / end of day', prodStageEdit.closing);
+  } else if (t === 'stuff_hang') {
     const countField = div('field'); countField.style.marginTop = '12px';
     countField.appendChild(label('Number of salami made today'));
     const countInp = input({type:'number', min:'0', step:'1', value: prodStageEdit.count || ''});
@@ -3782,6 +3876,24 @@ function renderStageForm() {
         const saltLine = (toSave.lines || []).find(function(l){ return l.name && l.name.toLowerCase() === 'salt'; });
         if (saltLine) { ch.saltGrams = saltLine.amount; }
       }
+    }
+    if (t === 'mince' && prodForm.children && toSave.childWork) {
+      // Save each child's salt + mark salt added on mince day. If the child already
+      // has a recipe, pre-tick (and set the amount of) its Salt line for next session.
+      prodForm.children.forEach(function(ch){
+        const cw = toSave.childWork[ch.letter];
+        if (!cw) return;
+        ch.minced = !!cw.minced;
+        ch.mixed = !!cw.mixed;
+        if (cw.salted && cw.saltGrams) {
+          ch.saltGrams = cw.saltGrams;
+          ch.saltAddedDate = toSave.date || today();
+          if (ch.recipe && ch.recipe.lines) {
+            const sLine = ch.recipe.lines.find(function(l){ return l.name && l.name.toLowerCase() === 'salt'; });
+            if (sLine) { sLine.amount = cw.saltGrams; sLine.addedDate = ch.saltAddedDate; }
+          }
+        }
+      });
     }
     prodStageEdit = null;
     saveAndStay();
