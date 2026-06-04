@@ -151,6 +151,7 @@
   <div id="view-pest" style="display:none"></div>
   <div id="view-prod" style="display:none"></div>
   <div id="view-clean" style="display:none"></div>
+  <div id="view-checks" style="display:none"></div>
 </div>
 
 <script>
@@ -233,6 +234,7 @@ let intakes = [], deliveries = [], dailyRecords = [], pestRecords = [], producti
   'Whole','Leg','Shoulder','Breast','Saddle','Haunch','Loin','Carcass','Mixed cuts'
 ];
 let generalTasks = [];  // loose quick-capture tasks, not tied to any record
+let dailyChecks = [];   // standalone opening/closing hygiene checks, one record per work day
 let currentView = 'list';
 let editId = null;
 let form = null;
@@ -274,6 +276,7 @@ async function loadData() {
       pestRecords = deliveryRows.filter(r => r.data._type === 'pest').map(r => r.data);
       productionRecords = deliveryRows.filter(r => r.data._type === 'production').map(r => r.data);
       periodicCleans = deliveryRows.filter(r => r.data._type === 'periodic_clean').map(r => r.data);
+      dailyChecks = deliveryRows.filter(r => r.data._type === 'dailychecks').map(r => r.data);
     }
 
     const {data: configRows} = await sb.from('app_config').select('*');
@@ -346,6 +349,9 @@ async function saveData() {
     }
     for (const r of periodicCleans) {
       await sb.from('deliveries').upsert({id: 'clean_' + r.id, data: {...r, _type: 'periodic_clean'}});
+    }
+    for (const r of dailyChecks) {
+      await sb.from('deliveries').upsert({id: 'dchk_' + r.id, data: {...r, _type: 'dailychecks'}});
     }
 
     showStatus('saved');
@@ -550,7 +556,7 @@ function renderTabs(activeTab) {
   bar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:0;margin-bottom:1.5rem;border-bottom:2px solid #e0e0dc;';
   const tabsLeft = div('row');
   tabsLeft.style.gap = '0';
-  const tabs = [['list','Intake records'],['daily','Daily Record'],['delivery','Finished Product'],['wetmeat','Wet Meat'],['pest','Pest Control'],['prod','Production'],['clean','Periodic Cleans'],['manage','Manage']];
+  const tabs = [['list','Intake records'],['daily','Daily Record'],['delivery','Finished Product'],['wetmeat','Wet Meat'],['pest','Pest Control'],['prod','Production'],['clean','Periodic Cleans'],['checks','Daily Checks'],['manage','Manage']];
   for (const [id, label] of tabs) {
     const b = btn(`tab-btn${activeTab===id?' active':''}`, label, () => {
       if (id === 'list') renderList();
@@ -560,6 +566,7 @@ function renderTabs(activeTab) {
       else if (id === 'pest') renderPestControl();
       else if (id === 'prod') renderProduction();
       else if (id === 'clean') renderPeriodicCleans();
+      else if (id === 'checks') renderDailyChecks();
       else renderManage();
     });
     tabsLeft.appendChild(b);
@@ -3090,6 +3097,90 @@ function blankProductionRecord(batchCode) {
     stages: [],
     runNumber: runsForBatch(batchCode).length + 1
   };
+}
+
+let dcForm = null;
+function newDcForm(date) {
+  return {
+    id: 'dc_' + Date.now(),
+    date: date || today(),
+    opening: MINCE_OPENING_CHECKS.map(function(t){ return {text: t, done: true}; }),
+    closing: MINCE_CLOSING_CHECKS.map(function(t){ return {text: t, done: true}; })
+  };
+}
+function hideAllForChecks() {
+  ['view-list','view-form','view-manage','view-wetmeat','view-delivery','view-daily','view-pest','view-prod','view-clean'].forEach(function(id){
+    var e = document.getElementById(id); if (e) e.style.display = 'none';
+  });
+}
+function renderDailyChecks() {
+  currentView = 'checks';
+  hideAllForChecks();
+  renderTabs('checks');
+  var v = document.getElementById('view-checks');
+  v.style.display = 'block'; v.innerHTML = '';
+  if (!dcForm) dcForm = newDcForm();
+  v.appendChild(el('h2', {style:'font-size:18px;font-weight:600;margin:0 0 4px;'}, 'Daily hygiene checks'));
+  v.appendChild(el('p', {style:'font-size:13px;color:#888;margin:0 0 16px;'}, 'Record opening and closing checks for any work day. Every item defaults to ticked — untick anything you skipped. These print in the nightly FSA report.'));
+
+  var card = div(''); card.style.cssText = 'border:1px solid #e0e0dc;border-radius:10px;padding:16px;margin-bottom:22px;';
+  var dateRow = div(''); dateRow.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:14px;';
+  dateRow.appendChild(el('label', {style:'font-weight:600;font-size:14px;'}, 'Date'));
+  var dateInp = input({type:'date', value: dcForm.date});
+  dateInp.addEventListener('change', function(){ dcForm.date = dateInp.value; });
+  dateRow.appendChild(dateInp);
+  card.appendChild(dateRow);
+
+  function group(title, list) {
+    var wrap = div('');
+    wrap.appendChild(el('h3', {style:'font-size:15px;font-weight:600;margin:10px 0 4px;color:#3a6b2a;'}, title));
+    list.forEach(function(item){
+      var rowL = el('label', {style:'display:flex;align-items:flex-start;gap:8px;padding:5px 0;font-size:14px;cursor:pointer;'});
+      var cb = input({type:'checkbox'}); cb.checked = !!item.done;
+      cb.style.cssText = 'margin-top:3px;width:18px;height:18px;flex-shrink:0;';
+      cb.addEventListener('change', function(){ item.done = cb.checked; });
+      rowL.appendChild(cb);
+      rowL.appendChild(el('span', {}, item.text));
+      wrap.appendChild(rowL);
+    });
+    return wrap;
+  }
+  card.appendChild(group('Opening checks', dcForm.opening));
+  card.appendChild(group('Closing checks', dcForm.closing));
+
+  var btnRow = div(''); btnRow.style.cssText = 'display:flex;gap:10px;margin-top:16px;';
+  var saveB = btn('', 'Save day', saveDailyChecks);
+  saveB.style.cssText = 'background:#3a6b2a;color:#fff;border-color:#3a6b2a;';
+  btnRow.appendChild(saveB);
+  btnRow.appendChild(btn('', 'Clear / new day', function(){ dcForm = newDcForm(); renderDailyChecks(); }));
+  card.appendChild(btnRow);
+  v.appendChild(card);
+
+  v.appendChild(el('h3', {style:'font-size:15px;font-weight:600;margin:0 0 8px;'}, 'Recorded days'));
+  var saved = dailyChecks.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  if (!saved.length) v.appendChild(el('p', {style:'color:#888;font-size:13px;'}, 'No days recorded yet.'));
+  saved.forEach(function(rec){
+    var od = (rec.opening||[]).filter(function(i){return i.done;}).length, ot = (rec.opening||[]).length;
+    var cd = (rec.closing||[]).filter(function(i){return i.done;}).length, ct = (rec.closing||[]).length;
+    var line = div(''); line.style.cssText = 'display:flex;justify-content:space-between;align-items:center;border:1px solid #e0e0dc;border-radius:8px;padding:10px 12px;margin-bottom:8px;';
+    var left = div('');
+    left.appendChild(el('span', {style:'font-weight:600;font-size:14px;'}, rec.date || '—'));
+    left.appendChild(el('span', {style:'font-size:12px;color:#888;margin-left:12px;'}, 'Opening ' + od + '/' + ot + '  \u00b7  Closing ' + cd + '/' + ct));
+    line.appendChild(left);
+    var ed = btn('', 'Edit', function(){ dcForm = JSON.parse(JSON.stringify(rec)); renderDailyChecks(); window.scrollTo(0,0); });
+    ed.style.cssText = 'font-size:12px;padding:4px 12px;';
+    line.appendChild(ed);
+    v.appendChild(line);
+  });
+}
+function saveDailyChecks() {
+  if (!dcForm) return;
+  var existing = dailyChecks.find(function(r){ return r.id === dcForm.id; });
+  if (existing) Object.assign(existing, JSON.parse(JSON.stringify(dcForm)));
+  else dailyChecks.push(JSON.parse(JSON.stringify(dcForm)));
+  saveData();
+  dcForm = newDcForm();
+  renderDailyChecks();
 }
 
 function hideAllExceptProd() {
