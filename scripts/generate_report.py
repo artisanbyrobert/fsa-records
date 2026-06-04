@@ -236,7 +236,8 @@ daily_records = [r['data'] for r in deliveries_raw if r.get('data') and r['data'
 deliveries = [r['data'] for r in deliveries_raw if r.get('data') and not r['data'].get('_type')]
 pest_records = [r['data'] for r in deliveries_raw if r.get('data') and r['data'].get('_type') == 'pest']
 production_records = [r['data'] for r in deliveries_raw if r.get('data') and r['data'].get('_type') == 'production']
-_log(f"  Records: intakes={len(intakes)}, daily={len(daily_records)}, deliveries={len(deliveries)}, pest={len(pest_records)}, prod={len(production_records)}")
+daily_checks = [r['data'] for r in deliveries_raw if r.get('data') and r['data'].get('_type') == 'dailychecks']
+_log(f"  Records: intakes={len(intakes)}, daily={len(daily_records)}, deliveries={len(deliveries)}, pest={len(pest_records)}, prod={len(production_records)}, checks={len(daily_checks)}")
 
 estates = {}
 for row in config_raw:
@@ -584,21 +585,25 @@ def _check_matrix(days, key, fixed_labels, section_title, section_desc):
     story.append(t)
 
 _mince_days = _gather_mince_days()
+# Standalone daily-check records (decoupled from mince day) join the same matrices.
+_standalone_checks = [(c.get('date', ''), '\u2014', c) for c in daily_checks]
+_check_days = _mince_days + _standalone_checks
+_check_days.sort(key=lambda x: x[0], reverse=True)
 # Derive the fixed label sets from the data (fall back to first day's labels)
 _open_labels = []
 _close_labels = []
-for _, _, _st in _mince_days:
+for _, _, _st in _check_days:
     for i in (_st.get('opening', []) or []):
         if i.get('text') and i['text'] not in _open_labels: _open_labels.append(i['text'])
     for i in (_st.get('closing', []) or []):
         if i.get('text') and i['text'] not in _close_labels: _close_labels.append(i['text'])
 
-_check_matrix(_mince_days, 'opening', _open_labels,
-    'Mince Day — Opening Checks',
-    'Start-of-day hygiene and equipment checks for every mince day. Each row is one mince day; a tick confirms the step was done, a cross means it was skipped that day. New page continues with the same column headers.')
-_check_matrix(_mince_days, 'closing', _close_labels,
-    'Mince Day — Closing Checks',
-    'End-of-day clean-down and shutdown checks for every mince day (3-stage clean, UV cabinet, heaters off, etc.). Each row is one mince day; tick = done, cross = skipped.')
+_check_matrix(_check_days, 'opening', _open_labels,
+    'Opening Checks',
+    'Start-of-day hygiene and equipment checks for every work day (mince days and standalone daily checks). Each row is one day; a tick confirms the step was done, a cross means it was skipped that day. New page continues with the same column headers.')
+_check_matrix(_check_days, 'closing', _close_labels,
+    'Closing Checks',
+    'End-of-day clean-down and shutdown checks for every work day (3-stage clean, UV cabinet, heaters off, etc.). Each row is one day; tick = done, cross = skipped.')
 
 # ── PRODUCTION SECTION ────────────────────────────────────────────────────────
 _log(f"Building Production section ({len(production_records)} records)")
