@@ -152,6 +152,7 @@
   <div id="view-prod" style="display:none"></div>
   <div id="view-clean" style="display:none"></div>
   <div id="view-checks" style="display:none"></div>
+  <div id="view-venison" style="display:none"></div>
 </div>
 
 <script>
@@ -235,6 +236,7 @@ let intakes = [], deliveries = [], dailyRecords = [], pestRecords = [], producti
 ];
 let generalTasks = [];  // loose quick-capture tasks, not tied to any record
 let dailyChecks = [];   // standalone opening/closing hygiene checks, one record per work day
+let venisonRuns = [];   // whole-carcass venison breakdowns; lanes = product children
 let currentView = 'list';
 let editId = null;
 let form = null;
@@ -277,6 +279,7 @@ async function loadData() {
       productionRecords = deliveryRows.filter(r => r.data._type === 'production').map(r => r.data);
       periodicCleans = deliveryRows.filter(r => r.data._type === 'periodic_clean').map(r => r.data);
       dailyChecks = deliveryRows.filter(r => r.data._type === 'dailychecks').map(r => r.data);
+      venisonRuns = deliveryRows.filter(r => r.data._type === 'venison').map(r => r.data);
     }
 
     const {data: configRows} = await sb.from('app_config').select('*');
@@ -352,6 +355,9 @@ async function saveData() {
     }
     for (const r of dailyChecks) {
       await sb.from('deliveries').upsert({id: 'dchk_' + r.id, data: {...r, _type: 'dailychecks'}});
+    }
+    for (const r of venisonRuns) {
+      await sb.from('deliveries').upsert({id: 'ven_' + r.id, data: {...r, _type: 'venison'}});
     }
 
     showStatus('saved');
@@ -556,7 +562,7 @@ function renderTabs(activeTab) {
   bar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:0;margin-bottom:1.5rem;border-bottom:2px solid #e0e0dc;';
   const tabsLeft = div('row');
   tabsLeft.style.gap = '0';
-  const tabs = [['list','Intake records'],['daily','Daily Record'],['delivery','Finished Product'],['wetmeat','Wet Meat'],['pest','Pest Control'],['prod','Production'],['clean','Periodic Cleans'],['checks','Daily Checks'],['manage','Manage']];
+  const tabs = [['list','Intake records'],['daily','Daily Record'],['delivery','Finished Product'],['wetmeat','Wet Meat'],['pest','Pest Control'],['prod','Production'],['clean','Periodic Cleans'],['checks','Daily Checks'],['venison','Venison'],['manage','Manage']];
   for (const [id, label] of tabs) {
     const b = btn(`tab-btn${activeTab===id?' active':''}`, label, () => {
       if (id === 'list') renderList();
@@ -567,6 +573,7 @@ function renderTabs(activeTab) {
       else if (id === 'prod') renderProduction();
       else if (id === 'clean') renderPeriodicCleans();
       else if (id === 'checks') renderDailyChecks();
+      else if (id === 'venison') renderVenison();
       else renderManage();
     });
     tabsLeft.appendChild(b);
@@ -3181,6 +3188,218 @@ function saveDailyChecks() {
   saveData();
   dcForm = newDcForm();
   renderDailyChecks();
+}
+
+// ── VENISON BREAKDOWN ─────────────────────────────────────────────────────────
+// A venison run = one whole-carcass intake split into product lanes (children).
+// Lanes are configurable per intake; pastrami diverts the shoulders out of salami.
+const VEN_LANE_TYPES = [
+  {key:'prosciutto', name:'Venison prosciutto',            calc:'cure60',  salt:true},
+  {key:'curedloin',  name:'Cured venison loins & fillet',  calc:'cure60',  salt:true},
+  {key:'salami',     name:'Venison salami',                calc:'salami',  salt:false},
+  {key:'pastrami',   name:'Venison pastrami',              calc:'pastrami',salt:true}
+];
+const VEN_SALE_PER_KG = 75;       // £/kg dry
+const VEN_SALT_PCT = 2.5;         // % of into-cure weight
+function venSumMeat(lane){ return (lane.components||[]).reduce(function(a,c){ return a + (Number(c.meat)||0); }, 0); }
+function venLaneFinishedG(lane){
+  if (lane.calc === 'cure60')  return venSumMeat(lane) * 0.60;
+  if (lane.calc === 'salami')  { var base = Number(lane.minceYield) || venSumMeat(lane); return base * 1.25 * 0.60; }
+  if (lane.calc === 'pastrami'){ var y = (Number(lane.yieldPct) || 60) / 100; return venSumMeat(lane) * y; }
+  return 0;
+}
+function venLaneValue(lane){ return venLaneFinishedG(lane) / 1000 * VEN_SALE_PER_KG; }
+function venRunFinishedG(run){ return (run.lanes||[]).reduce(function(a,l){ return a + venLaneFinishedG(l); }, 0); }
+function venCompLossPct(c){ var m=Number(c.meat)||0, b=Number(c.bone)||0; return (m+b)>0 ? b/(m+b)*100 : 0; }
+function venCompSalt(c){ return (Number(c.meat)||0) * VEN_SALT_PCT/100; }
+function venLaneStatus(lane){ if(lane.frozen) return 'Frozen (held)'; if(lane.cureDate) return 'Curing'; return 'In progress'; }
+function newVenRun(){ return {id:'venr_'+Date.now(), batchCode:'', estate:'', date:today(), note:'', lanes:[]}; }
+function venSortLanes(run){
+  var order = VEN_LANE_TYPES.map(function(t){return t.key;});
+  run.lanes.sort(function(a,b){ return order.indexOf(a.key) - order.indexOf(b.key); });
+}
+function venToggleLane(run, type, on){
+  if (on) {
+    if (run.lanes.find(function(l){return l.key===type;})) return;
+    var def = VEN_LANE_TYPES.find(function(t){return t.key===type;});
+    var lane = {key:type, name:def.name, calc:def.calc, salt:def.salt, components:[], frozen:false, frozenDate:'', resumeDate:'', cureDate:''};
+    if (type==='salami') lane.minceYield = '';
+    if (type==='pastrami') lane.yieldPct = 60;
+    run.lanes.push(lane);
+    if (type==='pastrami') {  // shoulders divert from salami → pastrami
+      var sal = run.lanes.find(function(l){return l.key==='salami';});
+      if (sal) {
+        var sh = sal.components.filter(function(c){return /shoulder/i.test(c.name||'');});
+        sal.components = sal.components.filter(function(c){return !/shoulder/i.test(c.name||'');});
+        lane.components = lane.components.concat(sh);
+      }
+    }
+  } else {
+    if (type==='pastrami') {  // shoulders move back to salami
+      var pas = run.lanes.find(function(l){return l.key==='pastrami';});
+      var sal2 = run.lanes.find(function(l){return l.key==='salami';});
+      if (pas && sal2) { sal2.components = sal2.components.concat(pas.components.filter(function(c){return /shoulder/i.test(c.name||'');})); }
+    }
+    run.lanes = run.lanes.filter(function(l){return l.key!==type;});
+  }
+  venSortLanes(run);
+}
+let venForm = null;
+function hideAllForVenison(){
+  ['view-list','view-form','view-manage','view-wetmeat','view-delivery','view-daily','view-pest','view-prod','view-clean','view-checks'].forEach(function(id){
+    var e=document.getElementById(id); if(e) e.style.display='none';
+  });
+}
+function renderVenison(){
+  currentView='venison';
+  hideAllForVenison(); renderTabs('venison');
+  var v=document.getElementById('view-venison'); v.style.display='block'; v.innerHTML='';
+  v.appendChild(el('h2',{style:'font-size:18px;font-weight:600;margin:0 0 4px;'}, 'Venison breakdown'));
+  v.appendChild(el('p',{style:'font-size:13px;color:#888;margin:0 0 14px;'}, 'Whole-carcass venison: pick the product lanes for this client, log the cuts, salt and freeze/resume. Finished weights and value calculate automatically.'));
+  var nb=btn('', '+ New venison breakdown', function(){ venForm=newVenRun(); renderVenisonForm(); });
+  nb.style.cssText='background:#3a6b2a;color:#fff;border-color:#3a6b2a;margin-bottom:18px;';
+  v.appendChild(nb);
+  var runs=venisonRuns.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  if(!runs.length) v.appendChild(el('p',{style:'color:#888;font-size:13px;'}, 'No venison breakdowns recorded yet.'));
+  runs.forEach(function(run){
+    var finG=venRunFinishedG(run);
+    var line=div(''); line.style.cssText='display:flex;justify-content:space-between;align-items:center;border:1px solid #e0e0dc;border-radius:8px;padding:12px 14px;margin-bottom:8px;';
+    var left=div('');
+    left.appendChild(el('div',{style:'font-weight:600;font-size:15px;'}, (run.batchCode||'(no batch)')+'  ·  '+(run.estate||'—')));
+    left.appendChild(el('div',{style:'font-size:12px;color:#888;margin-top:2px;'}, (run.date||'')+'  ·  '+(run.lanes||[]).length+' lanes  ·  '+(finG/1000).toFixed(2)+' kg  ·  £'+(finG/1000*VEN_SALE_PER_KG).toFixed(2)));
+    line.appendChild(left);
+    var ed=btn('', 'Open', function(){ venForm=JSON.parse(JSON.stringify(run)); renderVenisonForm(); window.scrollTo(0,0); });
+    ed.style.cssText='font-size:13px;padding:5px 14px;';
+    line.appendChild(ed);
+    v.appendChild(line);
+  });
+}
+function renderVenisonForm(){
+  currentView='venison';
+  hideAllForVenison(); renderTabs('venison');
+  var v=document.getElementById('view-venison'); v.style.display='block'; v.innerHTML='';
+  if(!venForm) venForm=newVenRun();
+  var run=venForm;
+  // back
+  var back=btn('', '← Back to list', function(){ venForm=null; renderVenison(); });
+  back.style.cssText='font-size:12px;padding:3px 10px;margin-bottom:12px;'; v.appendChild(back);
+  // header card
+  var hc=div(''); hc.style.cssText='border:1px solid #e0e0dc;border-radius:10px;padding:14px 16px;margin-bottom:18px;';
+  function field(lbl, inp){ var w=div(''); w.style.cssText='display:flex;flex-direction:column;gap:3px;'; w.appendChild(el('label',{style:'font-size:12px;font-weight:600;color:#555;'},lbl)); w.appendChild(inp); return w; }
+  var grid=div(''); grid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:10px;';
+  var bc=input({type:'text', value:run.batchCode||''}); bc.addEventListener('change', function(){ run.batchCode=bc.value; });
+  var est=input({type:'text', value:run.estate||''}); est.addEventListener('change', function(){ run.estate=est.value; });
+  var dt=input({type:'date', value:run.date||today()}); dt.addEventListener('change', function(){ run.date=dt.value; });
+  var nt=input({type:'text', value:run.note||''}); nt.addEventListener('change', function(){ run.note=nt.value; });
+  grid.appendChild(field('Batch code', bc)); grid.appendChild(field('Estate', est));
+  grid.appendChild(field('Breakdown date', dt)); grid.appendChild(field('Note', nt));
+  hc.appendChild(grid);
+  v.appendChild(hc);
+  // lane selection
+  var ls=div(''); ls.style.cssText='margin-bottom:16px;';
+  ls.appendChild(el('div',{style:'font-size:13px;font-weight:600;margin-bottom:6px;'}, 'Lanes for this client'));
+  var lsRow=div(''); lsRow.style.cssText='display:flex;flex-wrap:wrap;gap:14px;';
+  VEN_LANE_TYPES.forEach(function(t){
+    var on=!!run.lanes.find(function(l){return l.key===t.key;});
+    var lab=el('label',{style:'display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;'});
+    var cb=input({type:'checkbox'}); cb.checked=on;
+    cb.addEventListener('change', function(){ venToggleLane(run, t.key, cb.checked); renderVenisonForm(); });
+    lab.appendChild(cb); lab.appendChild(el('span',{}, t.name));
+    lsRow.appendChild(lab);
+  });
+  ls.appendChild(lsRow); v.appendChild(ls);
+  // lane cards
+  venSortLanes(run);
+  run.lanes.forEach(function(lane){ v.appendChild(venLaneCard(run, lane)); });
+  // totals
+  var finG=venRunFinishedG(run);
+  var tot=div(''); tot.style.cssText='border-top:2px solid #3a6b2a;margin-top:8px;padding-top:10px;display:flex;justify-content:space-between;font-size:15px;font-weight:700;';
+  tot.appendChild(el('span',{}, 'Total finished'));
+  tot.appendChild(el('span',{}, (finG/1000).toFixed(2)+' kg  ·  £'+(finG/1000*VEN_SALE_PER_KG).toFixed(2)));
+  v.appendChild(tot);
+  // save
+  var sv=btn('', 'Save breakdown', saveVenisonRun);
+  sv.style.cssText='background:#3a6b2a;color:#fff;border-color:#3a6b2a;margin-top:16px;';
+  v.appendChild(sv);
+}
+function venLaneCard(run, lane){
+  var card=div(''); card.style.cssText='border:1px solid #e0e0dc;border-radius:10px;padding:14px 16px;margin-bottom:14px;';
+  var head=div(''); head.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;';
+  head.appendChild(el('span',{style:'font-weight:700;font-size:15px;color:#3a6b2a;'}, lane.name));
+  var badge=lane.frozen?'#7a4d12':(lane.cureDate?'#2d6b9c':'#888');
+  head.appendChild(el('span',{style:'font-size:12px;font-weight:600;color:'+badge+';'}, venLaneStatus(lane)));
+  card.appendChild(head);
+  // component table
+  var tbl=document.createElement('table'); tbl.style.cssText='width:100%;border-collapse:collapse;font-size:13px;';
+  var hdr=document.createElement('tr');
+  var cols=['Component','Meat kept (g)','Bone / trim (g)','Loss %'];
+  if(lane.salt) cols.push('Salt 2.5% (g)');
+  cols.push('');
+  cols.forEach(function(c){ var th=document.createElement('th'); th.textContent=c; th.style.cssText='text-align:left;padding:4px 6px;border-bottom:1px solid #e0e0dc;font-size:11px;color:#666;'; hdr.appendChild(th); });
+  tbl.appendChild(hdr);
+  (lane.components||[]).forEach(function(c, idx){
+    var tr=document.createElement('tr');
+    function td(child){ var d=document.createElement('td'); d.style.cssText='padding:3px 6px;'; d.appendChild(child); return d; }
+    var nm=input({type:'text', value:c.name||''}); nm.style.width='100%'; nm.addEventListener('change', function(){ c.name=nm.value; renderVenisonForm(); });
+    var mt=input({type:'number', step:'any', value:(c.meat===''||c.meat==null)?'':c.meat}); mt.style.width='90px'; mt.addEventListener('change', function(){ c.meat=mt.value; renderVenisonForm(); });
+    var bn=input({type:'number', step:'any', value:(c.bone===''||c.bone==null)?'':c.bone}); bn.style.width='90px'; bn.addEventListener('change', function(){ c.bone=bn.value; renderVenisonForm(); });
+    tr.appendChild(td(nm)); tr.appendChild(td(mt)); tr.appendChild(td(bn));
+    tr.appendChild(td(el('span',{style:'font-size:12px;color:#888;'}, venCompLossPct(c).toFixed(1)+'%')));
+    if(lane.salt) tr.appendChild(td(el('span',{style:'font-size:12px;color:#888;'}, venCompSalt(c).toFixed(1))));
+    var rm=btn('', '✕', function(){ lane.components.splice(idx,1); renderVenisonForm(); }); rm.style.cssText='font-size:11px;padding:2px 7px;color:#a32d2d;';
+    tr.appendChild(td(rm));
+    tbl.appendChild(tr);
+  });
+  card.appendChild(tbl);
+  var addL=btn('', '+ Add line', function(){ lane.components.push({name:'',meat:'',bone:''}); renderVenisonForm(); });
+  addL.style.cssText='font-size:12px;padding:3px 10px;margin-top:6px;'; card.appendChild(addL);
+  // salami mince yield / pastrami yield
+  var extra=div(''); extra.style.cssText='display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap;';
+  if(lane.calc==='salami'){
+    extra.appendChild(el('label',{style:'font-size:12px;font-weight:600;color:#555;'}, 'Mince yield incl. trim (g)'));
+    var my=input({type:'number', step:'any', value:(lane.minceYield===''||lane.minceYield==null)?'':lane.minceYield}); my.style.width='110px';
+    my.addEventListener('change', function(){ lane.minceYield=my.value; renderVenisonForm(); });
+    extra.appendChild(my);
+    extra.appendChild(el('span',{style:'font-size:11px;color:#999;'}, '×1.25 (25% fat) → ×60% dry'));
+  }
+  if(lane.calc==='pastrami'){
+    extra.appendChild(el('label',{style:'font-size:12px;font-weight:600;color:#555;'}, 'Yield %'));
+    var yp=input({type:'number', step:'any', value:lane.yieldPct||60}); yp.style.width='70px';
+    yp.addEventListener('change', function(){ lane.yieldPct=yp.value; renderVenisonForm(); });
+    extra.appendChild(yp);
+  }
+  if(extra.childNodes.length) card.appendChild(extra);
+  // cure date + freeze/resume
+  var ctrl=div(''); ctrl.style.cssText='display:flex;align-items:center;gap:12px;margin-top:10px;flex-wrap:wrap;border-top:1px dashed #e0e0dc;padding-top:10px;';
+  ctrl.appendChild(el('label',{style:'font-size:12px;font-weight:600;color:#555;'}, 'Cure / start date'));
+  var cd=input({type:'date', value:lane.cureDate||''}); cd.addEventListener('change', function(){ lane.cureDate=cd.value; renderVenisonForm(); });
+  ctrl.appendChild(cd);
+  if(!lane.frozen){
+    var fz=btn('', '❄ Freeze (hold)', function(){ lane.frozen=true; if(!lane.frozenDate) lane.frozenDate=today(); renderVenisonForm(); });
+    fz.style.cssText='font-size:12px;padding:4px 10px;'; ctrl.appendChild(fz);
+  } else {
+    ctrl.appendChild(el('span',{style:'font-size:12px;color:#7a4d12;'}, 'Frozen'));
+    var fd=input({type:'date', value:lane.frozenDate||''}); fd.addEventListener('change', function(){ lane.frozenDate=fd.value; }); ctrl.appendChild(fd);
+    var rs=btn('', 'Resume (defrost)', function(){ lane.frozen=false; lane.resumeDate=today(); renderVenisonForm(); });
+    rs.style.cssText='font-size:12px;padding:4px 10px;'; ctrl.appendChild(rs);
+  }
+  if(lane.resumeDate) ctrl.appendChild(el('span',{style:'font-size:11px;color:#999;'}, 'resumed '+lane.resumeDate));
+  card.appendChild(ctrl);
+  // finished line
+  var finG=venLaneFinishedG(lane);
+  var fin=div(''); fin.style.cssText='margin-top:10px;font-size:13px;font-weight:600;color:#2c2a26;';
+  fin.textContent='Finished: '+(finG/1000).toFixed(3)+' kg  ·  £'+venLaneValue(lane).toFixed(2)+(lane.frozen?'  (potential — frozen)':'');
+  card.appendChild(fin);
+  return card;
+}
+function saveVenisonRun(){
+  if(!venForm) return;
+  var existing=venisonRuns.find(function(r){return r.id===venForm.id;});
+  if(existing) Object.assign(existing, JSON.parse(JSON.stringify(venForm)));
+  else venisonRuns.push(JSON.parse(JSON.stringify(venForm)));
+  saveData();
+  venForm=null;
+  renderVenison();
 }
 
 function hideAllExceptProd() {
