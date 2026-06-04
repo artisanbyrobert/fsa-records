@@ -237,7 +237,8 @@ deliveries = [r['data'] for r in deliveries_raw if r.get('data') and not r['data
 pest_records = [r['data'] for r in deliveries_raw if r.get('data') and r['data'].get('_type') == 'pest']
 production_records = [r['data'] for r in deliveries_raw if r.get('data') and r['data'].get('_type') == 'production']
 daily_checks = [r['data'] for r in deliveries_raw if r.get('data') and r['data'].get('_type') == 'dailychecks']
-_log(f"  Records: intakes={len(intakes)}, daily={len(daily_records)}, deliveries={len(deliveries)}, pest={len(pest_records)}, prod={len(production_records)}, checks={len(daily_checks)}")
+venison_runs = [r['data'] for r in deliveries_raw if r.get('data') and r['data'].get('_type') == 'venison']
+_log(f"  Records: intakes={len(intakes)}, daily={len(daily_records)}, deliveries={len(deliveries)}, pest={len(pest_records)}, prod={len(production_records)}, checks={len(daily_checks)}, venison={len(venison_runs)}")
 
 estates = {}
 for row in config_raw:
@@ -302,8 +303,9 @@ from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, PageBreak, KeepTogether
 from reportlab.graphics.shapes import Drawing, Rect, Circle, Line, String
 from reportlab.graphics import renderPDF
+from reportlab.pdfgen import canvas as _canvas
 
-doc = SimpleDocTemplate(filename, pagesize=landscape(A4), rightMargin=15*mm, leftMargin=15*mm, topMargin=15*mm, bottomMargin=15*mm)
+doc = SimpleDocTemplate(filename, pagesize=landscape(A4), rightMargin=15*mm, leftMargin=15*mm, topMargin=24*mm, bottomMargin=16*mm)
 GREEN = colors.HexColor('#3a6b2a')
 AMBER = colors.HexColor('#854f0b')
 LIGHT_GREEN = colors.HexColor('#e8f4e3')
@@ -727,11 +729,108 @@ if production_records:
 else:
     story.append(Paragraph('No production runs recorded yet.', small))
 
+# ── Venison Breakdown ───────────────────────────────────────────────────────
+VEN_ORDER = ['prosciutto', 'curedloin', 'salami', 'pastrami']
+ven_cell = ParagraphStyle('vcell', fontSize=8, leading=10)
+ven_cell_b = ParagraphStyle('vcellb', fontSize=8, leading=10, fontName='Helvetica-Bold')
+ven_hdr = ParagraphStyle('vhdr', fontSize=8, textColor=colors.white, fontName='Helvetica-Bold')
+ven_stat = ParagraphStyle('vstat', fontSize=9, textColor=colors.HexColor('#444'), spaceBefore=2, spaceAfter=4, keepWithNext=1)
+ven_mince = ParagraphStyle('vmince', fontSize=9, textColor=colors.HexColor('#444'), fontName='Helvetica-Bold', spaceBefore=3, spaceAfter=6)
+ven_lane_h = ParagraphStyle('vlh', fontSize=13, textColor=GREEN, fontName='Helvetica-Bold', spaceBefore=10, spaceAfter=2, keepWithNext=1)
+
+def _vg(n):
+    try: return float(n)
+    except (TypeError, ValueError): return 0.0
+def _vfmt(n):
+    n = _vg(n)
+    return f'{int(round(n)):,}' if n else '—'
+
+if venison_runs:
+    for run in sorted(venison_runs, key=lambda r: r.get('date', ''), reverse=True):
+        title = ("Venison Breakdown — " + str(run.get('batchCode', '(no batch)')) + " · " + str(run.get('estate', ''))).strip(' ·')
+        add_section(title, 'Private kill — processed for the estate\u2019s own consumption.')
+        lanes = sorted(run.get('lanes', []), key=lambda l: VEN_ORDER.index(l['key']) if l.get('key') in VEN_ORDER else 99)
+        for lane in lanes:
+            is_salami_frozen = (lane.get('calc') == 'salami' and lane.get('frozen'))
+            heading = 'Venison \u2014 diced meat (for salami)' if is_salami_frozen else str(lane.get('name', 'Lane'))
+            story.append(Paragraph(heading, ven_lane_h))
+            if is_salami_frozen:
+                st = "Trimmed and diced, pre-salted and frozen on " + str(lane.get('frozenDate', '')) + " \u2014 to defrost, add fat and mince into salami later"
+            elif lane.get('frozen'):
+                st = "Status: FROZEN (held) since " + str(lane.get('frozenDate', '')) + " \u2014 to defrost and continue later"
+            elif lane.get('cureDate'):
+                st = "Status: curing \u00b7 into cure " + str(lane.get('cureDate', ''))
+            else:
+                st = "Status: in progress"
+            story.append(Paragraph(st, ven_stat))
+            show_salt = bool(lane.get('salt'))
+            is_salami = lane.get('calc') == 'salami'
+            data = [[Paragraph(c, ven_hdr) for c in ['Component', 'Meat kept (g)', 'Bone / trim (g)', 'Loss %', 'Salt 2.5% (g)']]]
+            sum_meat = 0.0; sum_bone = 0.0
+            for c in lane.get('components', []):
+                meat = _vg(c.get('meat')); bone = _vg(c.get('bone'))
+                sum_meat += meat; sum_bone += bone
+                loss = (bone / (meat + bone) * 100) if (meat + bone) > 0 else 0
+                salt = (f'{meat * 0.025:.1f}' if show_salt else '\u2014')
+                data.append([Paragraph(str(c.get('name', '')), ven_cell), Paragraph(_vfmt(meat), ven_cell),
+                             Paragraph(_vfmt(bone), ven_cell), Paragraph(f'{loss:.1f}%', ven_cell), Paragraph(salt, ven_cell)])
+            total_idx = None
+            if is_salami:
+                my = _vg(lane.get('minceYield'))
+                if my:
+                    trim = my - sum_meat
+                    if trim > 0.5:
+                        data.append([Paragraph('Trim (from leg &amp; loin prep)', ven_cell), Paragraph(_vfmt(trim), ven_cell),
+                                     Paragraph('\u2014', ven_cell), Paragraph('\u2014', ven_cell), Paragraph('\u2014', ven_cell)])
+                    salt_total = my * 0.025 if lane.get('frozen') else my * 1.25 * 0.025
+                    label = 'Total diced (incl. trim)' if lane.get('frozen') else 'Total minced (incl. trim)'
+                    data.append([Paragraph(label, ven_cell_b), Paragraph(_vfmt(my), ven_cell_b),
+                                 Paragraph(_vfmt(sum_bone), ven_cell_b), Paragraph('', ven_cell_b), Paragraph(f'{salt_total:.0f}', ven_cell_b)])
+                    total_idx = len(data) - 1
+            t = Table(data, colWidths=[120*mm, 28*mm, 28*mm, 22*mm, 28*mm], repeatRows=1)
+            tstyle = [('BACKGROUND', (0,0), (-1,0), GREEN), ('FONTSIZE', (0,0), (-1,-1), 8),
+                ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]), ('GRID', (0,0), (-1,-1), 0.3, colors.HexColor('#e0e0dc')),
+                ('LEFTPADDING', (0,0), (-1,-1), 4), ('TOPPADDING', (0,0), (-1,-1), 4), ('BOTTOMPADDING', (0,0), (-1,-1), 4), ('VALIGN', (0,0), (-1,-1), 'TOP')]
+            if total_idx is not None:
+                tstyle.append(('BACKGROUND', (0, total_idx), (-1, total_idx), LIGHT_GREEN))
+                tstyle.append(('LINEABOVE', (0, total_idx), (-1, total_idx), 0.6, GREEN))
+            t.setStyle(TableStyle(tstyle))
+            story.append(t)
+
+class NumberedCanvas(_canvas.Canvas):
+    def __init__(self, *args, **kwargs):
+        _canvas.Canvas.__init__(self, *args, **kwargs)
+        self._saved_pages = []
+    def showPage(self):
+        self._saved_pages.append(dict(self.__dict__))
+        self._startPage()
+    def save(self):
+        total = len(self._saved_pages)
+        for state in self._saved_pages:
+            self.__dict__.update(state)
+            self._draw_furniture(total)
+            _canvas.Canvas.showPage(self)
+        _canvas.Canvas.save(self)
+    def _draw_furniture(self, total):
+        w, hh = landscape(A4)
+        self.setFont('Helvetica-Bold', 9); self.setFillColor(GREEN)
+        self.drawString(15*mm, hh - 12*mm, 'Artisan by Robert')
+        self.setFont('Helvetica', 8); self.setFillColor(colors.HexColor('#666'))
+        self.drawString(15*mm, hh - 16*mm, 'FSA Compliance Records 2025/26')
+        self.setFont('Helvetica', 8); self.setFillColor(AMBER)
+        self.drawRightString(w - 15*mm, hh - 12*mm, 'Licence UK2820')
+        self.setFillColor(colors.HexColor('#666'))
+        self.drawRightString(w - 15*mm, hh - 16*mm, 'Generated ' + str(report_date))
+        self.setStrokeColor(GREEN); self.setLineWidth(1)
+        self.line(15*mm, hh - 18*mm, w - 15*mm, hh - 18*mm)
+        self.setFont('Helvetica', 8); self.setFillColor(colors.HexColor('#888'))
+        self.drawCentredString(w / 2, 10*mm, f'Page {self._pageNumber} of {total} pages')
+
 story.append(Spacer(1, 8*mm))
 story.append(HRFlowable(width='100%', thickness=0.5, color=colors.grey, spaceAfter=4))
 story.append(Paragraph(f'Artisan by Robert · UK2820 · Generated {report_date} · Confidential FSA Records', small))
 _log(f"Building PDF ({len(story)} story elements)")
-doc.build(story)
+doc.build(story, canvasmaker=NumberedCanvas)
 _log(f"ok PDF generated: {filename} ({os.path.getsize(filename)} bytes)")
 print(f"PDF generated: {filename}")
 
