@@ -237,6 +237,13 @@ let intakes = [], deliveries = [], dailyRecords = [], pestRecords = [], producti
 let generalTasks = [];  // loose quick-capture tasks, not tied to any record
 let dailyChecks = [];   // standalone opening/closing hygiene checks, one record per work day
 let venisonRuns = [];   // whole-carcass venison breakdowns; lanes = product children
+// Skin/tube sizes for stuffing — each carries its standard dry time (weeks). Editable + addable.
+// Dry time is a FORECAST; actual vac-pack date is logged so forecast vs actual can be compared.
+let skinSizes = [
+  {name:'Beer stick', weeks:2},
+  {name:'45 mm', weeks:3.5},
+  {name:'68 mm', weeks:8}
+];
 let currentView = 'list';
 let editId = null;
 let form = null;
@@ -292,6 +299,7 @@ async function loadData() {
         if (row.key === 'speciesFat' && row.data) speciesFat = Object.assign(speciesFat, row.data);
         if (row.key === 'recipeLibrary' && row.data && row.data.length) recipeLibrary = row.data;
         if (row.key === 'generalTasks' && row.data) generalTasks = row.data;
+        if (row.key === 'skinSizes' && row.data && row.data.length) skinSizes = row.data;
       }
     }
 
@@ -341,6 +349,7 @@ async function saveData() {
     await sb.from('app_config').upsert({key: 'speciesFat', data: speciesFat});
     await sb.from('app_config').upsert({key: 'recipeLibrary', data: recipeLibrary});
     await sb.from('app_config').upsert({key: 'generalTasks', data: generalTasks});
+    await sb.from('app_config').upsert({key: 'skinSizes', data: skinSizes});
     for (const dr of dailyRecords) {
       await sb.from('deliveries').upsert({id: 'daily_' + dr.id, data: {...dr, _type: 'daily'}});
     }
@@ -3811,7 +3820,7 @@ function stageRowSummary(s, idx) {
   else if (s.type === 'fatcalc') summary = (s.totalKg ? s.meatKg + 'kg meat + ' + s.fatKg + 'kg fat = ' + s.totalKg + 'kg (' + s.fatPercent + '%)' : '');
   else if (s.type === 'recipe') summary = (s.recipeName ? s.recipeName + (s.childLetter ? ' → Child ' + (prodForm.batchCode||'') + s.childLetter : '') : '');
   else if (s.type === 'mince') { const cw = s.childWork || {}; const n = Object.keys(cw).length; const mixed = Object.keys(cw).filter(function(k){return cw[k].mixed;}).length; summary = n ? (mixed + ' of ' + n + ' children mixed') : 'mince day'; }
-  else if (s.type === 'stuff_hang') summary = (s.count ? s.count + (s.unitGrams ? ' × ' + s.unitGrams + 'g' : ' salami') : '');
+  else if (s.type === 'stuff_hang') { var parts = []; if (s.childLetter) { var sc = (prodForm.children||[]).find(function(c){return c.letter===s.childLetter;}); parts.push(sc && sc.recipe && sc.recipe.name ? sc.recipe.name : ('Child ' + (prodForm.batchCode||'') + s.childLetter)); } if (s.count) parts.push(s.count + (s.unitGrams ? ' × ' + s.unitGrams + 'g' : ' salami')); if (s.skinSize) parts.push(s.skinSize); if (s.finishDate) parts.push('ready ' + fmtDate(s.finishDate)); summary = parts.join(' · '); }
   const main = div(''); main.style.flex = '1';
   main.appendChild(el('p', {style:'font-size:13px;font-weight:500;margin:0 0 2px;'}, icon + ' ' + typeName));
   main.appendChild(el('p', {style:'font-size:12px;color:#888;margin:0;'}, fmtDate(s.date) + (summary ? ' · ' + summary : '')));
@@ -4165,21 +4174,88 @@ function renderStageForm() {
 
     checkList('4 · Closing / end of day', prodStageEdit.closing);
   } else if (t === 'stuff_hang') {
+    function weeksLabel(w){ var s = (w === Math.floor(w)) ? String(w) : ((w - Math.floor(w) === 0.5) ? (Math.floor(w) || '') + '\u00BD' : String(w)); return s + ' week' + (w === 1 ? '' : 's'); }
+    function skinByName(n){ return skinSizes.find(function(s){ return s.name === n; }); }
+    function calcFinish(){
+      var s = prodStageEdit.skinSize ? skinByName(prodStageEdit.skinSize) : null;
+      if (!s){ prodStageEdit.skinDays = null; prodStageEdit.finishDate = null; return; }
+      prodStageEdit.skinDays = Math.round(s.weeks * 7);
+      var base = new Date((prodStageEdit.date || today()) + 'T00:00:00');
+      prodStageEdit.finishDate = new Date(base.getTime() + prodStageEdit.skinDays * 86400000).toISOString().slice(0,10);
+    }
+    calcFinish();
+
+    // Which flavour (child) is being stuffed
+    const children = prodForm.children || [];
+    if (children.length === 0) {
+      const warn = div(''); warn.style.cssText = 'background:#faeeda;border:1px solid #f0d4a8;border-radius:8px;padding:12px 14px;margin-top:12px;';
+      warn.appendChild(p('', 'No children yet. Do the Fat calculator first so the run has flavours to stuff.'));
+      card.appendChild(warn);
+    } else {
+      if (prodStageEdit.childLetter == null) prodStageEdit.childLetter = children[0].letter;
+      const cf = div('field'); cf.style.marginTop = '12px';
+      cf.appendChild(label('Which flavour is this?'));
+      const cSel = select(children.map(function(c){ return [c.letter, 'Child ' + c.code + (c.recipe && c.recipe.name ? ' · ' + c.recipe.name : '')]; }), prodStageEdit.childLetter, function(val){ prodStageEdit.childLetter = val; renderStageForm(); });
+      cSel.style.cssText = 'width:100%;margin-top:4px;';
+      cf.appendChild(cSel); card.appendChild(cf);
+    }
+
+    // Skin / tube size — dropdown, addable, each carries its dry time
+    const skf = div('field'); skf.style.marginTop = '12px';
+    skf.appendChild(label('Skin / tube size'));
+    const skOpts = [['', '— choose a size —']].concat(skinSizes.map(function(s){ return [s.name, s.name + ' — ' + weeksLabel(s.weeks)]; }));
+    const skSel = select(skOpts, prodStageEdit.skinSize || '', function(val){ prodStageEdit.skinSize = val || null; calcFinish(); renderStageForm(); });
+    skSel.style.cssText = 'width:100%;margin-top:4px;';
+    skf.appendChild(skSel);
+    const addSkin = btn('', '+ Add a skin size', function(){
+      const nm = (prompt('Skin / tube size name (e.g. 32 mm):') || '').trim();
+      if (!nm) return;
+      const wk = parseFloat(prompt('Standard dry time in weeks (e.g. 4, or 3.5):'));
+      if (isNaN(wk) || wk <= 0) { showToast('Enter the dry time in weeks'); return; }
+      if (skinSizes.find(function(s){ return s.name.toLowerCase() === nm.toLowerCase(); })) { showToast('That size already exists'); return; }
+      skinSizes.push({name:nm, weeks:wk});
+      saveData();
+      prodStageEdit.skinSize = nm; calcFinish(); renderStageForm();
+    });
+    addSkin.style.cssText = 'margin-top:8px;background:#eef5ea;color:#27500a;border:1px solid #d0e8c8;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:13px;';
+    skf.appendChild(addSkin);
+    card.appendChild(skf);
+
+    // Estimated ready / vac-pack date (forecast — actual logged on the day)
+    const fdBox = div(''); fdBox.style.cssText = 'margin-top:12px;border-radius:8px;padding:12px 14px;' + (prodStageEdit.finishDate ? 'background:#e6f1fb;border:1px solid #b5d4f4;' : 'background:#f5f5f4;border:1px solid #e6e6e6;');
+    if (prodStageEdit.finishDate) {
+      fdBox.appendChild(el('p', {style:'font-size:12px;color:#185fa5;margin:0 0 2px;'}, 'Estimated ready — vac pack by'));
+      fdBox.appendChild(el('p', {style:'font-size:18px;font-weight:600;color:#0c447c;margin:0;'}, fmtDate(prodStageEdit.finishDate)));
+      fdBox.appendChild(el('p', {style:'font-size:12px;color:#185fa5;margin:4px 0 0;'}, 'Goes on your task list when you save. Estimate only — check the salami on the day.'));
+    } else {
+      fdBox.appendChild(el('p', {style:'font-size:13px;color:#888;margin:0;'}, 'Pick a skin size to set the ready date.'));
+    }
+    card.appendChild(fdBox);
+
+    // Weights per piece
+    const mwRow = div(''); mwRow.style.cssText = 'display:flex;gap:10px;margin-top:12px;';
+    const mF = div('field'); mF.style.flex = '1';
+    mF.appendChild(label('On machine each (g)'));
+    const mInp = input({type:'number', min:'0', step:'5', value: prodStageEdit.onMachineG || ''});
+    mInp.placeholder = 'e.g. 350';
+    mInp.addEventListener('input', function(e){ prodStageEdit.onMachineG = parseInt(e.target.value) || 0; });
+    mF.appendChild(mInp); mwRow.appendChild(mF);
+    const wF = div('field'); wF.style.flex = '1';
+    wF.appendChild(label('Wet weight each (g)'));
+    const wInp = input({type:'number', min:'0', step:'5', value: prodStageEdit.unitGrams || ''});
+    wInp.placeholder = 'e.g. 540';
+    wInp.addEventListener('input', function(e){ prodStageEdit.unitGrams = parseInt(e.target.value) || 0; });
+    wF.appendChild(wInp); mwRow.appendChild(wF);
+    card.appendChild(mwRow);
+
+    // Piece count — optional, can be added later
     const countField = div('field'); countField.style.marginTop = '12px';
-    countField.appendChild(label('Number of salami made today'));
+    countField.appendChild(label('Number of salami made'));
     const countInp = input({type:'number', min:'0', step:'1', value: prodStageEdit.count || ''});
-    countInp.placeholder = 'e.g. 24';
+    countInp.placeholder = 'add now or come back later';
     countInp.addEventListener('input', function(e){ prodStageEdit.count = parseInt(e.target.value) || 0; });
     countField.appendChild(countInp);
     card.appendChild(countField);
-
-    const sizeField = div('field'); sizeField.style.marginTop = '12px';
-    sizeField.appendChild(label('Size of each (grams) — optional, varies by client'));
-    const sizeInp = input({type:'number', min:'0', step:'10', value: prodStageEdit.unitGrams || ''});
-    sizeInp.placeholder = 'e.g. 400';
-    sizeInp.addEventListener('input', function(e){ prodStageEdit.unitGrams = parseInt(e.target.value) || 0; });
-    sizeField.appendChild(sizeInp);
-    card.appendChild(sizeField);
   }
 
   const notesField = div('field'); notesField.style.marginTop = '12px';
@@ -4209,8 +4285,9 @@ function renderStageForm() {
       if (!prodForm.children || prodForm.children.length === 0) { showToast('Do the Fat calculator first to create children'); return; }
       if (!prodStageEdit.recipeName || !prodStageEdit.recipeName.trim()) { showToast('Give the recipe a name'); return; }
     }
-    if (t === 'stuff_hang' && (!prodStageEdit.count || prodStageEdit.count <= 0) && !(prodStageEdit.notes && prodStageEdit.notes.trim())) {
-      showToast('Add a note now (piece count can come later), or enter how many you made'); return;
+    if (t === 'stuff_hang') {
+      const hasAny = (prodStageEdit.count && prodStageEdit.count > 0) || (prodStageEdit.notes && prodStageEdit.notes.trim()) || prodStageEdit.skinSize || prodStageEdit.unitGrams || prodStageEdit.onMachineG;
+      if (!hasAny) { showToast('Pick a skin size or add a note — piece count can come later'); return; }
     }
     prodForm.stages = prodForm.stages || [];
     const toSave = Object.assign({}, prodStageEdit);
@@ -4268,6 +4345,18 @@ function renderStageForm() {
           }
         }
       });
+    }
+    if (t === 'stuff_hang' && toSave.finishDate) {
+      // Put the estimated dry/vac-pack date on the to-do list (one task per batch+child;
+      // re-saving updates it rather than duplicating).
+      const ch = (prodForm.children || []).find(function(c){ return c.letter === toSave.childLetter; });
+      const childCode = ch ? ch.code : (prodForm.batchCode || '');
+      const flav = (ch && ch.recipe && ch.recipe.name) ? ' ' + ch.recipe.name : '';
+      const taskId = 'vac_' + (prodForm.batchCode || '') + (toSave.childLetter || '');
+      const text = '🌭 Vac pack ' + childCode + flav + ' — est. ready ' + fmtDate(toSave.finishDate);
+      const existing = generalTasks.find(function(g){ return g.id === taskId; });
+      if (existing) { existing.text = text; existing.dueDate = toSave.finishDate; existing.done = false; }
+      else { generalTasks.push({id: taskId, text: text, addedDate: today(), dueDate: toSave.finishDate, done: false, kind: 'fsa', _vacpack: true}); }
     }
     prodStageEdit = null;
     saveAndStay();
