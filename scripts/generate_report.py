@@ -267,14 +267,32 @@ for row in config_raw:
         if isinstance(d, list):
             general_tasks = d
 
+# Estate -> published ALIAS. Real estate names are confidential and must NEVER
+# appear in the FSA audit PDF. The alias is what gets published; the real estate
+# name lives only in the private commercial records.
+ESTATE_ALIASES = {
+    'coombe manor':'Jem', 'audley end':'Aimee',
+    'cold aston':'Gary', 'cold aston - gary':'Gary',
+    'belvoir':'Caroline', 'belvoir castle':'Caroline',
+    'lees court':'Elizabeth',
+}
+def to_alias(name):
+    if not name: return name
+    key = str(name).strip().lower()
+    for real, alias in ESTATE_ALIASES.items():
+        if real in key: return alias
+    return name  # no alias on file yet -> real name still shows (flagged to Robert)
+
 def get_estate(rec):
+    # A record may already carry a published alias
+    if rec.get('alias'): return rec['alias']
     # Try direct estate name first
     name = rec.get('estate','') or rec.get('estateName','')
-    if name and len(name) < 30 and not name.startswith('ey'): return name
+    if name and len(name) < 30 and not name.startswith('ey'): return to_alias(name)
     # Try lookup by ID
     eid = rec.get('estateId','') or rec.get('estate','')
     looked_up = estates.get(eid, '')
-    if looked_up: return looked_up
+    if looked_up: return to_alias(looked_up)
     # Return whatever we have
     return eid or '—'
 
@@ -627,7 +645,8 @@ if production_records:
         species = rec.get('speciesName','') or rec.get('species','')
         status = rec.get('status','in_progress')
         fat_pct = rec.get('fatPercent','') or rec.get('fatPct','')
-        header = f"<b>{clean(species)} · Batch {clean(batch)} · Process {proc} · {status}"
+        alias = rec.get('alias','')
+        header = f"<b>{clean(species)}" + (f" · {clean(alias)}" if alias else "") + f" · Batch {clean(batch)} · Process {proc} · {status}"
         if fat_pct: header += f" · fat {fat_pct}%"
         header += "</b>"
         story.append(Paragraph(header, ParagraphStyle('prh', fontSize=10, fontName='Helvetica-Bold', textColor=GREEN, spaceAfter=3, spaceBefore=6, keepWithNext=1)))
@@ -722,7 +741,8 @@ if production_records:
                     detail = f"{n} x {ug}g" if ug else f"{n} salami"
                 stage_label = {'fatcalc':'Fat Calculator','saltcalc':'Salt Calculator','stuff_hang':'Stuffing & Hanging','mince':'Mince Day','defrost':'Defrost'}.get(stage, stage.replace('_',' ').title())
                 detail_cell = Paragraph(clean(detail), ParagraphStyle('sdc', fontSize=7, leading=9)) if detail else ''
-                srows.append([dstr, stage_label, detail_cell, clean(st_rec.get('notes',''))[:60]])
+                notes_cell = Paragraph(clean(st_rec.get('notes','')), ParagraphStyle('snc', fontSize=7, leading=9)) if st_rec.get('notes') else ''
+                srows.append([dstr, stage_label, detail_cell, notes_cell])
             pt = Table(srows, colWidths=[22*mm, 32*mm, 60*mm, 110*mm], repeatRows=1)
             pt.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), GREEN), ('TEXTCOLOR', (0,0), (-1,0), colors.white), ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), ('FONTSIZE', (0,0), (-1,-1), 7), ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]), ('GRID', (0,0), (-1,-1), 0.3, colors.HexColor('#e0e0dc')), ('LEFTPADDING', (0,0), (-1,-1), 4), ('TOPPADDING', (0,0), (-1,-1), 3), ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('VALIGN', (0,0), (-1,-1), 'TOP')]))
             story.append(pt)
@@ -747,7 +767,8 @@ def _vfmt(n):
 
 if venison_runs:
     for run in sorted(venison_runs, key=lambda r: r.get('date', ''), reverse=True):
-        title = ("Venison Breakdown — " + str(run.get('batchCode', '(no batch)')) + " · " + str(run.get('estate', ''))).strip(' ·')
+        ven_alias = run.get('alias','') or to_alias(run.get('estate',''))
+        title = ("Venison Breakdown — " + str(run.get('batchCode', '(no batch)')) + " · " + str(ven_alias)).strip(' ·')
         add_section(title, 'Private kill — processed for the estate\u2019s own consumption.')
         lanes = sorted(run.get('lanes', []), key=lambda l: VEN_ORDER.index(l['key']) if l.get('key') in VEN_ORDER else 99)
         for lane in lanes:
