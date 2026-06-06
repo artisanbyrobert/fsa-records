@@ -3083,6 +3083,162 @@ function processCodeFromDate(dateStr) {
   return (dateStr || today()).replace(/-/g, '');
 }
 
+// ===== Salami hang label (print to Phomemo via image hand-off) =====
+// ── Salami hang label — pure canvas, identical in browser and node ──────────
+// d = { flavour, batchCode, processCode, hung, ready }  (hung/ready = ISO date strings)
+// orientation = 'landscape' (30×20) or 'portrait' (20×30)
+
+function labelDate(iso){
+  if(!iso) return '';
+  var M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var p=String(iso).slice(0,10).split('-');
+  if(p.length<3) return iso;
+  return parseInt(p[2],10)+' '+M[parseInt(p[1],10)-1]+' '+p[0].slice(2);
+}
+
+// fit text into maxWidth, wrapping on spaces, shrinking font from hi→lo
+function fitLines(ctx, text, maxWidth, hi, lo, weight, family, maxLines){
+  text = (text||'').trim();
+  for(var fs=hi; fs>=lo; fs--){
+    ctx.font = weight+' '+fs+'px '+family;
+    var words=text.split(/\s+/), lines=[], cur='';
+    for(var i=0;i<words.length;i++){
+      var t=cur?cur+' '+words[i]:words[i];
+      if(ctx.measureText(t).width<=maxWidth || !cur){ cur=t; }
+      else { lines.push(cur); cur=words[i]; }
+    }
+    if(cur) lines.push(cur);
+    var ok=lines.length<=maxLines && lines.every(function(l){return ctx.measureText(l).width<=maxWidth;});
+    if(ok) return {lines:lines, fs:fs};
+  }
+  ctx.font = weight+' '+lo+'px '+family;
+  return {lines:[text], fs:lo};
+}
+
+function drawSalamiLabel(ctx, W, H, d, orientation){
+  var FAM = 'Arial, Helvetica, sans-serif';
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#000';
+  ctx.textBaseline='alphabetic';
+  var pad = Math.round(W*0.05);
+  var iw = W - pad*2;
+
+  if(orientation==='portrait'){
+    // 20 (W) × 30 (H): stacked, left aligned
+    var y = pad + Math.round(H*0.02);
+    var fl = fitLines(ctx, d.flavour, iw, Math.round(H*0.11), Math.round(H*0.055), 'bold', FAM, 3);
+    ctx.textAlign='center';
+    for(var i=0;i<fl.lines.length;i++){ y+=fl.fs; ctx.font='bold '+fl.fs+'px '+FAM; ctx.fillText(fl.lines[i], W/2, y); y+=Math.round(fl.fs*0.12); }
+    y += Math.round(H*0.02);
+    ctx.strokeStyle='#000'; ctx.lineWidth=Math.max(2,Math.round(H*0.006));
+    ctx.beginPath(); ctx.moveTo(pad,y); ctx.lineTo(W-pad,y); ctx.stroke();
+    y += Math.round(H*0.035);
+    ctx.textAlign='left';
+    var rows=[['BATCH', d.batchCode||'—'],['RUN', d.processCode||'—'],['HUNG', labelDate(d.hung)],['READY', labelDate(d.ready)]];
+    var lblFs=Math.round(H*0.034), valFs=Math.round(H*0.055);
+    for(var r=0;r<rows.length;r++){
+      if(!rows[r][1]) continue;
+      ctx.font=lblFs+'px '+FAM; ctx.fillStyle='#000'; ctx.fillText(rows[r][0], pad, y+lblFs);
+      ctx.font='bold '+valFs+'px '+FAM; ctx.fillText(rows[r][1], pad, y+lblFs+Math.round(valFs*0.95));
+      y += lblFs + valFs + Math.round(H*0.022);
+    }
+  } else {
+    // 30 (W) × 20 (H) landscape: flavour, codes line, dates line — centred
+    var cy = pad;
+    var f2 = fitLines(ctx, d.flavour, iw, Math.round(H*0.30), Math.round(H*0.15), 'bold', FAM, 2);
+    ctx.textAlign='center';
+    for(var j=0;j<f2.lines.length;j++){ cy+=f2.fs; ctx.font='bold '+f2.fs+'px '+FAM; ctx.fillText(f2.lines[j], W/2, cy); cy+=Math.round(f2.fs*0.06); }
+    cy += Math.round(H*0.04);
+    ctx.strokeStyle='#000'; ctx.lineWidth=Math.max(2,Math.round(H*0.012));
+    ctx.beginPath(); ctx.moveTo(pad,cy); ctx.lineTo(W-pad,cy); ctx.stroke();
+    cy += Math.round(H*0.05);
+    var codes=(d.batchCode||'')+'   ·   '+(d.processCode||'');
+    var cf=fitLines(ctx, codes, iw, Math.round(H*0.17), Math.round(H*0.10), 'bold', FAM, 1);
+    cy+=cf.fs; ctx.font='bold '+cf.fs+'px '+FAM; ctx.fillText(cf.lines[0], W/2, cy);
+    cy+=Math.round(H*0.05);
+    var dates=[]; if(d.hung)dates.push('Hung '+labelDate(d.hung)); if(d.ready)dates.push('Ready '+labelDate(d.ready));
+    var dstr=dates.join('     ');
+    if(dstr){ var df=fitLines(ctx, dstr, iw, Math.round(H*0.13), Math.round(H*0.08), 'normal', FAM, 1); cy+=df.fs; ctx.font='normal '+df.fs+'px '+FAM; ctx.fillText(dstr, W/2, cy); }
+  }
+}
+
+function salamiLabelData(prodForm, stage){
+  var ch=(prodForm.children||[]).find(function(c){return c.letter===stage.childLetter;});
+  var flav=(ch&&ch.recipe&&ch.recipe.name)?ch.recipe.name:(ch?('Child '+ch.code):'Salami');
+  return { flavour:flav, batchCode:prodForm.batchCode||'',
+    processCode: prodForm.processCode || processCodeFromDate(prodForm.startDate||today()),
+    hung: stage.date||today(), ready: stage.finishDate||'' };
+}
+function renderLabelCanvas(d, orientation, scale){
+  scale=scale||4;
+  var W=orientation==='portrait'?240:360, H=orientation==='portrait'?360:240;
+  var c=document.createElement('canvas'); c.width=W*scale; c.height=H*scale;
+  var ctx=c.getContext('2d'); ctx.scale(scale,scale); drawSalamiLabel(ctx,W,H,d,orientation); return c;
+}
+function openSalamiLabelDialog(prodForm, stage){
+  if(!stage.childLetter && (prodForm.children||[]).length){ stage.childLetter=prodForm.children[0].letter; }
+  var d=salamiLabelData(prodForm, stage);
+  if(stage.labelOrientation==null) stage.labelOrientation='landscape';
+  if(stage.perString==null) stage.perString=5;
+  var back=document.createElement('div');
+  back.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:18px;';
+  var card=document.createElement('div');
+  card.style.cssText='background:#fff;border-radius:14px;max-width:420px;width:100%;padding:18px 18px 22px;box-shadow:0 10px 40px rgba(0,0,0,.3);margin:auto;';
+  function close(){ if(back.parentNode) document.body.removeChild(back); }
+  back.addEventListener('click', function(e){ if(e.target===back) close(); });
+  var h=document.createElement('h2'); h.textContent='Print label'; h.style.cssText='margin:0 0 4px;font-size:20px;'; card.appendChild(h);
+  var sub=document.createElement('p'); sub.textContent=d.flavour+'  \u00b7  '+d.batchCode; sub.style.cssText='margin:0 0 12px;color:#666;font-size:14px;'; card.appendChild(sub);
+  var prev=document.createElement('img');
+  prev.style.cssText='display:block;width:100%;max-width:300px;margin:0 auto 6px;border:1px solid #ddd;border-radius:6px;background:#fff;';
+  card.appendChild(prev);
+  var hint=document.createElement('p'); hint.textContent='Press & hold the label to Save to Photos'; hint.style.cssText='text-align:center;color:#999;font-size:12px;margin:0 0 14px;'; card.appendChild(hint);
+  var curFile=null;
+  function labelFileName(){ return 'label_'+(d.batchCode||'')+(stage.childLetter||'')+'.png'; }
+  function labelCountText(){
+    var n=stage.count||0, per=stage.perString||5;
+    if(!n) return 'Add the piece count on the stage to get the number of labels.';
+    var strings=Math.ceil(n/per);
+    return n+' salami \u00f7 '+per+' per string  \u2192  print '+strings+' label'+(strings===1?'':'s');
+  }
+  function refresh(){
+    var c=renderLabelCanvas(d, stage.labelOrientation, 4);
+    prev.src=c.toDataURL('image/png');
+    prev.style.maxWidth = (stage.labelOrientation==='portrait')?'200px':'300px';
+    c.toBlob(function(b){ try{ curFile=new File([b], labelFileName(), {type:'image/png'}); }catch(e){ curFile=null; } }, 'image/png');
+    countLine.textContent=labelCountText();
+  }
+  var orow=document.createElement('div'); orow.style.cssText='display:flex;gap:8px;margin-bottom:12px;';
+  function mkOrient(txt,val){ var b=document.createElement('button'); b.textContent=txt;
+    b._paint=function(){ var on=stage.labelOrientation===val; b.style.cssText='flex:1;padding:10px;border-radius:8px;cursor:pointer;font-size:14px;border:1px solid '+(on?'#27500a':'#ccc')+';background:'+(on?'#eef5ea':'#fff')+';color:'+(on?'#27500a':'#444')+';font-weight:'+(on?'600':'400')+';'; };
+    b.addEventListener('click', function(){ stage.labelOrientation=val; refresh(); paintAll(); }); return b; }
+  var ob1=mkOrient('Landscape','landscape'), ob2=mkOrient('Portrait','portrait');
+  function paintAll(){ ob1._paint(); ob2._paint(); }
+  orow.appendChild(ob1); orow.appendChild(ob2); card.appendChild(orow); paintAll();
+  var psWrap=document.createElement('div'); psWrap.style.cssText='display:flex;align-items:center;gap:10px;margin-bottom:6px;';
+  var psLbl=document.createElement('label'); psLbl.textContent='Salami per string'; psLbl.style.cssText='font-size:14px;color:#444;flex:1;';
+  var psInp=document.createElement('input'); psInp.type='number'; psInp.min='1'; psInp.step='1'; psInp.value=stage.perString||5;
+  psInp.style.cssText='width:70px;padding:8px;border:1px solid #ccc;border-radius:8px;font-size:15px;';
+  psInp.addEventListener('input', function(e){ stage.perString=parseInt(e.target.value)||5; refresh(); });
+  psWrap.appendChild(psLbl); psWrap.appendChild(psInp); card.appendChild(psWrap);
+  var countLine=document.createElement('p'); countLine.style.cssText='margin:0 0 16px;font-size:13px;color:#185fa5;'; card.appendChild(countLine);
+  var shareBtn=document.createElement('button'); shareBtn.textContent='Share / Save label';
+  shareBtn.style.cssText='width:100%;padding:15px;border:none;border-radius:10px;background:#27500a;color:#fff;font-size:17px;font-weight:600;cursor:pointer;';
+  shareBtn.addEventListener('click', async function(){
+    try{
+      if(curFile && navigator.canShare && navigator.canShare({files:[curFile]})){ await navigator.share({files:[curFile], title:'Salami label'}); }
+      else { var w=window.open(); if(w){ w.document.write('<img src="'+prev.src+'" style="max-width:100%">'); } showToast('Press & hold the image to Save to Photos, then open Print Master'); }
+    }catch(e){}
+  });
+  card.appendChild(shareBtn);
+  var note=document.createElement('p'); note.style.cssText='margin:12px 0 0;font-size:12px;color:#888;line-height:1.5;';
+  note.textContent='In Print Master: import this image, pick your label size, set quantity to the number above, print one per string.';
+  card.appendChild(note);
+  var closeBtn=document.createElement('button'); closeBtn.textContent='Done'; closeBtn.style.cssText='width:100%;margin-top:12px;padding:12px;border:1px solid #ddd;border-radius:10px;background:#fafafa;color:#444;font-size:15px;cursor:pointer;';
+  closeBtn.addEventListener('click', close); card.appendChild(closeBtn);
+  back.appendChild(card); document.body.appendChild(back); refresh();
+}
+
+
 function getSpeciesForBatch(batchCode) {
   const intake = intakes.find(function(i){ return i.batchCode === batchCode; });
   if (!intake || !intake.items || !intake.items[0]) return '';
@@ -4256,6 +4412,9 @@ function renderStageForm() {
     countInp.addEventListener('input', function(e){ prodStageEdit.count = parseInt(e.target.value) || 0; });
     countField.appendChild(countInp);
     card.appendChild(countField);
+    const labelBtn = btn('', '🏷️  Make label', function(){ openSalamiLabelDialog(prodForm, prodStageEdit); });
+    labelBtn.style.cssText = 'margin-top:16px;width:100%;padding:13px;background:#27500a;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;';
+    card.appendChild(labelBtn);
   }
 
   const notesField = div('field'); notesField.style.marginTop = '12px';
