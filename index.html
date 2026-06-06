@@ -4124,10 +4124,13 @@ function renderStageForm() {
   const notesField = div('field'); notesField.style.marginTop = '12px';
   notesField.appendChild(label('Notes (optional — what went well, what didn\'t)'));
   const notesInp = document.createElement('textarea');
-  notesInp.rows = 3;
+  notesInp.rows = 5;
+  notesInp.style.minHeight = '110px';
   notesInp.value = prodStageEdit.notes || '';
   notesInp.placeholder = 'e.g. "overfilled, bent mixer, stuffing pushed to tomorrow"';
-  notesInp.addEventListener('input', function(e){ prodStageEdit.notes = e.target.value; });
+  function autoGrowNotes(){ notesInp.style.height = 'auto'; notesInp.style.height = (notesInp.scrollHeight + 4) + 'px'; }
+  notesInp.addEventListener('input', function(e){ prodStageEdit.notes = e.target.value; autoGrowNotes(); });
+  setTimeout(autoGrowNotes, 0);
   notesField.appendChild(notesInp);
   card.appendChild(notesField);
 
@@ -4145,8 +4148,8 @@ function renderStageForm() {
       if (!prodForm.children || prodForm.children.length === 0) { showToast('Do the Fat calculator first to create children'); return; }
       if (!prodStageEdit.recipeName || !prodStageEdit.recipeName.trim()) { showToast('Give the recipe a name'); return; }
     }
-    if (t === 'stuff_hang' && (!prodStageEdit.count || prodStageEdit.count <= 0)) {
-      showToast('Enter how many salami you made today'); return;
+    if (t === 'stuff_hang' && (!prodStageEdit.count || prodStageEdit.count <= 0) && !(prodStageEdit.notes && prodStageEdit.notes.trim())) {
+      showToast('Add a note now (piece count can come later), or enter how many you made'); return;
     }
     prodForm.stages = prodForm.stages || [];
     const toSave = Object.assign({}, prodStageEdit);
