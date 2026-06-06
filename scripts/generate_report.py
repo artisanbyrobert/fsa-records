@@ -738,7 +738,19 @@ if production_records:
                 elif stage == 'stuff_hang':
                     n = st_rec.get('count','')
                     ug = st_rec.get('unitGrams','')
-                    detail = f"{n} x {ug}g" if ug else f"{n} salami"
+                    bits = []
+                    cl = st_rec.get('childLetter')
+                    if cl:
+                        ch = next((c for c in (rec.get('children',[]) or []) if c.get('letter') == cl), None)
+                        nm = (ch.get('recipe') or {}).get('name') if ch else None
+                        bits.append(nm if nm else f"Child {cl}")
+                    if n:
+                        bits.append(f"{n} x {ug}g" if ug else f"{n} salami")
+                    if st_rec.get('skinSize'):
+                        bits.append(f"{st_rec.get('skinSize')} skins")
+                    if st_rec.get('finishDate'):
+                        bits.append(f"est. ready {st_rec.get('finishDate')}")
+                    detail = ' · '.join(bits)
                 stage_label = {'fatcalc':'Fat Calculator','saltcalc':'Salt Calculator','stuff_hang':'Stuffing & Hanging','mince':'Mince Day','defrost':'Defrost'}.get(stage, stage.replace('_',' ').title())
                 detail_cell = Paragraph(clean(detail), ParagraphStyle('sdc', fontSize=7, leading=9)) if detail else ''
                 notes_cell = Paragraph(clean(st_rec.get('notes','')), ParagraphStyle('snc', fontSize=7, leading=9)) if st_rec.get('notes') else ''
