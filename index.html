@@ -3585,6 +3585,32 @@ function renderMakeMode() {
   const child = (prodForm.children || []).find(function(c){ return c.letter === makeChildLetter; });
   if (!child || !child.recipe || !child.recipe.lines) { makeChildLetter = null; renderProductionForm(); return; }
 
+  function lc(s){ return (s == null ? '' : s.toString()).toLowerCase(); }
+  function isSalt(l){ return lc(l.name).indexOf('salt') >= 0; }
+  function isMedium(l){ var n = lc(l.name); return (n.indexOf('alcohol') >= 0 || n.indexOf('wine') >= 0 || n.indexOf('wash') >= 0) && !isSalt(l); }
+  function isGarlic(l){ return lc(l.name).indexOf('garlic') >= 0; }
+  function isSugar(l){ var n = lc(l.name); return n.indexOf('sugar') >= 0 || n.indexOf('dextrose') >= 0; }
+  function isEnzyme(l){ var n = lc(l.name); return n.indexOf('enzyme') >= 0 || n.indexOf('flora') >= 0 || n.indexOf('culture') >= 0 || n.indexOf('starter') >= 0; }
+  function mediumName(l){ var n = lc(l.name); if (n.indexOf('alcohol') >= 0 || n.indexOf('wash') >= 0) return 'alcohol >13%'; if (n.indexOf('wine') >= 0) return 'wine'; return l.name; }
+  function amtStr(line){ return (line.type === 'asneeded' || line.amount == null || line.amount === '') ? 'as needed' : (line.amount + ' ' + (line.unit || 'g')); }
+
+  const lines = child.recipe.lines || [];
+  const saltLines = lines.filter(isSalt);
+  const mediumLines = lines.filter(isMedium);
+  const rest = lines.filter(function(l){ return !isSalt(l) && !isMedium(l); });
+  const sugars = rest.filter(isSugar);
+  const enz = rest.filter(function(l){ return isEnzyme(l) && !isSugar(l); });
+  const gar = rest.filter(function(l){ return isGarlic(l) && !isSugar(l) && !isEnzyme(l); });
+  const others = rest.filter(function(l){ return !isSugar(l) && !isEnzyme(l) && !isGarlic(l); });
+  const tickable = sugars.concat(enz).concat(gar).concat(others);
+  const mediumLabel = mediumLines.length ? mediumName(mediumLines[0]) : 'alcohol >13%';
+
+  // Salt + alcohol/wine are not tickable here (salt is in at mince; alcohol is the blending medium).
+  // Auto-mark them as in, so overview counts + any allDone checks elsewhere stay consistent.
+  var changed = false;
+  saltLines.concat(mediumLines).forEach(function(l){ if (!l.addedDate) { l.addedDate = today(); changed = true; } });
+  if (changed) saveData();
+
   const hdr = div('header-bar');
   hdr.appendChild(el('h2', {style:'font-size:20px;font-weight:700;margin:0;'}, 'Make: Child ' + child.code));
   const back = btn('', '← Back', function(){ makeChildLetter = null; renderProductionForm(); });
@@ -3594,22 +3620,38 @@ function renderMakeMode() {
 
   const sub = div(''); sub.style.cssText = 'margin:4px 0 16px;';
   sub.appendChild(el('p', {style:'font-size:16px;font-weight:600;color:#27500a;margin:0;'}, (child.recipe.name || 'Recipe') + ' · ' + child.totalKg + 'kg mix'));
-  const done = (child.recipe.lines||[]).filter(function(l){ return l.addedDate; }).length;
-  sub.appendChild(el('p', {style:'font-size:14px;color:#666;margin:2px 0 0;'}, done + ' of ' + child.recipe.lines.length + ' added · tap each ingredient as it goes in'));
+  const done = tickable.filter(function(l){ return l.addedDate; }).length;
+  sub.appendChild(el('p', {style:'font-size:14px;color:#666;margin:2px 0 0;'}, done + ' of ' + tickable.length + ' done · tap each as it goes in'));
   v.appendChild(sub);
 
   const list = div(''); list.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
-  child.recipe.lines.forEach(function(line){
+
+  // Salt context row(s) — already in at mince, not tickable
+  saltLines.forEach(function(line){
+    const row = div(''); row.style.cssText = 'display:flex;align-items:center;gap:14px;width:100%;border-radius:12px;padding:16px 18px;background:#f3f4f2;border:2px solid #ececec;';
+    row.appendChild(el('span', {style:'font-size:24px;width:32px;flex-shrink:0;color:#27500a;'}, '✓'));
+    const nw = div(''); nw.style.cssText = 'flex:1;';
+    nw.appendChild(el('span', {style:'font-weight:600;color:#7a8a72;'}, line.name));
+    nw.appendChild(el('span', {style:'display:block;font-size:12px;color:#999;margin-top:2px;'}, 'already in at mince — no action'));
+    row.appendChild(nw);
+    row.appendChild(el('span', {style:'font-size:16px;font-weight:600;color:#999;flex-shrink:0;'}, amtStr(line)));
+    list.appendChild(row);
+  });
+
+  // Tickable items, in order: sugar -> enzyme -> garlic(blitz into alcohol) -> the rest
+  tickable.forEach(function(line){
     const isAdded = !!line.addedDate;
-    const amtStr = (line.type === 'asneeded' || line.amount == null || line.amount === '') ? 'as needed' : (line.amount + ' ' + (line.unit || 'g'));
+    const garlic = isGarlic(line);
     const b = el('button', {});
-    b.style.cssText = 'display:flex;align-items:center;gap:14px;width:100%;text-align:left;border-radius:12px;padding:18px 18px;font-size:18px;cursor:pointer;border:2px solid ' +
-      (isAdded ? '#27500a' : '#d0e8c8') + ';background:' + (isAdded ? '#eaf3e4' : '#fff') + ';';
+    b.style.cssText = 'display:flex;align-items:center;gap:14px;width:100%;text-align:left;border-radius:12px;padding:18px;font-size:18px;cursor:pointer;border:2px solid ' +
+      (isAdded ? '#27500a' : (garlic ? '#cdd9e8' : '#d0e8c8')) + ';background:' + (isAdded ? '#eaf3e4' : (garlic ? '#eef3f9' : '#fff')) + ';';
     const tick = el('span', {style:'font-size:26px;width:32px;flex-shrink:0;color:' + (isAdded ? '#27500a' : '#bbb') + ';'}, isAdded ? '☑' : '☐');
     const nameWrap = div(''); nameWrap.style.cssText = 'flex:1;';
-    nameWrap.appendChild(el('span', {style:'font-weight:600;' + (isAdded ? 'text-decoration:line-through;color:#7a8a72;' : '')}, line.name));
+    var displayName = garlic ? ('Blitz ' + line.name + ' into ' + mediumLabel) : line.name;
+    nameWrap.appendChild(el('span', {style:'font-weight:600;' + (isAdded ? 'text-decoration:line-through;color:#7a8a72;' : (garlic ? 'color:#2c4a73;' : ''))}, displayName));
+    if (garlic && !isAdded) nameWrap.appendChild(el('span', {style:'display:block;font-size:12px;color:#3a5a86;margin-top:2px;'}, 'blitz into ' + mediumLabel + ' first'));
     if (isAdded) nameWrap.appendChild(el('span', {style:'display:block;font-size:12px;color:#888;margin-top:2px;'}, 'added ' + line.addedDate));
-    const amt = el('span', {style:'font-size:18px;font-weight:700;color:' + (isAdded ? '#7a8a72' : '#1a1a1a') + ';flex-shrink:0;'}, amtStr);
+    const amt = el('span', {style:'font-size:18px;font-weight:700;color:' + (isAdded ? '#7a8a72' : '#1a1a1a') + ';flex-shrink:0;'}, amtStr(line));
     b.appendChild(tick); b.appendChild(nameWrap); b.appendChild(amt);
     b.addEventListener('click', function(){
       if (line.addedDate) { delete line.addedDate; }
@@ -3621,9 +3663,21 @@ function renderMakeMode() {
   });
   v.appendChild(list);
 
-  const allDone = (child.recipe.lines||[]).every(function(l){ return l.addedDate; });
+  // Method / next-step note
+  if (mediumLines.length && gar.length === 0) {
+    const m = div(''); m.style.cssText = 'margin-top:12px;background:#eef3f9;border:1px solid #cdd9e8;border-radius:12px;padding:14px 16px;color:#2c4a73;font-size:14px;line-height:1.5;';
+    m.appendChild(el('span', {}, 'Method: blend the dry spices in ' + mediumLabel + ', then mix into the meat.'));
+    v.appendChild(m);
+  } else {
+    const m = div(''); m.style.cssText = 'margin-top:12px;background:#f7f8f6;border:1px solid #e6e9e3;border-radius:12px;padding:14px 16px;color:#555;font-size:14px;line-height:1.5;';
+    m.appendChild(el('span', {}, 'Then mix the whole blend into the meat.'));
+    v.appendChild(m);
+  }
+
+  // All-done banner (soft tint, no solid fill)
+  const allDone = tickable.length > 0 && tickable.every(function(l){ return l.addedDate; });
   if (allDone) {
-    const banner = div(''); banner.style.cssText = 'margin-top:16px;background:#27500a;color:#fff;border-radius:12px;padding:16px;text-align:center;font-size:17px;font-weight:600;';
+    const banner = div(''); banner.style.cssText = 'margin-top:16px;background:#eaf3e4;color:#27500a;border:1px solid #27500a;border-radius:12px;padding:16px;text-align:center;font-size:17px;font-weight:600;';
     banner.appendChild(el('span', {}, '✓ All ingredients added to Child ' + child.code));
     v.appendChild(banner);
   }
