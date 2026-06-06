@@ -3576,6 +3576,13 @@ function openProductionRun(id) {
   renderProductionForm();
 }
 
+// ── Recipe line classification (shared by overview + make screen) ──────────
+// Salt is already in at mince; alcohol/wine is the blending medium, not a
+// counted ingredient. "Actionable" = the dry spices you tick into the bowl.
+function recipeLineIsSalt(l){ return (l && l.name ? l.name.toString().toLowerCase() : '').indexOf('salt') >= 0; }
+function recipeLineIsMedium(l){ var n = (l && l.name ? l.name.toString().toLowerCase() : ''); return (n.indexOf('alcohol') >= 0 || n.indexOf('wine') >= 0 || n.indexOf('wash') >= 0) && !recipeLineIsSalt(l); }
+function recipeActionableLines(lines){ return (lines || []).filter(function(l){ return !recipeLineIsSalt(l) && !recipeLineIsMedium(l); }); }
+
 // ── Make mode: big-button butchery checklist for one child ─────────────────
 // Tick each ingredient as it goes in; untick to undo. Each tick stamps its date
 // (so a 2-day mix shows when each item went in). State saved on the child.
@@ -3736,11 +3743,11 @@ function renderProductionForm() {
       if (c.recipe && c.recipe.name) bits.push(c.recipe.name);
       row.appendChild(el('p', {style:'font-size:12px;color:#666;margin:0 0 6px;'}, bits.join(' · ')));
       if (c.recipe && c.recipe.lines && c.recipe.lines.length) {
-        const ticked = (c.recipe.lines || []).filter(function(l){ return l.addedDate; }).length;
-        const totalLines = c.recipe.lines.length;
-        const allDone = ticked === totalLines;
-        const mk = el('button', {style:'background:' + (allDone ? '#27500a' : '#3a6b2a') + ';color:#fff;border:none;border-radius:8px;padding:10px 16px;font-size:15px;font-weight:600;cursor:pointer;width:100%;'},
-          (allDone ? '✓ All added — view checklist' : '▶ Make / check off (' + ticked + ' of ' + totalLines + ' added)'));
+        const actionable = recipeActionableLines(c.recipe.lines);
+        const tickedAct = actionable.filter(function(l){ return l.addedDate; }).length;
+        const allDone = actionable.length > 0 ? (tickedAct === actionable.length) : true;
+        const mk = el('button', {style:'background:' + (allDone ? '#27500a' : '#3a6b2a') + ';color:#fff;border:none;border-radius:8px;padding:12px 16px;font-size:15px;font-weight:600;cursor:pointer;width:100%;line-height:1.35;'},
+          (allDone ? '✓ All added — view checklist' : '▶ Make this recipe now and check off as goes into bowl (' + tickedAct + ' of ' + actionable.length + ' in)'));
         mk.addEventListener('click', function(){ makeChildLetter = c.letter; renderMakeMode(); });
         row.appendChild(mk);
       } else {
