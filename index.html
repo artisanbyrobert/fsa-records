@@ -19,24 +19,25 @@
   );
 })();
 </script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f2;color:#1a1a1a;font-size:14px;line-height:1.5;}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#FBF8F1;color:#2C2A26;font-size:14px;line-height:1.5;}
   .wrap{max-width:720px;margin:0 auto;padding:1.5rem 1rem;}
-  h1{font-size:20px;font-weight:600;color:#1a1a1a;}
-  h2{font-size:16px;font-weight:600;margin-bottom:1rem;color:#1a1a1a;}
+  h1{font-family:'Cormorant Garamond',Georgia,serif;font-size:25px;font-weight:600;color:#18342A;letter-spacing:.2px;}
+  h2{font-family:'Cormorant Garamond',Georgia,serif;font-size:20px;font-weight:600;margin-bottom:1rem;color:#18342A;}
   label{font-size:12px;color:#666;display:block;margin-bottom:4px;}
   input,select,textarea{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;font-family:inherit;background:#fff;color:#1a1a1a;outline:none;}
-  input:focus,select:focus,textarea:focus{border-color:#3a6b2a;}
+  input:focus,select:focus,textarea:focus{border-color:#18342A;}
   textarea{resize:vertical;}
   button{cursor:pointer;font-family:inherit;font-size:13px;border-radius:6px;padding:7px 14px;border:1px solid #ddd;background:#fff;color:#444;}
   button:hover{background:#f0f0ee;}
-  .btn-primary{background:#3a6b2a;color:#fff;border-color:#3a6b2a;font-weight:600;}
-  .btn-primary:hover{background:#2d5a20;}
+  .btn-primary{background:#18342A;color:#fff;border-color:#18342A;font-weight:600;}
+  .btn-primary:hover{background:#0e231b;}
   .btn-danger{color:#c0392b;border-color:#f0b8b8;}
   .btn-danger:hover{background:#fce8e8;}
   .btn-sm{padding:4px 10px;font-size:12px;}
-  .card{background:#fff;border:1px solid #e0e0dc;border-radius:10px;padding:1rem 1.25rem;margin-bottom:12px;}
+  .card{background:#fff;border:1px solid #E7DFCE;border-radius:10px;padding:1rem 1.25rem;margin-bottom:12px;}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
   .span2{grid-column:1/-1;}
   .field{margin-bottom:0;}
@@ -47,10 +48,10 @@
   .tag-fail{background:#fce8e8;color:#791f1f;}
   .tag-pending{background:#f0f0ee;color:#666;}
   .mono{font-family:'Courier New',monospace;letter-spacing:1px;}
-  .green{color:#3a6b2a;}
+  .green{color:#18342A;}
   .muted{color:#888;font-size:12px;}
-  .section-title{font-size:14px;font-weight:600;margin:1.5rem 0 0.75rem;color:#1a1a1a;}
-  .toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#3a6b2a;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:500;z-index:999;display:none;}
+  .section-title{font-family:'Cormorant Garamond',Georgia,serif;font-size:18px;font-weight:600;margin:1.5rem 0 0.6rem;color:#18342A;border-bottom:1.5px solid #C9A86A;padding-bottom:5px;}
+  .toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#18342A;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:500;z-index:999;display:none;}
   .warn-box{background:#faeeda;border:1px solid #ef9f27;border-radius:8px;padding:12px;margin-bottom:12px;}
   .warn-box p{color:#633806;font-size:12px;margin-bottom:4px;}
   .status{font-size:11px;display:flex;align-items:center;gap:5px;}
@@ -59,9 +60,9 @@
   .dot-grey{background:#aaa;}
   .dot-red{background:#c0392b;}
   .storage-note{font-size:11px;color:#888;margin-top:4px;}
-  .intake-card{background:#fff;border:1px solid #e0e0dc;border-radius:10px;padding:1rem 1.25rem;margin-bottom:10px;cursor:pointer;}
+  .intake-card{background:#fff;border:1px solid #E7DFCE;border-radius:10px;padding:1rem 1.25rem;margin-bottom:10px;cursor:pointer;}
   .intake-card:hover{border-color:#3a6b2a;}
-  .batch-code{font-size:16px;font-weight:700;font-family:'Courier New',monospace;letter-spacing:1px;color:#3a6b2a;}
+  .batch-code{font-size:16px;font-weight:700;font-family:'Courier New',monospace;letter-spacing:1px;color:#18342A;}
   .toggle-btn{flex:1;padding:8px 0;border:1px solid #ddd;border-radius:6px;text-align:center;font-size:13px;font-weight:500;background:#fff;color:#666;}
   .toggle-btn.active{border-color:#3a6b2a;background:#e8f4e3;color:#3a6b2a;}
   .pkg-btn{flex:1;padding:6px 0;border:1px solid #ddd;border-radius:6px;text-align:center;font-size:12px;font-weight:500;background:#fff;color:#666;}
@@ -79,7 +80,7 @@
   .empty-state p{color:#888;font-size:13px;margin-bottom:1.5rem;}
   .big-btn{padding:14px 36px;font-size:15px;}
   .save-bar{display:flex;gap:10px;margin-top:1rem;flex-wrap:wrap;}
-  .daily-card{background:#fff;border:1px solid #e0e0dc;border-radius:10px;padding:1rem 1.25rem;margin-bottom:10px;cursor:pointer;}
+  .daily-card{background:#fff;border:1px solid #E7DFCE;border-radius:10px;padding:1rem 1.25rem;margin-bottom:10px;cursor:pointer;}
   .daily-card:hover{border-color:#3a6b2a;}
   .check-section{background:#f9fdf8;border:1px solid #d0e8c8;border-radius:8px;padding:1rem;margin-bottom:12px;}
   .check-section h3{font-size:13px;font-weight:600;color:#27500a;margin-bottom:10px;}
@@ -91,7 +92,7 @@
   .machine-section h3{font-size:13px;font-weight:600;color:#633806;margin-bottom:10px;}
   .day-type-btn{padding:8px 12px;border:1px solid #ddd;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;text-align:left;margin-bottom:6px;width:100%;}
   .day-type-btn.active{border-color:#3a6b2a;background:#e8f4e3;color:#27500a;font-weight:600;}
-  .day-type-btn{width:100%;padding:12px 16px;border:1px solid #e0e0dc;border-radius:8px;background:#fff;font-size:14px;cursor:pointer;text-align:left;margin-bottom:8px;display:flex;align-items:center;gap:10px;}
+  .day-type-btn{width:100%;padding:12px 16px;border:1px solid #E7DFCE;border-radius:8px;background:#fff;font-size:14px;cursor:pointer;text-align:left;margin-bottom:8px;display:flex;align-items:center;gap:10px;}
   .day-type-btn:hover{border-color:#3a6b2a;background:#f9fdf8;}
   .day-type-btn.active{border-color:#3a6b2a;background:#e8f4e3;color:#27500a;font-weight:600;}
   .day-type-icon{font-size:20px;width:28px;text-align:center;}
@@ -104,10 +105,10 @@
   .machine-section{background:#fff8f0;border:1px solid #f0d4a8;border-radius:8px;padding:1rem;margin-bottom:12px;}
   .machine-section-title{font-size:12px;font-weight:600;color:#633806;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;}
   .tick-all-btn{font-size:11px;color:#3a6b2a;background:none;border:1px solid #3a6b2a;border-radius:6px;padding:3px 10px;cursor:pointer;margin-top:8px;}
-  .daily-card{background:#fff;border:1px solid #e0e0dc;border-radius:10px;padding:1rem 1.25rem;margin-bottom:10px;cursor:pointer;}
+  .daily-card{background:#fff;border:1px solid #E7DFCE;border-radius:10px;padding:1rem 1.25rem;margin-bottom:10px;cursor:pointer;}
   .daily-card:hover{border-color:#3a6b2a;}
   .day-badge{display:inline-block;padding:3px 10px;background:#e8f4e3;color:#27500a;border-radius:20px;font-size:11px;font-weight:600;margin-top:4px;}
-  .del-card{background:#fff;border:1px solid #e0e0dc;border-radius:10px;padding:1rem 1.25rem;margin-bottom:10px;cursor:pointer;}
+  .del-card{background:#fff;border:1px solid #E7DFCE;border-radius:10px;padding:1rem 1.25rem;margin-bottom:10px;cursor:pointer;}
   .del-card:hover{border-color:#3a6b2a;}
   .flavour-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
   .batch-tag{display:inline-block;padding:3px 10px;background:#e8f4e3;color:#27500a;border-radius:20px;font-size:12px;font-weight:500;margin:2px;}
@@ -116,17 +117,17 @@
   .batch-search-item:hover{background:#f0f7ee;}
   .batch-search-item .batch-meta{font-size:11px;color:#888;margin-top:2px;}
   .wm-table{width:100%;border-collapse:collapse;margin-bottom:1.5rem;}
-  .wm-table th{background:#f0f7ee;color:#27500a;font-size:12px;font-weight:600;padding:8px 12px;text-align:left;border-bottom:2px solid #b8d9b0;}
+  .wm-table th{background:#F4EEDF;color:#18342A;font-size:12px;font-weight:600;padding:8px 12px;text-align:left;border-bottom:2px solid #C9A86A;}
   .wm-table td{padding:8px 12px;font-size:13px;border-bottom:1px solid #f0f0ee;vertical-align:top;}
   .wm-table tr:last-child td{border-bottom:none;}
-  .wm-table .total-row td{font-weight:600;background:#f9fdf8;border-top:2px solid #b8d9b0;}
-  .wm-season-header{background:#3a6b2a;color:#fff;padding:10px 14px;border-radius:8px 8px 0 0;font-size:14px;font-weight:600;margin-top:1.5rem;}
+  .wm-table .total-row td{font-weight:600;background:#FBF8F1;border-top:2px solid #C9A86A;}
+  .wm-season-header{font-family:'Cormorant Garamond',Georgia,serif;background:#FBF8F1;color:#18342A;padding:8px 2px;border-bottom:2px solid #C9A86A;font-size:18px;font-weight:600;margin-top:1.5rem;}
   .wm-season-header:first-child{margin-top:0;}
-  .tab-bar{display:flex;gap:0;margin-bottom:1.5rem;border-bottom:2px solid #e0e0dc;}
+  .tab-bar{display:flex;gap:0;margin-bottom:1.5rem;border-bottom:2px solid #E7DFCE;}
   .tab-btn{padding:8px 20px;font-size:14px;font-weight:500;background:none;border:none;border-bottom:3px solid transparent;margin-bottom:-2px;cursor:pointer;color:#888;border-radius:0;}
-  .tab-btn:hover{color:#3a6b2a;background:none;}
-  .tab-btn.active{color:#3a6b2a;border-bottom:3px solid #3a6b2a;background:none;}
-  .manage-card{background:#fff;border:1px solid #e0e0dc;border-radius:10px;padding:1rem 1.25rem;margin-bottom:10px;}
+  .tab-btn:hover{color:#18342A;background:none;}
+  .tab-btn.active{color:#18342A;border-bottom:3px solid #C9A86A;background:none;}
+  .manage-card{background:#fff;border:1px solid #E7DFCE;border-radius:10px;padding:1rem 1.25rem;margin-bottom:10px;}
   .manage-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0ee;}
   .manage-row:last-child{border-bottom:none;}
   @media print{
@@ -568,7 +569,7 @@ function renderTabs(activeTab) {
   const v = document.getElementById('view-tabs');
   v.innerHTML = '';
   const bar = div('tab-bar');
-  bar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:0;margin-bottom:1.5rem;border-bottom:2px solid #e0e0dc;';
+  bar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:0;margin-bottom:1.5rem;border-bottom:2px solid #E7DFCE;';
   const tabsLeft = div('row');
   tabsLeft.style.gap = '0';
   const tabs = [['list','Intake records'],['daily','Daily Record'],['delivery','Finished Product'],['wetmeat','Wet Meat'],['pest','Pest Control'],['prod','Production'],['clean','Periodic Cleans'],['checks','Daily Checks'],['venison','Venison'],['manage','Manage']];
@@ -2749,7 +2750,7 @@ function renderPestControl() {
 
   // ── Bait station map (embedded SVG) ────────────────────────────────────────
   var mapCard = document.createElement('div');
-  mapCard.style.cssText = 'background:#fff;border:1px solid #e0e0dc;border-radius:8px;padding:1rem;text-align:left;margin-top:1rem;';
+  mapCard.style.cssText = 'background:#fff;border:1px solid #E7DFCE;border-radius:8px;padding:1rem;text-align:left;margin-top:1rem;';
   mapCard.innerHTML =
     '<p style="font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Bait station map</p>' +
     '<p style="font-size:11px;color:#888;margin:0 0 12px;">Workshop layout · revised 28 Oct 2024</p>' +
@@ -3295,7 +3296,7 @@ function renderDailyChecks() {
   v.appendChild(el('h2', {style:'font-size:18px;font-weight:600;margin:0 0 4px;'}, 'Daily hygiene checks'));
   v.appendChild(el('p', {style:'font-size:13px;color:#888;margin:0 0 16px;'}, 'Record opening and closing checks for any work day. Every item defaults to ticked — untick anything you skipped. These print in the nightly FSA report.'));
 
-  var card = div(''); card.style.cssText = 'border:1px solid #e0e0dc;border-radius:10px;padding:16px;margin-bottom:22px;';
+  var card = div(''); card.style.cssText = 'border:1px solid #E7DFCE;border-radius:10px;padding:16px;margin-bottom:22px;';
   var dateRow = div(''); dateRow.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:14px;';
   dateRow.appendChild(el('label', {style:'font-weight:600;font-size:14px;'}, 'Date'));
   var dateInp = input({type:'date', value: dcForm.date});
@@ -3334,7 +3335,7 @@ function renderDailyChecks() {
   saved.forEach(function(rec){
     var od = (rec.opening||[]).filter(function(i){return i.done;}).length, ot = (rec.opening||[]).length;
     var cd = (rec.closing||[]).filter(function(i){return i.done;}).length, ct = (rec.closing||[]).length;
-    var line = div(''); line.style.cssText = 'display:flex;justify-content:space-between;align-items:center;border:1px solid #e0e0dc;border-radius:8px;padding:10px 12px;margin-bottom:8px;';
+    var line = div(''); line.style.cssText = 'display:flex;justify-content:space-between;align-items:center;border:1px solid #E7DFCE;border-radius:8px;padding:10px 12px;margin-bottom:8px;';
     var left = div('');
     left.appendChild(el('span', {style:'font-weight:600;font-size:14px;'}, rec.date || '—'));
     left.appendChild(el('span', {style:'font-size:12px;color:#888;margin-left:12px;'}, 'Opening ' + od + '/' + ot + '  \u00b7  Closing ' + cd + '/' + ct));
@@ -3428,7 +3429,7 @@ function renderVenison(){
   if(!runs.length) v.appendChild(el('p',{style:'color:#888;font-size:13px;'}, 'No venison breakdowns recorded yet.'));
   runs.forEach(function(run){
     var finG=venRunFinishedG(run);
-    var line=div(''); line.style.cssText='display:flex;justify-content:space-between;align-items:center;border:1px solid #e0e0dc;border-radius:8px;padding:12px 14px;margin-bottom:8px;';
+    var line=div(''); line.style.cssText='display:flex;justify-content:space-between;align-items:center;border:1px solid #E7DFCE;border-radius:8px;padding:12px 14px;margin-bottom:8px;';
     var left=div('');
     left.appendChild(el('div',{style:'font-weight:600;font-size:15px;'}, (run.batchCode||'(no batch)')+'  ·  '+(run.estate||'—')));
     left.appendChild(el('div',{style:'font-size:12px;color:#888;margin-top:2px;'}, (run.date||'')+'  ·  '+(run.lanes||[]).length+' lanes  ·  '+(finG/1000).toFixed(2)+' kg  ·  £'+(finG/1000*VEN_SALE_PER_KG).toFixed(2)));
@@ -3449,7 +3450,7 @@ function renderVenisonForm(){
   var back=btn('', '← Back to list', function(){ venForm=null; renderVenison(); });
   back.style.cssText='font-size:12px;padding:3px 10px;margin-bottom:12px;'; v.appendChild(back);
   // header card
-  var hc=div(''); hc.style.cssText='border:1px solid #e0e0dc;border-radius:10px;padding:14px 16px;margin-bottom:18px;';
+  var hc=div(''); hc.style.cssText='border:1px solid #E7DFCE;border-radius:10px;padding:14px 16px;margin-bottom:18px;';
   function field(lbl, inp){ var w=div(''); w.style.cssText='display:flex;flex-direction:column;gap:3px;'; w.appendChild(el('label',{style:'font-size:12px;font-weight:600;color:#555;'},lbl)); w.appendChild(inp); return w; }
   var grid=div(''); grid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:10px;';
   var bc=input({type:'text', value:run.batchCode||''}); bc.addEventListener('change', function(){ run.batchCode=bc.value; });
@@ -3488,7 +3489,7 @@ function renderVenisonForm(){
   v.appendChild(sv);
 }
 function venLaneCard(run, lane){
-  var card=div(''); card.style.cssText='border:1px solid #e0e0dc;border-radius:10px;padding:14px 16px;margin-bottom:14px;';
+  var card=div(''); card.style.cssText='border:1px solid #E7DFCE;border-radius:10px;padding:14px 16px;margin-bottom:14px;';
   var head=div(''); head.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;';
   head.appendChild(el('span',{style:'font-weight:700;font-size:15px;color:#3a6b2a;'}, lane.name));
   var badge=lane.frozen?'#7a4d12':(lane.cureDate?'#2d6b9c':'#888');
@@ -3500,7 +3501,7 @@ function venLaneCard(run, lane){
   var cols=['Component','Meat kept (g)','Bone / trim (g)','Loss %'];
   if(lane.salt) cols.push('Salt 2.5% (g)');
   cols.push('');
-  cols.forEach(function(c){ var th=document.createElement('th'); th.textContent=c; th.style.cssText='text-align:left;padding:4px 6px;border-bottom:1px solid #e0e0dc;font-size:11px;color:#666;'; hdr.appendChild(th); });
+  cols.forEach(function(c){ var th=document.createElement('th'); th.textContent=c; th.style.cssText='text-align:left;padding:4px 6px;border-bottom:1px solid #E7DFCE;font-size:11px;color:#666;'; hdr.appendChild(th); });
   tbl.appendChild(hdr);
   (lane.components||[]).forEach(function(c, idx){
     var tr=document.createElement('tr');
@@ -3535,7 +3536,7 @@ function venLaneCard(run, lane){
   }
   if(extra.childNodes.length) card.appendChild(extra);
   // cure date + freeze/resume
-  var ctrl=div(''); ctrl.style.cssText='display:flex;align-items:center;gap:12px;margin-top:10px;flex-wrap:wrap;border-top:1px dashed #e0e0dc;padding-top:10px;';
+  var ctrl=div(''); ctrl.style.cssText='display:flex;align-items:center;gap:12px;margin-top:10px;flex-wrap:wrap;border-top:1px dashed #E7DFCE;padding-top:10px;';
   ctrl.appendChild(el('label',{style:'font-size:12px;font-weight:600;color:#555;'}, 'Cure / start date'));
   var cd=input({type:'date', value:lane.cureDate||''}); cd.addEventListener('change', function(){ lane.cureDate=cd.value; renderVenisonForm(); });
   ctrl.appendChild(cd);
@@ -3940,14 +3941,15 @@ function renderProductionForm() {
     card.appendChild(kidsWrap);
   }
 
-  card.appendChild(el('p', {style:'font-size:13px;font-weight:500;color:#27500a;margin:0 0 8px;'}, 'Days worked on this batch'));
+  var _ns = (prodForm.stages||[]).length;
+  card.appendChild(el('p', {style:"font-family:'Cormorant Garamond',Georgia,serif;font-size:16px;font-weight:600;color:#18342A;margin:16px 0 10px;"}, 'Days worked' + (_ns ? ' \u00b7 ' + _ns + (_ns===1?' stage':' stages') + ' \u00b7 tap to view' : '')));
   const stagesContainer = div('');
-  stagesContainer.style.cssText = 'display:flex;flex-direction:column;gap:6px;margin-bottom:14px;';
+  stagesContainer.style.cssText = 'display:flex;flex-direction:column;margin-bottom:14px;';
   if (!prodForm.stages || prodForm.stages.length === 0) {
     stagesContainer.appendChild(p('muted', 'No days logged yet. Tap below to add your first.'));
   } else {
     prodForm.stages.forEach(function(s, idx){
-      stagesContainer.appendChild(stageRowSummary(s, idx));
+      stagesContainer.appendChild(stageRowSummary(s, idx, idx === prodForm.stages.length - 1));
     });
   }
   card.appendChild(stagesContainer);
@@ -3983,32 +3985,70 @@ function renderProductionForm() {
   v.appendChild(delBar);
 }
 
-function stageRowSummary(s, idx) {
-  const row = div('');
-  row.style.cssText = 'display:flex;align-items:flex-start;gap:10px;background:#f9fdf8;border:1px solid #d0e8c8;border-radius:8px;padding:10px 12px;';
-  const icon = {defrost:'❄️', fatcalc:'🧮', recipe:'📋', mince:'🔪', stuff_hang:'🌭'}[s.type] || '•';
+function stageMeta(s){
+  const icon = {defrost:'\u2744\ufe0f', fatcalc:'\ud83e\uddee', recipe:'\ud83d\udccb', mince:'\ud83d\udd2a', stuff_hang:'\ud83c\udf2d'}[s.type] || '\u2022';
   const typeName = {defrost:'Defrost', fatcalc:'Fat calculator', recipe:'Recipe', mince:'Prep, wash & mince', stuff_hang:'Stuffing & hanging'}[s.type] || s.type;
   let summary = '';
   if (s.type === 'defrost') summary = (s.meatKg ? s.meatKg + 'kg meat out' : '');
   else if (s.type === 'fatcalc') summary = (s.totalKg ? s.meatKg + 'kg meat + ' + s.fatKg + 'kg fat = ' + s.totalKg + 'kg (' + s.fatPercent + '%)' : '');
-  else if (s.type === 'recipe') summary = (s.recipeName ? s.recipeName + (s.childLetter ? ' → Child ' + (prodForm.batchCode||'') + s.childLetter : '') : '');
+  else if (s.type === 'recipe') summary = (s.recipeName ? s.recipeName + (s.childLetter ? ' \u2192 ' + (prodForm.batchCode||'') + s.childLetter : '') : '');
   else if (s.type === 'mince') { const cw = s.childWork || {}; const n = Object.keys(cw).length; const mixed = Object.keys(cw).filter(function(k){return cw[k].mixed;}).length; summary = n ? (mixed + ' of ' + n + ' children mixed') : 'mince day'; }
-  else if (s.type === 'stuff_hang') { var parts = []; if (s.childLetter) { var sc = (prodForm.children||[]).find(function(c){return c.letter===s.childLetter;}); parts.push(sc && sc.recipe && sc.recipe.name ? sc.recipe.name : ('Child ' + (prodForm.batchCode||'') + s.childLetter)); } if (s.count) parts.push(s.count + (s.unitGrams ? ' × ' + s.unitGrams + 'g' : ' salami')); if (s.skinSize) parts.push(s.skinSize); if (s.finishDate) parts.push('ready ' + fmtDate(s.finishDate)); summary = parts.join(' · '); }
-  const main = div(''); main.style.flex = '1';
-  main.appendChild(el('p', {style:'font-size:13px;font-weight:500;margin:0 0 2px;'}, icon + ' ' + typeName));
-  main.appendChild(el('p', {style:'font-size:12px;color:#888;margin:0;'}, fmtDate(s.date) + (summary ? ' · ' + summary : '')));
-  if (s.notes) main.appendChild(el('p', {style:'font-size:12px;color:#444;margin:4px 0 0;font-style:italic;'}, '"' + s.notes + '"'));
-  row.appendChild(main);
+  else if (s.type === 'stuff_hang') { var parts = []; if (s.childLetter) { var sc = (prodForm.children||[]).find(function(c){return c.letter===s.childLetter;}); parts.push(sc && sc.recipe && sc.recipe.name ? sc.recipe.name : ('Child ' + (prodForm.batchCode||'') + s.childLetter)); } if (s.count) parts.push(s.count + (s.unitGrams ? ' \u00d7 ' + s.unitGrams + 'g' : ' salami')); if (s.skinSize) parts.push(s.skinSize); if (s.finishDate) parts.push('ready ' + fmtDate(s.finishDate)); summary = parts.join(' \u00b7 '); }
+  return {icon:icon, typeName:typeName, summary:summary};
+}
+
+function stageRowSummary(s, idx, isLast) {
+  const meta = stageMeta(s);
+  const node = div(''); node.style.cssText = 'display:flex;gap:10px;';
+  const rail = div(''); rail.style.cssText = 'display:flex;flex-direction:column;align-items:center;width:16px;flex-shrink:0;';
+  const dot = div(''); dot.style.cssText = 'width:11px;height:11px;border-radius:50%;background:#18342A;margin-top:8px;flex-shrink:0;';
+  rail.appendChild(dot);
+  if (!isLast) { const line = div(''); line.style.cssText = 'flex:1;width:2px;background:#E7DFCE;margin:3px 0;'; rail.appendChild(line); }
+  node.appendChild(rail);
+  const c = div(''); c.style.cssText = 'flex:1;min-width:0;background:#fff;border:1px solid #E7DFCE;border-radius:10px;padding:9px 12px;margin-bottom:10px;cursor:pointer;';
+  c.addEventListener('click', function(){ openStageView(s); });
+  const top = div(''); top.style.cssText = 'display:flex;justify-content:space-between;align-items:flex-start;gap:8px;';
+  top.appendChild(el('p', {style:'font-size:13px;font-weight:600;color:#18342A;margin:0;'}, meta.icon + ' ' + meta.typeName));
+  top.appendChild(el('span', {style:'font-size:11px;color:#9a917f;white-space:nowrap;'}, fmtDate(s.date)));
+  c.appendChild(top);
+  if (meta.summary) c.appendChild(el('p', {style:'font-size:12px;color:#6b6557;margin:3px 0 0;'}, meta.summary));
+  if (s.notes) c.appendChild(el('p', {style:'font-size:12px;color:#444;margin:4px 0 0;font-style:italic;'}, '\u201c' + s.notes + '\u201d'));
+  const foot = div(''); foot.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-top:7px;';
+  foot.appendChild(el('span', {style:'font-size:12px;color:#8A6D2F;'}, 'View \u203a'));
   if (prodForm.status !== 'finished') {
-    const rmBtn = btn('btn-sm btn-danger', '✕', function(){
-      if (!confirm('Remove this ' + typeName + ' stage?')) return;
-      prodForm.stages.splice(idx, 1);
-      saveAndStay();
-    });
-    rmBtn.style.cssText += ';padding:4px 8px;flex-shrink:0;';
-    row.appendChild(rmBtn);
+    const rm = el('button', {style:'background:none;border:none;color:#b1543f;font-size:12px;cursor:pointer;padding:2px 4px;'}, 'Delete');
+    rm.addEventListener('click', function(ev){ ev.stopPropagation(); if (!confirm('Remove this ' + meta.typeName + ' stage?')) return; prodForm.stages.splice(idx, 1); saveAndStay(); });
+    foot.appendChild(rm);
   }
-  return row;
+  c.appendChild(foot);
+  node.appendChild(c);
+  return node;
+}
+
+function openStageView(s){
+  const meta = stageMeta(s);
+  var back = document.createElement('div');
+  back.style.cssText = 'position:fixed;inset:0;background:rgba(20,15,10,.45);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:18px;';
+  var box = document.createElement('div');
+  box.style.cssText = 'background:#FBF8F1;border-radius:14px;max-width:380px;width:100%;padding:18px 18px 20px;box-shadow:0 12px 40px rgba(0,0,0,.3);margin:auto;';
+  function close(){ if (back.parentNode) document.body.removeChild(back); }
+  back.addEventListener('click', function(e){ if (e.target===back) close(); });
+  var h = div(''); h.style.cssText = 'display:flex;justify-content:space-between;align-items:flex-start;gap:10px;';
+  h.appendChild(el('div', {style:"font-family:'Cormorant Garamond',Georgia,serif;font-size:19px;color:#18342A;"}, meta.icon + ' ' + meta.typeName));
+  h.appendChild(el('span', {style:'font-size:11px;color:#9a917f;white-space:nowrap;'}, fmtDate(s.date)));
+  box.appendChild(h);
+  var rule = div(''); rule.style.cssText = 'height:2px;width:44px;background:#C9A86A;margin:10px 0 4px;'; box.appendChild(rule);
+  function kv(k, val){ if (val===undefined || val===null || val==='') return; var r = div(''); r.style.cssText = 'display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px solid #ECE4D4;'; r.appendChild(el('span', {style:'font-size:13px;color:#6b6557;'}, k)); r.appendChild(el('span', {style:'font-size:14px;color:#2C2A26;text-align:right;'}, String(val))); box.appendChild(r); }
+  if (s.type === 'defrost') { kv('Meat out', s.meatKg ? s.meatKg + ' kg' : ''); }
+  else if (s.type === 'fatcalc') { kv('Meat', s.meatKg ? s.meatKg + ' kg' : ''); kv('Fat added', s.fatKg ? s.fatKg + ' kg' : ''); kv('Fat %', s.fatPercent ? s.fatPercent + '%' : ''); kv('Total mix', s.totalKg ? s.totalKg + ' kg' : ''); }
+  else if (s.type === 'recipe') { kv('Recipe', s.recipeName); if (s.childLetter) kv('Child', (prodForm.batchCode||'') + s.childLetter); (s.lines||[]).forEach(function(l){ if (l && l.name) kv(l.name, (l.amount!=null && l.amount!=='') ? (l.amount + (l.unit||'g')) : (l.type==='asneeded' ? 'as needed' : '')); }); }
+  else if (s.type === 'mince') { var cw = s.childWork || {}; Object.keys(cw).forEach(function(k){ var w = cw[k] || {}; var bits = []; if (w.minced) bits.push('minced'); if (w.salted) bits.push('salted'); if (w.mixed) bits.push('mixed'); kv('Child ' + (prodForm.batchCode||'') + k, bits.join(', ') || '\u2014'); }); }
+  else if (s.type === 'stuff_hang') { if (s.childLetter){ var sc = (prodForm.children||[]).find(function(c){return c.letter===s.childLetter;}); kv('Flavour', sc && sc.recipe && sc.recipe.name ? sc.recipe.name : ('Child ' + (prodForm.batchCode||'') + s.childLetter)); } kv('Pieces', s.count ? (s.count + (s.unitGrams ? ' \u00d7 ' + s.unitGrams + ' g' : '')) : ''); kv('Skin', s.skinSize); kv('Hung', s.hangDate ? fmtDate(s.hangDate) : (s.date ? fmtDate(s.date) : '')); kv('Ready', s.finishDate ? fmtDate(s.finishDate) : ''); kv('On machine', s.machineG ? s.machineG + ' g' : ''); }
+  if (s.notes) { var nb = div(''); nb.style.cssText = 'padding:11px 0 0;'; nb.appendChild(el('div', {style:'font-size:13px;color:#6b6557;margin-bottom:3px;'}, 'Note')); nb.appendChild(el('div', {style:'font-size:14px;color:#2C2A26;line-height:1.5;'}, s.notes)); box.appendChild(nb); }
+  var cb = document.createElement('button'); cb.textContent = 'Close';
+  cb.style.cssText = 'width:100%;margin-top:18px;padding:13px;background:#18342A;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;';
+  cb.addEventListener('click', close); box.appendChild(cb);
+  back.appendChild(box); document.body.appendChild(back);
 }
 
 function renderStageForm() {
@@ -5087,7 +5127,7 @@ function renderCleanRunMode() {
 
     // Detail panel — collapsed by default
     const detail = document.createElement('div');
-    detail.style.cssText = 'display:none;background:#f9fdf8;border-top:1px solid #e0e0dc;padding:10px 16px 14px;';
+    detail.style.cssText = 'display:none;background:#f9fdf8;border-top:1px solid #E7DFCE;padding:10px 16px 14px;';
     (job.subtasks || []).forEach(function(st){
       const stRow = div('');
       stRow.style.cssText = 'display:flex;align-items:flex-start;gap:10px;padding:5px 0;';
