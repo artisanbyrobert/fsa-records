@@ -855,7 +855,6 @@ story.append(Spacer(1, 6*mm))
 
 # Pest checks — date-row matrices (bait stations + insectocutors), matched pair
 if pest_records:
-    story.append(Paragraph('Bait Station Checks', ParagraphStyle('rbh', fontSize=11, fontName=SERIFB, textColor=GREEN, spaceAfter=2, spaceBefore=2)))
     _bait_stations = []
     for rec in pest_records:
         for _stn in (rec.get('stations', []) or []):
@@ -863,7 +862,7 @@ if pest_records:
             if _nm and _nm not in _bait_stations: _bait_stations.append(_nm)
     if _bait_stations:
         _legend = '  \u00b7  '.join(f'{i+1}: {nm}' for i, nm in enumerate(_bait_stations))
-        story.append(Paragraph('Stations \u2014 ' + _legend, ParagraphStyle('blg', fontName=SERIF, fontSize=8, textColor=MUTE, leading=11, spaceAfter=4)))
+        _bait_legend = Paragraph('Stations \u2014 ' + _legend, ParagraphStyle('blg', fontName=SERIF, fontSize=8, textColor=MUTE, leading=11, spaceAfter=4))
         _bh = ParagraphStyle('bh', fontName=SERIFB, fontSize=8, textColor=TEAL[1], alignment=1)
         _bhl = ParagraphStyle('bhl', fontName=SERIFB, fontSize=8, textColor=TEAL[1])
         _bc = ParagraphStyle('bc', fontName=SERIF, fontSize=8, leading=10, alignment=1)
@@ -876,7 +875,7 @@ if pest_records:
         _nst = len(_bait_stations); _dw = 24*mm; _cw = (267*mm - _dw)/_nst
         bt = Table(brows, colWidths=[_dw] + [_cw]*_nst, repeatRows=1)
         bt.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),TEAL[0]), ('LINEABOVE',(0,0),(-1,0),0.8,GOLD), ('LINEBELOW',(0,0),(-1,0),0.8,GOLD), ('FONTSIZE',(0,0),(-1,-1),8), ('ROWBACKGROUNDS',(0,1),(-1,-1),[colors.white,ROWB]), ('GRID',(0,0),(-1,-1),0.35,HAIR), ('ALIGN',(1,0),(-1,-1),'CENTER'), ('LEFTPADDING',(0,0),(-1,-1),4), ('RIGHTPADDING',(0,0),(-1,-1),4), ('TOPPADDING',(0,0),(-1,-1),5), ('BOTTOMPADDING',(0,0),(-1,-1),5), ('VALIGN',(0,0),(-1,-1),'MIDDLE')]))
-        story.append(bt)
+        story.append(KeepTogether([Paragraph('Bait Station Checks', ParagraphStyle('rbh', fontSize=11, fontName=SERIFB, textColor=GREEN, spaceAfter=2, spaceBefore=2)), _bait_legend, bt]))
 
     def _itick(val):
         if isinstance(val, bool): return '\u2713' if val else '\u2013'
@@ -890,7 +889,7 @@ if pest_records:
             if loc not in ins_locs: ins_locs.append(loc)
     if ins_locs:
         story.append(Spacer(1, 5*mm))
-        story.append(Paragraph('Insectocutor Checks', ParagraphStyle('insh', fontSize=11, fontName=SERIFB, textColor=GREEN, spaceAfter=4, spaceBefore=2)))
+        _ins_heading = Paragraph('Insectocutor Checks', ParagraphStyle('insh', fontSize=11, fontName=SERIFB, textColor=GREEN, spaceAfter=4, spaceBefore=2))
         _sub = ['St','Cl','La','Sr']
         _roomh = ParagraphStyle('irh', fontName=SERIFB, fontSize=8.5, textColor=TEAL[1], alignment=1)
         _subh = ParagraphStyle('ish', fontName=SERIFB, fontSize=7.5, textColor=TEAL[1], alignment=1)
@@ -929,8 +928,8 @@ if pest_records:
             _isty.append(('SPAN',(_c0,0),(_c0+3,0)))
             _isty.append(('LINEAFTER',(_c0+3,0),(_c0+3,-1),0.4,HAIR))
         it.setStyle(TableStyle(_isty))
-        story.append(it)
-        story.append(Paragraph('St = sticky board \u00b7 Cl = cleanout \u00b7 La = lamp \u00b7 Sr = starter &nbsp;\u00b7&nbsp; \u2713 done \u00b7 \u2013 not done / not recorded', small))
+        _ins_legend = Paragraph('St = sticky board \u00b7 Cl = cleanout \u00b7 La = lamp \u00b7 Sr = starter &nbsp;\u00b7&nbsp; \u2713 done \u00b7 \u2013 not done / not recorded', small)
+        story.append(KeepTogether([_ins_heading, it, _ins_legend]))
 else:
     story.append(Paragraph('No pest control checks recorded yet.', small))
 
