@@ -3855,6 +3855,16 @@ function renderMakeMode() {
   }
 }
 
+function childProgress(c){
+  var hasRecipe = !!(c.recipe && c.recipe.lines && c.recipe.lines.length);
+  var act = hasRecipe ? recipeActionableLines(c.recipe.lines) : [];
+  var ticked = act.filter(function(l){ return l.addedDate; }).length;
+  var blendMade = hasRecipe && (act.length===0 ? true : ticked===act.length);
+  var minced = !!c.minced;
+  var stuffed = !!c.stuffed;
+  var step = stuffed ? 5 : (minced ? 4 : (blendMade ? 3 : (hasRecipe ? 2 : 1)));
+  return {hasRecipe:hasRecipe, blendMade:blendMade, minced:minced, stuffed:stuffed, step:step, ticked:ticked, total:act.length};
+}
 function renderProductionForm() {
   if (!prodForm) { renderProduction(); return; }
   hideAllExceptProd();
@@ -3900,24 +3910,31 @@ function renderProductionForm() {
   // Children (divisions) — created by the Fat calculator
   if (prodForm.children && prodForm.children.length > 0) {
     card.appendChild(el('p', {style:'font-size:13px;font-weight:500;color:#27500a;margin:0 0 8px;'}, 'Children in this run (' + prodForm.children.length + ')'));
-    const kidsWrap = div(''); kidsWrap.style.cssText = 'display:flex;flex-direction:column;gap:6px;margin-bottom:14px;';
+    const kidsWrap = div(''); kidsWrap.style.cssText = 'display:flex;flex-direction:column;gap:8px;margin-bottom:14px;';
+    const STEP_LABELS = ['Add the recipe', 'Make the blend', 'Mix into meat & mince', 'Stuff & hang', 'Hung'];
     prodForm.children.forEach(function(c){
-      const row = div(''); row.style.cssText = 'background:#f9fdf8;border:1px solid #d0e8c8;border-radius:8px;padding:10px 12px;';
-      row.appendChild(el('p', {style:'font-size:13px;font-weight:600;margin:0 0 2px;'}, 'Child ' + c.code));
+      const pr = childProgress(c);
+      const row = div(''); row.style.cssText = 'background:#f9fdf8;border:1px solid #d0e8c8;border-radius:10px;padding:11px 13px;';
+      const top = div(''); top.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;';
+      top.appendChild(el('p', {style:'font-size:13px;font-weight:600;margin:0;'}, 'Child ' + c.code));
+      top.appendChild(el('span', {style:'font-size:11px;color:#27500a;background:#eaf3de;border-radius:6px;padding:2px 8px;'}, (pr.step >= 5 ? 'Done' : 'Step ' + pr.step + ' of 4')));
+      row.appendChild(top);
       const bits = [c.meatKg + 'kg meat + ' + c.fatKg + 'kg fat = ' + c.totalKg + 'kg'];
       if (c.recipe && c.recipe.name) bits.push(c.recipe.name);
-      row.appendChild(el('p', {style:'font-size:12px;color:#666;margin:0 0 6px;'}, bits.join(' · ')));
-      if (c.recipe && c.recipe.lines && c.recipe.lines.length) {
-        const actionable = recipeActionableLines(c.recipe.lines);
-        const tickedAct = actionable.filter(function(l){ return l.addedDate; }).length;
-        const allDone = actionable.length > 0 ? (tickedAct === actionable.length) : true;
-        const mk = el('button', {style:'background:' + (allDone ? '#27500a' : '#3a6b2a') + ';color:#fff;border:none;border-radius:8px;padding:12px 16px;font-size:15px;font-weight:600;cursor:pointer;width:100%;line-height:1.35;'},
-          (allDone ? '✓ All added — view checklist' : '▶ Make this recipe now and check off as goes into bowl (' + tickedAct + ' of ' + actionable.length + ' in)'));
-        mk.addEventListener('click', function(){ makeChildLetter = c.letter; renderMakeMode(); });
-        row.appendChild(mk);
-      } else {
-        row.appendChild(p('muted', 'Add a recipe for this child first (📋 Recipe stage).'));
-      }
+      row.appendChild(el('p', {style:'font-size:12px;color:#666;margin:0 0 4px;'}, bits.join(' \u00b7 ')));
+      const dots = div(''); dots.style.cssText='display:flex;gap:5px;margin:0 0 8px;align-items:center;';
+      for (var i=1;i<=4;i++){ var doneStep=(pr.step>4)||(i<pr.step); var curStep=(i===pr.step && pr.step<=4); dots.appendChild(el('span',{style:'width:9px;height:9px;border-radius:50%;background:'+(doneStep?'#27500a':(curStep?'#9ec77f':'#dfe7d8'))+';'})); }
+      dots.appendChild(el('span',{style:'font-size:11px;color:#777;margin-left:4px;'}, pr.step>=5 ? ('Hung \u2713' + (c.stuffFinish ? ' \u00b7 ready ' + fmtDate(c.stuffFinish) : '')) : ('Next: ' + STEP_LABELS[pr.step-1])));
+      row.appendChild(dots);
+      var lblTxt, fn;
+      if (pr.step===1){ lblTxt='\u2460 Add the recipe'; fn=function(){ prodStageEdit={type:'recipe', date:today(), notes:'', childLetter:c.letter}; renderProductionForm(); }; }
+      else if (pr.step===2){ lblTxt='\u2461 Make the blend \u2014 ' + pr.ticked + ' of ' + pr.total + ' in'; fn=function(){ makeChildLetter=c.letter; renderMakeMode(); }; }
+      else if (pr.step===3){ lblTxt='\u2462 Mix into meat & mince'; fn=function(){ prodStageEdit={type:'mince', date:today(), notes:''}; renderProductionForm(); }; }
+      else if (pr.step===4){ lblTxt='\u2463 Stuff & hang'; fn=function(){ prodStageEdit={type:'stuff_hang', date:today(), notes:'', childLetter:c.letter}; renderProductionForm(); }; }
+      else { lblTxt='\ud83c\udff7\ufe0f  Make label'; fn=function(){ openSalamiLabelDialog(prodForm, {childLetter:c.letter, date:c.stuffed||today(), finishDate:c.stuffFinish||'', count:c.stuffCount||0, skinSize:c.stuffSkin||null}); }; }
+      const mk = el('button', {style:'background:'+(pr.step>=5?'#3a6b2a':'#27500a')+';color:#fff;border:none;border-radius:8px;padding:11px 14px;font-size:15px;font-weight:600;cursor:pointer;width:100%;line-height:1.35;'}, (pr.step>=5?'\u2713 ':'\u25b6 ')+lblTxt);
+      mk.addEventListener('click', fn);
+      row.appendChild(mk);
       kidsWrap.appendChild(row);
     });
     card.appendChild(kidsWrap);
@@ -4452,7 +4469,11 @@ function renderStageForm() {
     const toSave = Object.assign({}, prodStageEdit);
     delete toSave.picker;
     if (!toSave.savedAt) toSave.savedAt = new Date().toISOString();  // real moment saved, for audit (separate from chosen date)
-    prodForm.stages.push(toSave);
+    var _dedupe = {recipe:1, stuff_hang:1};
+    if (_dedupe[t] && toSave.childLetter) {
+      var _ix = prodForm.stages.findIndex(function(st){ return st.type===t && st.childLetter===toSave.childLetter; });
+      if (_ix >= 0) { prodForm.stages[_ix] = toSave; } else { prodForm.stages.push(toSave); }
+    } else { prodForm.stages.push(toSave); }
     // Fat calculator declares the children (divisions) for this run.
     if (t === 'fatcalc') {
       const n = toSave.childCount || 1;
@@ -4504,6 +4525,10 @@ function renderStageForm() {
           }
         }
       });
+    }
+    if (t === 'stuff_hang' && prodForm.children) {
+      var _sc = prodForm.children.find(function(c){ return c.letter === toSave.childLetter; });
+      if (_sc) { _sc.stuffed = toSave.date || today(); _sc.stuffSkin = toSave.skinSize || null; _sc.stuffFinish = toSave.finishDate || null; _sc.stuffCount = toSave.count || 0; }
     }
     if (t === 'stuff_hang' && toSave.finishDate) {
       // Put the estimated dry/vac-pack date on the to-do list (one task per batch+child;
