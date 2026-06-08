@@ -3580,6 +3580,72 @@ function hideAllExceptProd() {
   document.getElementById('view-prod').style.display = 'block';
 }
 
+var prodHangingExpanded = false;
+const ESTATE_ALIAS = {'coombe manor':'Jem','belvoir castle':'Caroline','lees court':'Elizabeth','hoddington':'Sam','audley end':'Aimee','cold aston':'Gary','st clair':'Alex'};
+const STEP_NAME = {1:'recipe',2:'blend',3:'mince',4:'stuff & hang'};
+function _titleCase(x){ return (x||'').replace(/\b\w/g, function(c){ return c.toUpperCase(); }); }
+function getRunEstateName(r){
+  if (r.estate) return r.estate;
+  var ins = intakes.find(function(i){ return i.batchCode === r.batchCode; });
+  if (!ins) return '';
+  var nm = getName(estates, ins.estateId);
+  return (nm && nm !== '\u2014' && nm !== '-') ? nm : '';
+}
+function getRunAlias(r){
+  var name = (getRunEstateName(r) || '').trim();
+  if (!name) return '';
+  var low = name.toLowerCase();
+  if (low.indexOf(' - ') >= 0) return _titleCase(name.split(' - ').pop().trim());
+  for (var k in ESTATE_ALIAS){ if (low.indexOf(k) >= 0) return ESTATE_ALIAS[k]; }
+  return _titleCase(name);
+}
+function runStage(r){
+  var kids = r.children || [];
+  if (r.status === 'finished') return 'ready';
+  if (kids.length && kids.every(function(c){ return c.vacPacked; })) return 'ready';
+  if (kids.length && kids.every(function(c){ return c.stuffed; })) return 'hanging';
+  return 'active';
+}
+function runActiveStep(r){
+  var kids = r.children || [];
+  if (!kids.length) return 1;
+  return Math.min.apply(null, kids.map(function(c){ return childProgress(c).step; }));
+}
+function runReadyDate(r){
+  var ds = (r.children||[]).map(function(c){ return c.stuffFinish; }).filter(Boolean).sort();
+  return ds.length ? ds[ds.length-1] : null;
+}
+function weeksLeft(iso){
+  if (!iso) return null;
+  var d = new Date(iso), n = new Date(today());
+  var ms = d - n; if (isNaN(ms)) return null;
+  return Math.max(0, Math.ceil(ms/(7*86400000)));
+}
+function openVacPackDialog(child){
+  var back = div(''); back.style.cssText='position:fixed;inset:0;background:rgba(24,52,42,0.45);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;';
+  var box = div(''); box.style.cssText='background:#FBF8F1;border:1px solid #E7DFCE;border-radius:14px;padding:18px 18px 20px;max-width:340px;width:100%;';
+  box.appendChild(el('p',{style:"font-family:'Cormorant Garamond',Georgia,serif;font-size:20px;color:#18342A;margin:0 0 2px;"}, 'Vac-pack'));
+  box.appendChild(el('p',{style:'font-size:13px;color:#6b6557;margin:0 0 4px;'}, 'Child ' + child.code + (child.recipe&&child.recipe.name?' \u00b7 '+child.recipe.name:'')));
+  var rule=div(''); rule.style.cssText='height:1.5px;background:#C9A86A;margin:8px 0 14px;'; box.appendChild(rule);
+  box.appendChild(el('p',{style:'font-size:13px;color:#2C2A26;margin:0 0 6px;'}, 'Finished weight (optional)'));
+  var wrap=div(''); wrap.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:16px;';
+  var wInp=input({type:'number',min:'0',step:'1',placeholder:'total g'}); wInp.style.cssText='flex:1;'; wrap.appendChild(wInp);
+  wrap.appendChild(el('span',{style:'font-size:13px;color:#888;'},'g')); box.appendChild(wrap);
+  var btns=div(''); btns.style.cssText='display:flex;gap:8px;';
+  var cancel=el('button',{style:'flex:1;background:#fff;color:#6b6557;border:1px solid #E7DFCE;border-radius:8px;padding:11px;font-size:14px;cursor:pointer;'},'Cancel');
+  cancel.addEventListener('click', function(){ document.body.removeChild(back); });
+  var ok=el('button',{style:'flex:1;background:#18342A;color:#fff;border:none;border-radius:8px;padding:11px;font-size:14px;font-weight:600;cursor:pointer;'},'Confirm vac-packed');
+  ok.addEventListener('click', function(){
+    child.vacPacked = today();
+    var w = parseFloat(wInp.value); if (!isNaN(w) && w>0) child.finishedG = w;
+    saveAndStay();
+    document.body.removeChild(back);
+    renderProductionForm();
+  });
+  btns.appendChild(cancel); btns.appendChild(ok); box.appendChild(btns);
+  back.appendChild(box); document.body.appendChild(back);
+}
+
 function renderProduction() {
   currentView = 'prod';
   hideAllExceptProd();
@@ -3587,64 +3653,78 @@ function renderProduction() {
   v.innerHTML = '';
   renderTabs('prod');
 
+  const runs = productionRecords;
+  const active = runs.filter(function(r){ return runStage(r) === 'active'; });
+  const hanging = runs.filter(function(r){ return runStage(r) === 'hanging'; }).sort(function(a,b){ return (runReadyDate(a)||'').localeCompare(runReadyDate(b)||''); });
+  const ready = runs.filter(function(r){ return runStage(r) === 'ready'; });
+
   const hdr = div('header-bar');
   const hdrLeft = div('');
   hdrLeft.appendChild(el('h2', {style:'font-size:18px;font-weight:600;margin:0;'}, 'Production runs'));
-  const inProg = productionRecords.filter(function(r){ return r.status === 'in_progress'; });
-  const fin = productionRecords.filter(function(r){ return r.status === 'finished'; });
-  hdrLeft.appendChild(p('muted', inProg.length + ' in progress · ' + fin.length + ' finished'));
+  hdrLeft.appendChild(p('muted', active.length + ' active \u00b7 ' + hanging.length + ' hanging \u00b7 ' + ready.length + ' ready'));
   hdr.appendChild(hdrLeft);
-  const newBtn = btn('btn-primary', '+ Start new run', startNewProductionRun);
-  hdr.appendChild(newBtn);
+  hdr.appendChild(btn('btn-primary', '+ Start new run', startNewProductionRun));
   v.appendChild(hdr);
 
-  if (inProg.length === 0 && fin.length === 0) {
+  const key = div('');
+  key.style.cssText = 'background:#fff;border:1px solid #E7DFCE;border-radius:8px;padding:8px 12px;margin:0 0 14px;font-size:12px;color:#6b6557;line-height:1.6;';
+  key.innerHTML = '<span style="color:#8A6D2F;">Steps</span> &nbsp; 1 \u00b7 recipe &nbsp; 2 \u00b7 make blend &nbsp; 3 \u00b7 mince &nbsp; 4 \u00b7 stuff &amp; hang';
+  v.appendChild(key);
+
+  if (!runs.length) {
     const empty = div('empty-state');
     empty.appendChild(el('h3', {}, 'No production runs yet'));
     empty.appendChild(p('', 'Start your first run when you defrost a batch of meat.'));
-    const b = btn('btn-primary big-btn', '+ Start new run', startNewProductionRun);
-    empty.appendChild(b);
+    empty.appendChild(btn('btn-primary big-btn', '+ Start new run', startNewProductionRun));
     v.appendChild(empty);
     return;
   }
 
-  if (inProg.length > 0) {
+  function addSection(title, items, kind) {
+    if (!items.length) return;
     const sec = div('');
-    sec.appendChild(el('h3', {style:'font-size:14px;font-weight:600;color:#27500a;margin:1rem 0 8px;'}, 'In progress'));
-    inProg.sort(function(a,b){ return (b.startDate||'').localeCompare(a.startDate||''); }).forEach(function(r){
-      sec.appendChild(productionCardSummary(r));
-    });
+    sec.appendChild(el('p', {style:"font-family:'Cormorant Garamond',Georgia,serif;font-size:16px;font-weight:600;color:#18342A;border-bottom:1.5px solid #C9A86A;padding-bottom:3px;margin:14px 0 8px;"}, title));
+    var show = items;
+    if (kind === 'hanging' && !prodHangingExpanded && items.length > 4) show = items.slice(0,4);
+    show.forEach(function(r){ sec.appendChild(productionCardSummary(r, kind)); });
+    if (kind === 'hanging' && items.length > 4) {
+      const more = el('button', {style:'background:none;border:none;color:#8A6D2F;font-size:12px;cursor:pointer;display:block;margin:4px auto 0;'}, prodHangingExpanded ? 'show less' : ('+ ' + (items.length-4) + ' more hanging \u2014 tap to expand'));
+      more.addEventListener('click', function(){ prodHangingExpanded = !prodHangingExpanded; renderProduction(); });
+      sec.appendChild(more);
+    }
     v.appendChild(sec);
   }
 
-  if (fin.length > 0) {
-    const linkBtn = document.createElement('button');
-    linkBtn.style.cssText = 'background:none;border:none;color:#888;font-size:12px;cursor:pointer;text-decoration:underline;display:block;margin:1.5rem auto 0;';
-    linkBtn.textContent = 'View finished runs (' + fin.length + ')';
-    linkBtn.addEventListener('click', renderProductionRecordsList);
-    v.appendChild(linkBtn);
-  }
+  addSection('Active \u00b7 being worked', active, 'active');
+  addSection('Hanging \u00b7 curing', hanging, 'hanging');
+  addSection('Ready to ship', ready, 'ready');
 }
-
-function productionCardSummary(r) {
+function productionCardSummary(r, kind) {
+  kind = kind || runStage(r);
   const card = div('card');
-  card.style.cssText = 'cursor:pointer;margin-bottom:10px;';
+  card.style.cssText = 'cursor:pointer;margin-bottom:8px;';
   const top = div('row-sb');
-  top.style.marginBottom = '6px';
-  const left = div(''); left.style.flex = '1';
-  left.appendChild(el('span', {style:'font-size:15px;font-weight:600;color:#1a1a1a;'}, (r.speciesName || 'Run')));
-  left.appendChild(el('span', {className:'muted'}, ' · run ' + (r.runNumber || '?') + ' from ' + (r.batchCode || '?')));
+  top.style.marginBottom = '4px';
+  const left = div(''); left.style.cssText = 'display:flex;align-items:center;gap:6px;flex-wrap:wrap;';
+  left.appendChild(el('span', {style:'font-family:monospace;font-size:13px;color:#18342A;font-weight:500;'}, r.batchCode || '(no batch)'));
+  var alias = getRunAlias(r);
+  if (alias) left.appendChild(el('span', {style:'background:#F4E3BF;color:#7a5a16;font-size:11px;padding:1px 7px;border-radius:5px;'}, alias));
   top.appendChild(left);
-  const pillBg = r.status === 'finished' ? '#eaf3de' : '#faeeda';
-  const pillFg = r.status === 'finished' ? '#27500a' : '#633806';
-  top.appendChild(el('span', {style:'background:'+pillBg+';color:'+pillFg+';font-size:11px;padding:3px 10px;border-radius:8px;white-space:nowrap;'}, r.status === 'finished' ? 'Finished' : 'In progress'));
+  var pillTxt, pillBg, pillFg;
+  if (kind === 'active') { var s = runActiveStep(r); pillTxt = s + ' of 4 \u00b7 ' + (STEP_NAME[s] || ''); pillBg = '#FAEEDA'; pillFg = '#854F0B'; }
+  else if (kind === 'hanging') { var w = weeksLeft(runReadyDate(r)); pillTxt = (w == null ? 'curing' : (w + ' wk' + (w===1?'':'s') + ' left')); pillBg = '#EAF3DE'; pillFg = '#3B6D11'; }
+  else { pillTxt = (r.status === 'finished' && !(r.children||[]).some(function(c){ return c.vacPacked; })) ? 'Finished' : 'Vac-packed'; pillBg = '#E6F1FB'; pillFg = '#185FA5'; }
+  top.appendChild(el('span', {style:'background:'+pillBg+';color:'+pillFg+';font-size:11px;padding:2px 8px;border-radius:6px;white-space:nowrap;'}, pillTxt));
   card.appendChild(top);
-  const stageCount = (r.stages || []).length;
-  card.appendChild(p('muted', 'Process ' + (r.processCode || '?') + ' · ' + stageCount + ' day' + (stageCount===1?'':'s') + ' worked'));
+  var detail = (r.speciesName || 'Run');
+  var sticks = (r.children||[]).reduce(function(t,c){ return t + (c.stuffCount||0); }, 0);
+  if (kind === 'hanging') { var rd = runReadyDate(r); detail += (sticks ? ' \u00b7 ' + sticks + ' sticks' : '') + (rd ? ' \u00b7 ready ' + fmtDate(rd) : ''); }
+  else if (kind === 'ready') { detail += (sticks ? ' \u00b7 ' + sticks + ' pieces' : '') + ' \u00b7 ready to deliver'; }
+  else { detail += ' \u00b7 run ' + (r.runNumber || '?'); }
+  card.appendChild(p('muted', detail));
   card.addEventListener('click', function(){ openProductionRun(r.id); });
   return card;
 }
-
 function startNewProductionRun() {
   hideAllExceptProd();
   const v = document.getElementById('view-prod');
@@ -3863,8 +3943,9 @@ function childProgress(c){
   var blendMade = hasRecipe && (act.length===0 ? true : ticked===act.length);
   var minced = !!c.minced;
   var stuffed = !!c.stuffed;
-  var step = stuffed ? 5 : (minced ? 4 : (blendMade ? 3 : (hasRecipe ? 2 : 1)));
-  return {hasRecipe:hasRecipe, blendMade:blendMade, minced:minced, stuffed:stuffed, step:step, ticked:ticked, total:act.length};
+  var vacPacked = !!c.vacPacked;
+  var step = vacPacked ? 6 : (stuffed ? 5 : (minced ? 4 : (blendMade ? 3 : (hasRecipe ? 2 : 1))));
+  return {hasRecipe:hasRecipe, blendMade:blendMade, minced:minced, stuffed:stuffed, vacPacked:vacPacked, step:step, ticked:ticked, total:act.length};
 }
 function renderProductionForm() {
   if (!prodForm) { renderProduction(); return; }
@@ -3918,24 +3999,38 @@ function renderProductionForm() {
       const row = div(''); row.style.cssText = 'background:#f9fdf8;border:1px solid #d0e8c8;border-radius:10px;padding:11px 13px;';
       const top = div(''); top.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;';
       top.appendChild(el('p', {style:'font-size:13px;font-weight:600;margin:0;'}, 'Child ' + c.code));
-      top.appendChild(el('span', {style:'font-size:11px;color:#27500a;background:#eaf3de;border-radius:6px;padding:2px 8px;'}, (pr.step >= 5 ? 'Done' : 'Step ' + pr.step + ' of 4')));
+      top.appendChild(el('span', {style:'font-size:11px;color:#27500a;background:#eaf3de;border-radius:6px;padding:2px 8px;'}, (pr.step >= 6 ? 'Packed' : (pr.step >= 5 ? 'Hung' : 'Step ' + pr.step + ' of 4'))));
       row.appendChild(top);
       const bits = [c.meatKg + 'kg meat + ' + c.fatKg + 'kg fat = ' + c.totalKg + 'kg'];
       if (c.recipe && c.recipe.name) bits.push(c.recipe.name);
       row.appendChild(el('p', {style:'font-size:12px;color:#666;margin:0 0 4px;'}, bits.join(' \u00b7 ')));
       const dots = div(''); dots.style.cssText='display:flex;gap:5px;margin:0 0 8px;align-items:center;';
       for (var i=1;i<=4;i++){ var doneStep=(pr.step>4)||(i<pr.step); var curStep=(i===pr.step && pr.step<=4); dots.appendChild(el('span',{style:'width:9px;height:9px;border-radius:50%;background:'+(doneStep?'#27500a':(curStep?'#9ec77f':'#dfe7d8'))+';'})); }
-      dots.appendChild(el('span',{style:'font-size:11px;color:#777;margin-left:4px;'}, pr.step>=5 ? ('Hung \u2713' + (c.stuffFinish ? ' \u00b7 ready ' + fmtDate(c.stuffFinish) : '')) : ('Next: ' + STEP_LABELS[pr.step-1])));
+      dots.appendChild(el('span',{style:'font-size:11px;color:#777;margin-left:4px;'}, pr.step>=6 ? 'Vac-packed \u2713' : (pr.step>=5 ? ('Hung \u2713' + (c.stuffFinish ? ' \u00b7 ready ' + fmtDate(c.stuffFinish) : '')) : ('Next: ' + STEP_LABELS[pr.step-1]))));
       row.appendChild(dots);
-      var lblTxt, fn;
-      if (pr.step===1){ lblTxt='\u2460 Add the recipe'; fn=function(){ prodStageEdit={type:'recipe', date:today(), notes:'', childLetter:c.letter}; renderProductionForm(); }; }
-      else if (pr.step===2){ lblTxt='\u2461 Make the blend \u2014 ' + pr.ticked + ' of ' + pr.total + ' in'; fn=function(){ makeChildLetter=c.letter; renderMakeMode(); }; }
-      else if (pr.step===3){ lblTxt='\u2462 Mix into meat & mince'; fn=function(){ prodStageEdit={type:'mince', date:today(), notes:''}; renderProductionForm(); }; }
-      else if (pr.step===4){ lblTxt='\u2463 Stuff & hang'; fn=function(){ prodStageEdit={type:'stuff_hang', date:today(), notes:'', childLetter:c.letter}; renderProductionForm(); }; }
-      else { lblTxt='\ud83c\udff7\ufe0f  Make label'; fn=function(){ openSalamiLabelDialog(prodForm, {childLetter:c.letter, date:c.stuffed||today(), finishDate:c.stuffFinish||'', count:c.stuffCount||0, skinSize:c.stuffSkin||null}); }; }
-      const mk = el('button', {style:'background:'+(pr.step>=5?'#3a6b2a':'#27500a')+';color:#fff;border:none;border-radius:8px;padding:11px 14px;font-size:15px;font-weight:600;cursor:pointer;width:100%;line-height:1.35;'}, (pr.step>=5?'\u2713 ':'\u25b6 ')+lblTxt);
-      mk.addEventListener('click', fn);
-      row.appendChild(mk);
+      if (pr.step <= 4) {
+        var lblTxt, fn;
+        if (pr.step===1){ lblTxt='\u2460 Add the recipe'; fn=function(){ prodStageEdit={type:'recipe', date:today(), notes:'', childLetter:c.letter}; renderProductionForm(); }; }
+        else if (pr.step===2){ lblTxt='\u2461 Make the blend \u2014 ' + pr.ticked + ' of ' + pr.total + ' in'; fn=function(){ makeChildLetter=c.letter; renderMakeMode(); }; }
+        else if (pr.step===3){ lblTxt='\u2462 Mix into meat & mince'; fn=function(){ prodStageEdit={type:'mince', date:today(), notes:''}; renderProductionForm(); }; }
+        else { lblTxt='\u2463 Stuff & hang'; fn=function(){ prodStageEdit={type:'stuff_hang', date:today(), notes:'', childLetter:c.letter}; renderProductionForm(); }; }
+        const mk = el('button', {style:'background:#27500a;color:#fff;border:none;border-radius:8px;padding:11px 14px;font-size:15px;font-weight:600;cursor:pointer;width:100%;line-height:1.35;'}, '\u25b6 '+lblTxt);
+        mk.addEventListener('click', fn);
+        row.appendChild(mk);
+      } else {
+        const btnRow = div(''); btnRow.style.cssText='display:flex;gap:8px;';
+        const lab = el('button', {style:'flex:1;background:#3a6b2a;color:#fff;border:none;border-radius:8px;padding:10px;font-size:14px;font-weight:600;cursor:pointer;'}, '\ud83c\udff7\ufe0f Label');
+        lab.addEventListener('click', function(){ openSalamiLabelDialog(prodForm, {childLetter:c.letter, date:c.stuffed||today(), finishDate:c.stuffFinish||'', count:c.stuffCount||0, skinSize:c.stuffSkin||null}); });
+        btnRow.appendChild(lab);
+        if (pr.step >= 6) {
+          btnRow.appendChild(el('span', {style:'flex:1;text-align:center;align-self:center;font-size:13px;color:#185FA5;font-weight:600;'}, '\u2713 Packed' + (c.vacPacked ? ' ' + fmtDate(c.vacPacked) : '')));
+        } else {
+          const vp = el('button', {style:'flex:1;background:#fff;color:#185FA5;border:1px solid #185FA5;border-radius:8px;padding:10px;font-size:14px;font-weight:600;cursor:pointer;'}, 'Mark vac-packed');
+          vp.addEventListener('click', function(){ openVacPackDialog(c); });
+          btnRow.appendChild(vp);
+        }
+        row.appendChild(btnRow);
+      }
       kidsWrap.appendChild(row);
     });
     card.appendChild(kidsWrap);
@@ -4255,42 +4350,79 @@ function renderStageForm() {
 
       // Ingredient table — suggested grams (editable)
       card.appendChild(el('p', {style:'font-size:13px;font-weight:600;color:#27500a;margin:14px 0 6px;'}, 'Ingredients for Child ' + child.code + ' (' + childTotal + 'kg mix)'));
-      card.appendChild(p('muted', 'The app suggests an amount; type over it any time (colour, species, taste).'));
+      card.appendChild(p('muted', 'Spices scale to the batch weight. Salt is a % of the mix; sugar and the enzyme stay fixed (they seed and feed the culture). Type over any amount to adjust.'));
       const tbl = div(''); tbl.style.cssText = 'display:flex;flex-direction:column;gap:6px;margin-top:8px;';
 
       function suggestG(line) {
         if (line.type === 'pct') return Math.round(childTotal * 1000 * (line.value/100));
         if (line.type === 'perkg') return Math.round(childTotal * line.value);
+        if (line.type === 'ratio') return Math.round(childTotal * 1000 * line.value);
         if (line.type === 'fixed') return line.value;
         return null; // asneeded
       }
 
+      function setLineFromGrams(line, grams) {
+        line.amount = grams;
+        if (grams == null || isNaN(grams)) return;
+        if (line.type === 'fixed') { line.value = grams; return; }
+        if (childTotal <= 0) return;
+        if (line.type === 'pct') line.value = grams / (childTotal * 10);
+        else if (line.type === 'perkg') line.value = grams / childTotal;
+        else if (line.type === 'ratio') { line.value = grams / (childTotal * 1000); line.refAmt = grams; line.refMix = Math.round(childTotal * 1000); }
+      }
+
       prodStageEdit.lines.forEach(function(line, idx){
-        if (line.amount == null) line.amount = suggestG(line); // seed editable amount once
-        const row = div(''); row.style.cssText = 'display:flex;align-items:center;gap:8px;background:#f9fdf8;border:1px solid #d0e8c8;border-radius:8px;padding:8px 10px;';
-        var nm;
+        if (line.amount == null) line.amount = suggestG(line);
+        const row = div(''); row.style.cssText = 'background:#f9fdf8;border:1px solid #d0e8c8;border-radius:8px;padding:8px 10px;';
         if (idx < 4) {
-          nm = el('span', {style:'flex:1;font-size:14px;'}, line.name);
+          const r1 = div(''); r1.style.cssText = 'display:flex;align-items:center;gap:8px;';
+          r1.appendChild(el('span', {style:'flex:1;font-size:14px;'}, line.name));
+          if (line.type === 'asneeded') {
+            r1.appendChild(el('span', {style:'font-size:13px;color:#888;'}, 'as needed'));
+          } else {
+            const amtInp = input({type:'number', min:'0', step:'1', value: (line.amount != null ? line.amount : '')});
+            amtInp.style.cssText = 'width:80px;text-align:right;';
+            amtInp.addEventListener('input', function(e){ setLineFromGrams(line, e.target.value === '' ? null : parseFloat(e.target.value)); });
+            r1.appendChild(amtInp);
+            var stdHint = line.type==='fixed' ? ' \u00b7 fixed' : (line.type==='pct' ? ' \u00b7 %' : ' \u00b7 scales');
+            r1.appendChild(el('span', {style:'font-size:12px;color:#999;white-space:nowrap;'}, (line.unit || 'g') + stdHint));
+          }
+          row.appendChild(r1);
         } else {
-          nm = input({type:'text', value: line.name || '', placeholder:'Ingredient name'});
-          nm.style.cssText = 'flex:1;font-size:14px;';
+          const r1 = div(''); r1.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:6px;';
+          const nm = input({type:'text', value: line.name || '', placeholder:'Ingredient name'});
+          nm.style.cssText = 'flex:1 1 auto;min-width:0;font-size:14px;';
           nm.addEventListener('input', function(e){ line.name = e.target.value; });
-        }
-        row.appendChild(nm);
-        if (line.type === 'asneeded') {
-          row.appendChild(el('span', {style:'font-size:13px;color:#888;'}, 'as needed'));
-        } else {
-          const amtInp = input({type:'number', min:'0', step:'1', value: (line.amount != null ? line.amount : '')});
-          amtInp.style.cssText = 'width:80px;text-align:right;';
-          amtInp.addEventListener('input', function(e){ line.amount = e.target.value === '' ? null : parseFloat(e.target.value); });
-          row.appendChild(amtInp);
-          row.appendChild(el('span', {style:'font-size:13px;color:#888;width:40px;'}, line.unit || 'g'));
-        }
-        // remove button (not for the 4 standard lines)
-        if (idx >= 4) {
-          const rm = el('button', {style:'background:none;border:none;color:#a32d2d;cursor:pointer;font-size:16px;'}, '×');
+          r1.appendChild(nm);
+          const modeSel = document.createElement('select');
+          modeSel.style.cssText = 'flex:0 0 auto;width:122px;font-size:12px;padding:3px 4px;border:1px solid #cdddc4;border-radius:6px;background:#fff;';
+          [['perkg','scales to batch'],['ratio','per mix']].forEach(function(o){ const op=document.createElement('option'); op.value=o[0]; op.textContent=o[1]; if((line.type==='ratio'?'ratio':'perkg')===o[0]) op.selected=true; modeSel.appendChild(op); });
+          modeSel.addEventListener('change', function(e){
+            if (e.target.value === 'ratio') { var g0 = suggestG(line); line.type='ratio'; line.refMix=Math.round(childTotal*1000)||15625; line.refAmt=(g0!=null?g0:0); line.value=(line.refMix? line.refAmt/line.refMix:0); }
+            else { var g1 = suggestG(line); line.type='perkg'; line.value = childTotal>0 ? ((g1!=null?g1:0)/childTotal) : 0; }
+            line.amount=null; renderStageForm();
+          });
+          r1.appendChild(modeSel);
+          const rm = el('button', {style:'background:none;border:none;color:#a32d2d;cursor:pointer;font-size:18px;line-height:1;'}, '\u00d7');
           rm.addEventListener('click', function(){ prodStageEdit.lines.splice(idx,1); renderStageForm(); });
-          row.appendChild(rm);
+          r1.appendChild(rm);
+          row.appendChild(r1);
+          const r2 = div(''); r2.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:13px;color:#555;flex-wrap:wrap;';
+          if (line.type === 'ratio') {
+            const aInp = input({type:'number', min:'0', step:'1', value: (line.refAmt != null ? line.refAmt : '')}); aInp.style.cssText='width:64px;text-align:right;';
+            const mInp = input({type:'number', min:'1', step:'1', value: (line.refMix != null ? line.refMix : '')}); mInp.style.cssText='width:78px;text-align:right;';
+            const calc = el('span', {style:'margin-left:auto;color:#27500a;font-weight:600;white-space:nowrap;'}, '');
+            const recalc = function(){ line.value=(line.refMix? line.refAmt/line.refMix:0); line.amount=suggestG(line); const sg=suggestG(line); calc.textContent='= '+(sg!=null?sg:'?')+' g this batch'; };
+            aInp.addEventListener('input', function(e){ line.refAmt = e.target.value===''?0:parseFloat(e.target.value); recalc(); });
+            mInp.addEventListener('input', function(e){ line.refMix = e.target.value===''?0:parseFloat(e.target.value); recalc(); });
+            recalc();
+            r2.appendChild(aInp); r2.appendChild(el('span',{},'g per')); r2.appendChild(mInp); r2.appendChild(el('span',{},'g mix')); r2.appendChild(calc);
+          } else {
+            const amtInp = input({type:'number', min:'0', step:'1', value: (line.amount != null ? line.amount : '')}); amtInp.style.cssText='width:80px;text-align:right;';
+            amtInp.addEventListener('input', function(e){ setLineFromGrams(line, e.target.value===''?null:parseFloat(e.target.value)); });
+            r2.appendChild(amtInp); r2.appendChild(el('span',{style:'color:#888;'}, (line.unit||'g')+' \u00b7 scales'));
+          }
+          row.appendChild(r2);
         }
         tbl.appendChild(row);
       });
@@ -4298,7 +4430,7 @@ function renderStageForm() {
 
       // Add ingredient
       const addBtn = btn('btn-secondary', '+ Add ingredient', function(){
-        prodStageEdit.lines.push({name:'', type:'fixed', value:0, unit:'g', amount:0});
+        prodStageEdit.lines.push({name:'', type:'perkg', value:0, unit:'g', amount:null});
         renderStageForm();
       });
       addBtn.style.cssText = 'margin-top:10px;background:#eef5ea;color:#27500a;border:1px solid #d0e8c8;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:14px;';
@@ -4310,7 +4442,7 @@ function renderStageForm() {
         const nm = (prodStageEdit.recipeName || '').trim();
         if (!nm) { showToast('Give the recipe a name first'); return; }
         const existing = recipeLibrary.find(function(r){ return r.name.toLowerCase() === nm.toLowerCase(); });
-        const ingredients = prodStageEdit.lines.map(function(l){ return {name:l.name, type:l.type, value:l.value, unit:l.unit}; });
+        const ingredients = prodStageEdit.lines.map(function(l){ return {name:l.name, type:l.type, value:l.value, unit:l.unit, refAmt:l.refAmt, refMix:l.refMix}; });
         if (existing) { existing.ingredients = ingredients; }
         else { recipeLibrary.push({id:'rcp_'+Date.now(), name:nm, ingredients:ingredients}); }
         saveData();
