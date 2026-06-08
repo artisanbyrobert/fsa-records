@@ -324,7 +324,6 @@ async function loadData() {
       } catch(e) {}
     }
 
-    if (intakes.length) showToast(`${intakes.length} record${intakes.length>1?'s':''} · ${estates.length} estate${estates.length!==1?'s':''} · ${processors.length} processor${processors.length!==1?'s':''} loaded`);
   } catch(e) {
     console.error('Load error', e);
     showToast('Could not connect to cloud — check internet connection');
@@ -3255,9 +3254,14 @@ function getFatPercentForSpecies(speciesName) {
 function runsForBatch(batchCode) {
   return productionRecords.filter(function(r){ return r.batchCode === batchCode; });
 }
+function childLetterOffset(batchCode, excludeId) {
+  var used = 0;
+  productionRecords.forEach(function(r){ if (r.batchCode === batchCode && r.id !== excludeId) used += (r.children || []).length; });
+  return used;
+}
 
-function blankProductionRecord(batchCode) {
-  const speciesName = getSpeciesForBatch(batchCode);
+function blankProductionRecord(batchCode, speciesName) {
+  speciesName = speciesName || getSpeciesForBatch(batchCode);
   return {
     id: uid(),
     processCode: processCodeFromDate(today()),
@@ -3758,19 +3762,46 @@ function startNewProductionRun() {
   });
   card.appendChild(sel);
 
+  var chosenSpecies = '';
+  const spWrap = div(''); spWrap.style.cssText = 'margin:2px 0 12px;';
+  card.appendChild(spWrap);
+  function batchSpeciesList(bc){
+    const intake = intakes.find(function(i){ return i.batchCode === bc; });
+    if (!intake || !intake.items) return [];
+    var seen = {}, out = [];
+    intake.items.forEach(function(it){ var sp = it.species==='Other'?(it.custom||'Other'):it.species; if (sp && !seen[sp]) { seen[sp]=1; out.push(sp); } });
+    return out;
+  }
+  function batchSpeciesUsed(bc){ var u={}; productionRecords.forEach(function(r){ if (r.batchCode===bc && r.speciesName) u[r.speciesName]=true; }); return u; }
+  function refreshSpecies(){
+    spWrap.innerHTML = '';
+    var list = batchSpeciesList(sel.value);
+    chosenSpecies = list[0] || '';
+    if (list.length <= 1) return;
+    var used = batchSpeciesUsed(sel.value);
+    spWrap.appendChild(el('p', {style:'font-size:13px;color:#27500a;font-weight:600;margin:6px 0 4px;'}, 'This batch has ' + list.length + ' species \u2014 which is this run for?'));
+    list.forEach(function(sp){
+      var on = (sp === chosenSpecies);
+      var b = el('button', {style:'display:block;width:100%;text-align:left;margin:4px 0;padding:9px 12px;border-radius:8px;border:1px solid '+(on?'#18342A':'#d0e8c8')+';background:'+(on?'#eef5ea':'#fff')+';cursor:pointer;font-size:14px;color:#1a1a1a;'}, sp + (used[sp] ? '  \u00b7  already started' : ''));
+      b.addEventListener('click', function(){ chosenSpecies = sp; refreshSpecies(); });
+      spWrap.appendChild(b);
+    });
+  }
+  sel.addEventListener('change', refreshSpecies);
+
   const startBtn = btn('btn-primary', 'Start run', function(){
     if (!sel.value) { showToast('Pick a batch first'); return; }
     const batchCode = sel.value;
-    const speciesName = getSpeciesForBatch(batchCode);
+    const speciesName = chosenSpecies || getSpeciesForBatch(batchCode);
     const fatPct = getFatPercentForSpecies(speciesName);
     if (fatPct === null && speciesName) {
       promptForFatPercent(speciesName, function(pct){
         speciesFat[speciesName] = pct;
         saveData();
-        actuallyStartRun(batchCode);
+        actuallyStartRun(batchCode, speciesName);
       });
     } else {
-      actuallyStartRun(batchCode);
+      actuallyStartRun(batchCode, speciesName);
     }
   });
   card.appendChild(startBtn);
@@ -3806,8 +3837,8 @@ function promptForFatPercent(speciesName, onSet) {
   v.appendChild(card);
 }
 
-function actuallyStartRun(batchCode) {
-  const r = blankProductionRecord(batchCode);
+function actuallyStartRun(batchCode, speciesName) {
+  const r = blankProductionRecord(batchCode, speciesName);
   productionRecords.push(r);
   saveData();
   openProductionRun(r.id);
@@ -4289,7 +4320,8 @@ function renderStageForm() {
           krow.appendChild(b);
         });
         kids.appendChild(krow);
-        const letters = []; for (let i=0;i<n;i++) letters.push((prodForm.batchCode||'') + String.fromCharCode(65+i));
+        const _off = childLetterOffset(prodForm.batchCode, prodEditId);
+        const letters = []; for (let i=0;i<n;i++) letters.push((prodForm.batchCode||'') + String.fromCharCode(65+_off+i));
         kids.appendChild(el('p', {style:'font-size:12px;color:#444;margin:10px 0 0;'}, 'Children: ' + letters.map(function(c){return 'Child ' + c;}).join(', ')));
         resultHolder.appendChild(kids);
       }
@@ -4661,9 +4693,10 @@ function renderStageForm() {
       const childFat = Math.round((fat / n) * 100) / 100;
       const childTotal = Math.round((total / n) * 100) / 100;
       const existing = prodForm.children || [];
+      const offset = childLetterOffset(prodForm.batchCode, prodEditId);
       const kids = [];
       for (let i = 0; i < n; i++) {
-        const letter = String.fromCharCode(65 + i);
+        const letter = String.fromCharCode(65 + offset + i);
         const prev = existing.find(function(c){ return c.letter === letter; }) || {};
         kids.push({
           letter: letter,
@@ -4681,7 +4714,7 @@ function renderStageForm() {
         // store recipe with the final (possibly edited) amounts and the ratio definitions
         ch.recipe = {
           name: toSave.recipeName,
-          lines: (toSave.lines || []).map(function(l){ return {name:l.name, type:l.type, value:l.value, unit:l.unit, amount:l.amount}; })
+          lines: (toSave.lines || []).map(function(l){ return {name:l.name, type:l.type, value:l.value, unit:l.unit, amount:l.amount, refAmt:l.refAmt, refMix:l.refMix}; })
         };
         const saltLine = (toSave.lines || []).find(function(l){ return l.name && l.name.toLowerCase() === 'salt'; });
         if (saltLine) { ch.saltGrams = saltLine.amount; }
@@ -5358,12 +5391,60 @@ function renderCompletedCleansList() {
   done.forEach(function(r){ v.appendChild(cleanCardSummary(r)); });
 }
 
+// ── Session draft: auto-save in-progress entry + last screen, restore on reopen ──
+const SESSION_KEY = 'fsa_session_v1';
+function saveSession(){
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({
+      v: currentView, form: form, dailyForm: dailyForm,
+      prodForm: prodForm, prodEditId: prodEditId, prodStageEdit: prodStageEdit,
+      makeChildLetter: makeChildLetter, dcForm: dcForm, ts: Date.now()
+    }));
+  } catch (e) {}
+}
+function sessionRouteTo(v){
+  switch (v) {
+    case 'prod': if (prodForm) renderProductionForm(); else renderProduction(); break;
+    case 'daily': renderDailyHome(); break;
+    case 'form': if (form) renderForm(); else renderList(); break;
+    case 'list-records': renderList('records'); break;
+    case 'pest': renderPestControl(); break;
+    case 'checks': renderDailyChecks(); break;
+    case 'clean': renderPeriodicCleans(); break;
+    case 'delivery': case 'delivery-form': renderDeliveryList(); break;
+    case 'wetmeat': renderWetMeat(); break;
+    case 'venison': (typeof renderVenison === 'function' ? renderVenison() : renderList()); break;
+    case 'manage': renderManage(); break;
+    default: renderList();
+  }
+}
+function restoreSession(){
+  try {
+    var s = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+    if (!s || !s.v) return false;
+    form = s.form || null;
+    dailyForm = s.dailyForm || null;
+    prodForm = s.prodForm || null;
+    prodEditId = s.prodEditId || null;
+    prodStageEdit = s.prodStageEdit || null;
+    makeChildLetter = s.makeChildLetter || null;
+    dcForm = s.dcForm || null;
+    currentView = s.v;
+    sessionRouteTo(s.v);
+    return true;
+  } catch (e) { return false; }
+}
+
 // ── Boot ──────────────────────────────────────────────────────────────────────
 (async () => {
   await loadData();
   migrateShortCodes();
   checkAndFixSeasons();
-  renderList();
+  if (!restoreSession()) renderList();
+  setInterval(saveSession, 2500);
+  document.addEventListener('visibilitychange', function(){ if (document.hidden) saveSession(); });
+  window.addEventListener('pagehide', saveSession);
+  window.addEventListener('beforeunload', saveSession);
 })();
 </script>
 </body></html>
