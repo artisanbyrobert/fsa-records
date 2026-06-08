@@ -4268,7 +4268,14 @@ function renderStageForm() {
       prodStageEdit.lines.forEach(function(line, idx){
         if (line.amount == null) line.amount = suggestG(line); // seed editable amount once
         const row = div(''); row.style.cssText = 'display:flex;align-items:center;gap:8px;background:#f9fdf8;border:1px solid #d0e8c8;border-radius:8px;padding:8px 10px;';
-        const nm = el('span', {style:'flex:1;font-size:14px;'}, line.name);
+        var nm;
+        if (idx < 4) {
+          nm = el('span', {style:'flex:1;font-size:14px;'}, line.name);
+        } else {
+          nm = input({type:'text', value: line.name || '', placeholder:'Ingredient name'});
+          nm.style.cssText = 'flex:1;font-size:14px;';
+          nm.addEventListener('input', function(e){ line.name = e.target.value; });
+        }
         row.appendChild(nm);
         if (line.type === 'asneeded') {
           row.appendChild(el('span', {style:'font-size:13px;color:#888;'}, 'as needed'));
@@ -4291,7 +4298,7 @@ function renderStageForm() {
 
       // Add ingredient
       const addBtn = btn('btn-secondary', '+ Add ingredient', function(){
-        prodStageEdit.lines.push({name:'New ingredient', type:'fixed', value:0, unit:'g', amount:0});
+        prodStageEdit.lines.push({name:'', type:'fixed', value:0, unit:'g', amount:0});
         renderStageForm();
       });
       addBtn.style.cssText = 'margin-top:10px;background:#eef5ea;color:#27500a;border:1px solid #d0e8c8;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:14px;';
