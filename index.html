@@ -19,7 +19,7 @@
   );
 })();
 </script>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#FBF8F1;color:#2C2A26;font-size:14px;line-height:1.5;}
@@ -3129,6 +3129,8 @@ function drawSalamiLabel(ctx, W, H, d, orientation){
     var fl = fitLines(ctx, d.flavour, iw, Math.round(H*0.11), Math.round(H*0.055), 'bold', FAM, 3);
     ctx.textAlign='center';
     for(var i=0;i<fl.lines.length;i++){ y+=fl.fs; ctx.font='bold '+fl.fs+'px '+FAM; ctx.fillText(fl.lines[i], W/2, y); y+=Math.round(fl.fs*0.12); }
+    var subP=[]; if(d.species)subP.push(d.species); if(d.alias)subP.push(d.alias);
+    if(subP.length){ var alP=fitLines(ctx, subP.join('  \u00b7  '), iw, Math.round(H*0.056), Math.round(H*0.036), 'normal', FAM, 1); y+=Math.round(H*0.012)+alP.fs; ctx.font=alP.fs+'px '+FAM; ctx.fillText(alP.lines[0], W/2, y); }
     y += Math.round(H*0.02);
     ctx.strokeStyle='#000'; ctx.lineWidth=Math.max(2,Math.round(H*0.006));
     ctx.beginPath(); ctx.moveTo(pad,y); ctx.lineTo(W-pad,y); ctx.stroke();
@@ -3143,29 +3145,34 @@ function drawSalamiLabel(ctx, W, H, d, orientation){
       y += lblFs + valFs + Math.round(H*0.022);
     }
   } else {
-    // 30 (W) × 20 (H) landscape: flavour, codes line, dates line — centred
-    var cy = pad;
-    var f2 = fitLines(ctx, d.flavour, iw, Math.round(H*0.30), Math.round(H*0.15), 'bold', FAM, 2);
+    // 30 (W) × 20 (H) landscape: flavour, species·alias, codes, dates — centred, sized to fit H
+    var cy = Math.round(H*0.06);
     ctx.textAlign='center';
-    for(var j=0;j<f2.lines.length;j++){ cy+=f2.fs; ctx.font='bold '+f2.fs+'px '+FAM; ctx.fillText(f2.lines[j], W/2, cy); cy+=Math.round(f2.fs*0.06); }
-    cy += Math.round(H*0.04);
-    ctx.strokeStyle='#000'; ctx.lineWidth=Math.max(2,Math.round(H*0.012));
+    var f2 = fitLines(ctx, d.flavour, iw, Math.round(H*0.19), Math.round(H*0.10), 'bold', FAM, 2);
+    for(var j=0;j<f2.lines.length;j++){ cy+=f2.fs; ctx.font='bold '+f2.fs+'px '+FAM; ctx.fillText(f2.lines[j], W/2, cy); cy+=Math.round(f2.fs*0.08); }
+    var subL=[]; if(d.species)subL.push(d.species); if(d.alias)subL.push(d.alias);
+    if(subL.length){ var alL=fitLines(ctx, subL.join('  \u00b7  '), iw, Math.round(H*0.10), Math.round(H*0.065), 'normal', FAM, 1); cy+=Math.round(H*0.01)+alL.fs; ctx.font=alL.fs+'px '+FAM; ctx.fillText(alL.lines[0], W/2, cy); }
+    cy += Math.round(H*0.035);
+    ctx.strokeStyle='#000'; ctx.lineWidth=Math.max(2,Math.round(H*0.01));
     ctx.beginPath(); ctx.moveTo(pad,cy); ctx.lineTo(W-pad,cy); ctx.stroke();
-    cy += Math.round(H*0.05);
-    var codes=(d.batchCode||'')+'   ·   '+(d.processCode||'');
-    var cf=fitLines(ctx, codes, iw, Math.round(H*0.17), Math.round(H*0.10), 'bold', FAM, 1);
+    cy += Math.round(H*0.04);
+    var codes=(d.batchCode||'')+'   \u00b7   '+(d.processCode||'');
+    var cf=fitLines(ctx, codes, iw, Math.round(H*0.12), Math.round(H*0.075), 'bold', FAM, 1);
     cy+=cf.fs; ctx.font='bold '+cf.fs+'px '+FAM; ctx.fillText(cf.lines[0], W/2, cy);
-    cy+=Math.round(H*0.05);
+    cy+=Math.round(H*0.035);
     var dates=[]; if(d.hung)dates.push('Hung '+labelDate(d.hung)); if(d.ready)dates.push('Ready '+labelDate(d.ready));
-    var dstr=dates.join('     ');
-    if(dstr){ var df=fitLines(ctx, dstr, iw, Math.round(H*0.13), Math.round(H*0.08), 'normal', FAM, 1); cy+=df.fs; ctx.font='normal '+df.fs+'px '+FAM; ctx.fillText(dstr, W/2, cy); }
+    var dstr=dates.join('    ');
+    if(dstr){ var df=fitLines(ctx, dstr, iw, Math.round(H*0.095), Math.round(H*0.058), 'normal', FAM, 1); cy+=df.fs; ctx.font='normal '+df.fs+'px '+FAM; ctx.fillText(dstr, W/2, cy); }
   }
 }
 
 function salamiLabelData(prodForm, stage){
   var ch=(prodForm.children||[]).find(function(c){return c.letter===stage.childLetter;});
   var flav=(ch&&ch.recipe&&ch.recipe.name)?ch.recipe.name:(ch?('Child '+ch.code):'Salami');
-  return { flavour:flav, batchCode:prodForm.batchCode||'',
+  flav=(flav.replace(/\s*\bmix\b\s*$/i,'').trim())||flav;
+  var sp=(ch&&ch.species)?ch.species:(prodForm.speciesName||'');
+  if(sp) sp=sp.charAt(0).toUpperCase()+sp.slice(1);
+  return { flavour:flav, species:sp, alias:(((typeof getRunAlias==='function' && getRunAlias(prodForm)) || prodForm.alias || '')), batchCode:prodForm.batchCode||'',
     processCode: prodForm.processCode || processCodeFromDate(prodForm.startDate||today()),
     hung: stage.date||today(), ready: stage.finishDate||'' };
 }
@@ -3175,9 +3182,71 @@ function renderLabelCanvas(d, orientation, scale){
   var c=document.createElement('canvas'); c.width=W*scale; c.height=H*scale;
   var ctx=c.getContext('2d'); ctx.scale(scale,scale); drawSalamiLabel(ctx,W,H,d,orientation); return c;
 }
+function customerEstateName(prodForm){
+  var nm=(typeof getRunEstateName==='function' ? getRunEstateName(prodForm) : '') || '';
+  if(!nm && prodForm.alias){ for(var kk in ESTATE_ALIAS){ if(ESTATE_ALIAS[kk]===prodForm.alias){ nm=kk; break; } } }
+  return (typeof _titleCase==='function') ? _titleCase(nm||'') : (nm||'');
+}
+var CUST_ALLERGENS=['mustard','celery','milk','egg','eggs','fish','soya','soy','sesame','peanut','peanuts','nut','nuts','almond','hazelnut','walnut','cashew','gluten','wheat','barley','rye','oats','sulphite','sulphites','sulphur','lupin','crustacean','mollusc'];
+var CUST_EXCLUDE=['paprika','sugar','dextrose','enzyme','flora','culture','starter','alcohol','wine','wash'];
+function _custExcluded(name){ var n=(name||'').trim().toLowerCase(); if(!n) return true; return CUST_EXCLUDE.indexOf(n.split(/\s+/)[0])>=0; }
+function _isAllergenWord(w){ return CUST_ALLERGENS.indexOf((w||'').toLowerCase().replace(/[^a-z]/g,''))>=0; }
+function customerLabelData(prodForm, stage){
+  var ch=(prodForm.children||[]).find(function(c){return c.letter===stage.childLetter;}) || (prodForm.children||[])[0] || {};
+  var flav=(ch.recipe&&ch.recipe.name)?ch.recipe.name:(ch.code?('Child '+ch.code):'Salami');
+  flav=(flav.replace(/\s*\bmix\b\s*$/i,'').trim())||flav;
+  var sp=(ch.species||prodForm.speciesName||''); if(sp) sp=sp.charAt(0).toUpperCase()+sp.slice(1);
+  var meat=+ch.meatKg||0, fat=+ch.fatKg||0, tot=meat+fat;
+  var lines=(ch.recipe&&ch.recipe.lines)?ch.recipe.lines.slice():[];
+  var sps=lines.filter(function(l){return !_custExcluded(l.name);})
+    .map(function(l){return {amt:(+l.amount||0), name:l.name};})
+    .sort(function(a,b){return b.amt-a.amt;}).map(function(x){return x.name;});
+  var ingr=[];
+  if(tot>0){ ingr.push(sp+' meat '+Math.round(meat/tot*100)+'%'); ingr.push('Organic pork fat '+Math.round(fat/tot*100)+'%'); }
+  ingr=ingr.concat(sps);
+  return { title:(sp+' '+flav).trim(), sub:customerEstateName(prodForm), ingredients:ingr, batchCode:prodForm.batchCode||'' };
+}
+function drawCustomerLabel(ctx,W,H,d){
+  var DISP='"Cormorant Garamond",Georgia,serif', BODY='"EB Garamond",Georgia,serif';
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);ctx.fillStyle='#000';ctx.textAlign='center';
+  var pad=Math.round(W*0.07), iw=W-pad*2, y=Math.round(H*0.085);
+  ctx.font='500 '+Math.round(H*0.062)+'px '+DISP; if(ctx.letterSpacing!==undefined)try{ctx.letterSpacing=Math.round(W*0.012)+'px';}catch(e){}
+  ctx.fillText('ARTISAN BY ROBERT', W/2, y); if(ctx.letterSpacing!==undefined)try{ctx.letterSpacing='0px';}catch(e){}
+  y+=Math.round(H*0.03); ctx.strokeStyle='#000'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(W*0.30,y); ctx.lineTo(W*0.70,y); ctx.stroke();
+  y+=Math.round(H*0.055);
+  var tf=Math.round(H*0.155), tl=null;
+  for(; tf>=Math.round(H*0.10); tf--){ ctx.font='600 '+tf+'px '+DISP; var ws=(d.title||'').split(' '),ln=[],cur=''; for(var i=0;i<ws.length;i++){var t=cur?cur+' '+ws[i]:ws[i]; if(ctx.measureText(t).width<=iw||!cur)cur=t; else{ln.push(cur);cur=ws[i];}} if(cur)ln.push(cur); if(ln.length<=2&&ln.every(function(l){return ctx.measureText(l).width<=iw;})){tl=ln;break;} }
+  if(!tl)tl=[d.title||''];
+  for(var k=0;k<tl.length;k++){ y+=tf; ctx.font='600 '+tf+'px '+DISP; ctx.fillText(tl[k],W/2,y); if(k<tl.length-1)y+=Math.round(tf*0.12); }
+  if(d.sub){ y+=Math.round(H*0.092); ctx.font='italic 400 '+Math.round(H*0.072)+'px '+BODY; ctx.fillText(d.sub,W/2,y); }
+  y+=Math.round(H*0.052); ctx.strokeStyle='#000'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(pad,y); ctx.lineTo(W-pad,y); ctx.stroke(); y+=Math.round(H*0.05);
+  ctx.textAlign='left';
+  var toks=('Ingredients: '+(d.ingredients||[]).join(', ')).split(' ').map(function(w){return {t:w,b:_isAllergenWord(w)};});
+  var fs=Math.round(H*0.078), lines;
+  function layout(fsz){ var L=[[]],lw=0; ctx.font=fsz+'px '+BODY; var spc=ctx.measureText(' ').width;
+    for(var i=0;i<toks.length;i++){ ctx.font=(toks[i].b?'500 ':'')+fsz+'px '+BODY; var ww=ctx.measureText(toks[i].t).width; var add=(L[L.length-1].length?spc:0)+ww; if(lw+add>iw&&L[L.length-1].length){L.push([]);lw=0;add=ww;} L[L.length-1].push(toks[i]); lw+=add; } return L; }
+  while(fs>=Math.round(H*0.05)){ lines=layout(fs); if(y+lines.length*(fs*1.32)<=H-pad)break; fs--; }
+  lines=layout(fs);
+  for(var li=0;li<lines.length;li++){ y+=fs; var x=pad; ctx.font=fs+'px '+BODY; var spc=ctx.measureText(' ').width;
+    for(var wi=0;wi<lines[li].length;wi++){ var tk=lines[li][wi]; ctx.font=(tk.b?'500 ':'')+fs+'px '+BODY; if(wi>0)x+=spc; ctx.fillText(tk.t,x,y); x+=ctx.measureText(tk.t).width; }
+    y+=Math.round(fs*0.32); }
+}
+function renderCustomerLabelCanvas(d, orientation, scale){
+  scale=scale||4; var W=orientation==='portrait'?240:360, H=orientation==='portrait'?360:240;
+  var c=document.createElement('canvas'); c.width=W*scale; c.height=H*scale; var ctx=c.getContext('2d'); ctx.scale(scale,scale); drawCustomerLabel(ctx,W,H,d); return c;
+}
+function ensureSerifFonts(cb){
+  try{
+    if(document.fonts&&document.fonts.load){
+      Promise.all([document.fonts.load('600 40px "Cormorant Garamond"'),document.fonts.load('500 40px "Cormorant Garamond"'),document.fonts.load('400 20px "EB Garamond"'),document.fonts.load('500 20px "EB Garamond"'),document.fonts.load('italic 400 20px "EB Garamond"')]).then(function(){cb&&cb();}).catch(function(){cb&&cb();});
+    } else { cb&&cb(); }
+  }catch(e){ cb&&cb(); }
+}
 function openSalamiLabelDialog(prodForm, stage){
   if(!stage.childLetter && (prodForm.children||[]).length){ stage.childLetter=prodForm.children[0].letter; }
   var d=salamiLabelData(prodForm, stage);
+  var dCust=customerLabelData(prodForm, stage);
+  var labelType='internal';
   if(stage.labelOrientation==null) stage.labelOrientation='landscape';
   if(stage.perString==null) stage.perString=5;
   var back=document.createElement('div');
@@ -3193,7 +3262,7 @@ function openSalamiLabelDialog(prodForm, stage){
   card.appendChild(prev);
   var hint=document.createElement('p'); hint.textContent='Press & hold the label to Save to Photos'; hint.style.cssText='text-align:center;color:#999;font-size:12px;margin:0 0 14px;'; card.appendChild(hint);
   var curFile=null;
-  function labelFileName(){ return 'label_'+(d.batchCode||'')+(stage.childLetter||'')+'.png'; }
+  function labelFileName(){ return (labelType==='customer'?'custlabel_':'label_')+(d.batchCode||'')+(stage.childLetter||'')+'.png'; }
   function labelCountText(){
     var n=stage.count||0, per=stage.perString||5;
     if(!n) return 'Add the piece count on the stage to get the number of labels.';
@@ -3201,12 +3270,19 @@ function openSalamiLabelDialog(prodForm, stage){
     return n+' salami \u00f7 '+per+' per string  \u2192  print '+strings+' label'+(strings===1?'':'s');
   }
   function refresh(){
-    var c=renderLabelCanvas(d, stage.labelOrientation, 4);
+    var c = (labelType==='customer') ? renderCustomerLabelCanvas(dCust, stage.labelOrientation, 4) : renderLabelCanvas(d, stage.labelOrientation, 4);
     prev.src=c.toDataURL('image/png');
     prev.style.maxWidth = (stage.labelOrientation==='portrait')?'200px':'300px';
     c.toBlob(function(b){ try{ curFile=new File([b], labelFileName(), {type:'image/png'}); }catch(e){ curFile=null; } }, 'image/png');
     countLine.textContent=labelCountText();
   }
+  var trow=document.createElement('div'); trow.style.cssText='display:flex;gap:8px;margin-bottom:10px;';
+  function mkType(txt,val){ var b=document.createElement('button'); b.textContent=txt;
+    b._paint=function(){ var on=labelType===val; b.style.cssText='flex:1;padding:10px;border-radius:8px;cursor:pointer;font-size:14px;border:1px solid '+(on?'#18342A':'#ccc')+';background:'+(on?'#eef5ea':'#fff')+';color:'+(on?'#18342A':'#444')+';font-weight:'+(on?'600':'400')+';'; };
+    b.addEventListener('click', function(){ labelType=val; paintType(); if(val==='customer'){ ensureSerifFonts(function(){ refresh(); }); } refresh(); }); return b; }
+  var tb1=mkType('Internal','internal'), tb2=mkType('Customer','customer');
+  function paintType(){ tb1._paint(); tb2._paint(); }
+  trow.appendChild(tb1); trow.appendChild(tb2); card.appendChild(trow); paintType();
   var orow=document.createElement('div'); orow.style.cssText='display:flex;gap:8px;margin-bottom:12px;';
   function mkOrient(txt,val){ var b=document.createElement('button'); b.textContent=txt;
     b._paint=function(){ var on=stage.labelOrientation===val; b.style.cssText='flex:1;padding:10px;border-radius:8px;cursor:pointer;font-size:14px;border:1px solid '+(on?'#27500a':'#ccc')+';background:'+(on?'#eef5ea':'#fff')+';color:'+(on?'#27500a':'#444')+';font-weight:'+(on?'600':'400')+';'; };
@@ -4220,6 +4296,26 @@ function renderStageForm() {
   }
 
   const t = prodStageEdit.type;
+  // GUARD: never let the Fat calculator overwrite children that already have
+  // real work on them. If this run is already underway, send Robert to a new run
+  // (children carry on lettering: C, D, …) instead of silently wiping A, B.
+  if (t === 'fatcalc') {
+    var _committedKids = (prodForm.children || []).filter(function(c){ return c.minced || c.stuffed || (c.recipe && c.recipe.lines && c.recipe.lines.length) || c.stuffCount; });
+    if (_committedKids.length) {
+      const w = div('card');
+      w.appendChild(el('h3', {style:'font-size:17px;font-weight:700;margin:0 0 10px;color:#a32d2d;'}, '\u26a0 This run already has children'));
+      w.appendChild(p('', 'This run already has ' + _committedKids.length + ' child' + (_committedKids.length>1?'ren':'') + ' on the go (' + _committedKids.map(function(c){return c.code;}).join(', ') + '). Re-doing the Fat calculator here would wipe them.'));
+      w.appendChild(p('', 'To process more meat from this batch, start a separate run — the new children carry straight on (C, D, …).'));
+      const goNew = btn('btn-primary', 'Start a new run for this batch', function(){ var bc = prodForm.batchCode, sp = prodForm.speciesName; prodStageEdit = null; prodForm = null; prodEditId = null; actuallyStartRun(bc, sp); });
+      goNew.style.marginTop = '6px';
+      w.appendChild(goNew);
+      const back = btn('', 'Back to this run', function(){ prodStageEdit = null; renderProductionForm(); });
+      back.style.marginLeft = '8px';
+      w.appendChild(back);
+      v.appendChild(w);
+      return;
+    }
+  }
   const card = div('card');
   const typeName = {defrost:'Defrost day', fatcalc:'Fat calculator', recipe:'Recipe', mince:'Prep, wash & mince day', stuff_hang:'Stuffing & hanging day'}[t] || t;
   card.appendChild(el('h3', {style:'font-size:16px;font-weight:600;margin:0 0 12px;'}, typeName));
@@ -4429,7 +4525,7 @@ function renderStageForm() {
       prodStageEdit.lines.forEach(function(line, idx){
         if (line.amount == null) line.amount = suggestG(line);
         const row = div(''); row.style.cssText = 'background:#f9fdf8;border:1px solid #d0e8c8;border-radius:8px;padding:8px 10px;';
-        if (idx < 4) {
+        if (idx < 4 && !line.custom) {
           const r1 = div(''); r1.style.cssText = 'display:flex;align-items:center;gap:8px;';
           r1.appendChild(el('span', {style:'flex:1;font-size:14px;'}, line.name));
           if (line.type === 'asneeded') {
@@ -4490,7 +4586,7 @@ function renderStageForm() {
 
       // Add ingredient
       const addBtn = btn('btn-secondary', '+ Add ingredient', function(){
-        prodStageEdit.lines.push({name:'', type:'perkg', value:0, unit:'g', amount:null});
+        prodStageEdit.lines.push({name:'', type:'ratio', value:0, unit:'g', amount:null, refAmt:null, refMix:Math.round(childTotal*1000)||15625, custom:true});
         renderStageForm();
       });
       addBtn.style.cssText = 'margin-top:10px;background:#eef5ea;color:#27500a;border:1px solid #d0e8c8;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:14px;';
@@ -4695,6 +4791,9 @@ function renderStageForm() {
     }
     if (t === 'fatcalc' && (!prodStageEdit.meatKg || prodStageEdit.meatKg <= 0 || !prodStageEdit.fatPercent || prodStageEdit.fatPercent <= 0)) {
       showToast('Enter a meat weight and fat % first'); return;
+    }
+    if (t === 'fatcalc' && (prodForm.children || []).some(function(c){ return c.minced || c.stuffed || (c.recipe && c.recipe.lines && c.recipe.lines.length) || c.stuffCount; })) {
+      showToast('This run already has children in progress — start a new run for this batch instead (Back → Start a new production run).'); return;
     }
     if (t === 'recipe') {
       if (!prodForm.children || prodForm.children.length === 0) { showToast('Do the Fat calculator first to create children'); return; }
