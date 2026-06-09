@@ -4035,6 +4035,14 @@ function renderProductionForm() {
       const bits = [c.meatKg + 'kg meat + ' + c.fatKg + 'kg fat = ' + c.totalKg + 'kg'];
       if (c.recipe && c.recipe.name) bits.push(c.recipe.name);
       row.appendChild(el('p', {style:'font-size:12px;color:#666;margin:0 0 4px;'}, bits.join(' \u00b7 ')));
+      (function(){
+        var md = [];
+        if (c.plateMeat && c.plateMeat.length === 2) md.push('meat plates ' + c.plateMeat[0] + '/' + c.plateMeat[1]);
+        if (c.plateFat && c.plateFat.length === 2) md.push('fat plates ' + c.plateFat[0] + '/' + c.plateFat[1]);
+        if (c.skinType) md.push('skin ' + c.skinType + (c.skinCost ? ' (' + c.skinCost + ')' : ''));
+        if (c.labourHrs && c.labourHrs.length) md.push('labour ' + c.labourHrs.join('/') + ' h');
+        if (md.length) row.appendChild(el('p', {style:'font-size:11px;color:#8A6D2F;margin:0 0 4px;'}, '\u2699 ' + md.join(' \u00b7 ')));
+      })();
       const dots = div(''); dots.style.cssText='display:flex;gap:5px;margin:0 0 8px;align-items:center;';
       for (var i=1;i<=4;i++){ var doneStep=(pr.step>4)||(i<pr.step); var curStep=(i===pr.step && pr.step<=4); dots.appendChild(el('span',{style:'width:9px;height:9px;border-radius:50%;background:'+(doneStep?'#27500a':(curStep?'#9ec77f':'#dfe7d8'))+';'})); }
       dots.appendChild(el('span',{style:'font-size:11px;color:#777;margin-left:4px;'}, pr.step>=6 ? 'Vac-packed \u2713' : (pr.step>=5 ? ('Hung \u2713' + (c.stuffFinish ? ' \u00b7 ready ' + fmtDate(c.stuffFinish) : '')) : ('Next: ' + STEP_LABELS[pr.step-1]))));
@@ -4403,6 +4411,21 @@ function renderStageForm() {
         else if (line.type === 'ratio') { line.value = grams / (childTotal * 1000); line.refAmt = grams; line.refMix = Math.round(childTotal * 1000); }
       }
 
+      // 100 g powder quality guide: a single FLAVOUR/dry powder over ~100 g per
+      // 12.5 kg meat tends to make the salami crumbly. Salt, sugar, enzyme,
+      // garlic (fresh) and the alcohol medium are exempt. Design-time hint only.
+      function powderIsFlavour(l){
+        var n = (l && l.name ? l.name.toString().toLowerCase() : '');
+        if (!n) return false;
+        if (n.indexOf('salt') >= 0 || n.indexOf('sugar') >= 0 || n.indexOf('dextrose') >= 0) return false;
+        if (n.indexOf('enzyme') >= 0 || n.indexOf('flora') >= 0 || n.indexOf('culture') >= 0 || n.indexOf('starter') >= 0) return false;
+        if (n.indexOf('alcohol') >= 0 || n.indexOf('wine') >= 0 || n.indexOf('wash') >= 0) return false;
+        if (n.indexOf('garlic') >= 0) return false;
+        return l.type !== 'asneeded';
+      }
+      var _meatRef = (child.meatKg && child.meatKg > 0) ? child.meatKg : (childTotal > 0 ? childTotal / 1.25 : 0);
+      var powderThreshold = _meatRef > 0 ? Math.round(100 * (_meatRef / 12.5)) : 100;
+
       prodStageEdit.lines.forEach(function(line, idx){
         if (line.amount == null) line.amount = suggestG(line);
         const row = div(''); row.style.cssText = 'background:#f9fdf8;border:1px solid #d0e8c8;border-radius:8px;padding:8px 10px;';
@@ -4455,6 +4478,11 @@ function renderStageForm() {
             r2.appendChild(amtInp); r2.appendChild(el('span',{style:'color:#888;'}, (line.unit||'g')+' \u00b7 scales'));
           }
           row.appendChild(r2);
+        }
+        if (powderIsFlavour(line) && line.amount != null && line.amount > powderThreshold) {
+          const warn = div(''); warn.style.cssText = 'margin-top:6px;background:#fdf3e3;border:1px solid #e9c886;border-radius:6px;padding:6px 9px;font-size:12px;color:#8a5a00;line-height:1.4;';
+          warn.textContent = '\u26a0 heavy \u2014 ' + line.amount + ' g is over the ~' + powderThreshold + ' g guide for this batch (100 g per 12.5 kg meat). Too much dry powder can make the salami crumbly.';
+          row.appendChild(warn);
         }
         tbl.appendChild(row);
       });
