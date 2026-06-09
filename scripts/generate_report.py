@@ -631,6 +631,11 @@ if production_records:
                 lines = rcp.get('lines', []) if isinstance(rcp, dict) else []
                 if lines:
                     story.append(Paragraph('<b>Child ' + clean(str(c.get('code',''))) + ' — ' + clean(rcp.get('name','')) + '</b>', ParagraphStyle('rch', fontSize=8, fontName=SERIFB, textColor=GOLDLBL, spaceAfter=2, spaceBefore=4, keepWithNext=1)))
+                    _pm = c.get('plateMeat'); _pf = c.get('plateFat'); _plate_bits = []
+                    if _pm and len(_pm) == 2: _plate_bits.append(f"meat 20mm {_pm[0]}% / 6mm {_pm[1]}%")
+                    if _pf and len(_pf) == 2: _plate_bits.append(f"fat 20mm {_pf[0]}% / 4mm {_pf[1]}%")
+                    if _plate_bits:
+                        story.append(Paragraph('Mince plates — ' + ' · '.join(_plate_bits), ParagraphStyle('plt', fontSize=7.5, fontName=SERIF, textColor=GOLDLBL, spaceAfter=2, keepWithNext=1)))
                     irows = [['Ingredient', 'Amount', 'Added']]
                     for ln in lines:
                         amt = ln.get('amount')
