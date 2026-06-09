@@ -3208,28 +3208,42 @@ function customerLabelData(prodForm, stage){
 }
 function drawCustomerLabel(ctx,W,H,d){
   var DISP='"Cormorant Garamond",Georgia,serif', BODY='"EB Garamond",Georgia,serif';
-  ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);ctx.fillStyle='#000';ctx.textAlign='center';
-  var pad=Math.round(W*0.07), iw=W-pad*2, y=Math.round(H*0.085);
-  ctx.font='500 '+Math.round(H*0.062)+'px '+DISP; if(ctx.letterSpacing!==undefined)try{ctx.letterSpacing=Math.round(W*0.012)+'px';}catch(e){}
-  ctx.fillText('ARTISAN BY ROBERT', W/2, y); if(ctx.letterSpacing!==undefined)try{ctx.letterSpacing='0px';}catch(e){}
-  y+=Math.round(H*0.03); ctx.strokeStyle='#000'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(W*0.30,y); ctx.lineTo(W*0.70,y); ctx.stroke();
-  y+=Math.round(H*0.055);
-  var tf=Math.round(H*0.155), tl=null;
-  for(; tf>=Math.round(H*0.10); tf--){ ctx.font='600 '+tf+'px '+DISP; var ws=(d.title||'').split(' '),ln=[],cur=''; for(var i=0;i<ws.length;i++){var t=cur?cur+' '+ws[i]:ws[i]; if(ctx.measureText(t).width<=iw||!cur)cur=t; else{ln.push(cur);cur=ws[i];}} if(cur)ln.push(cur); if(ln.length<=2&&ln.every(function(l){return ctx.measureText(l).width<=iw;})){tl=ln;break;} }
-  if(!tl)tl=[d.title||''];
-  for(var k=0;k<tl.length;k++){ y+=tf; ctx.font='600 '+tf+'px '+DISP; ctx.fillText(tl[k],W/2,y); if(k<tl.length-1)y+=Math.round(tf*0.12); }
-  if(d.sub){ y+=Math.round(H*0.092); ctx.font='italic 400 '+Math.round(H*0.072)+'px '+BODY; ctx.fillText(d.sub,W/2,y); }
-  y+=Math.round(H*0.052); ctx.strokeStyle='#000'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(pad,y); ctx.lineTo(W-pad,y); ctx.stroke(); y+=Math.round(H*0.05);
-  ctx.textAlign='left';
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);ctx.fillStyle='#000';
+  var pad=Math.round(W*0.06), iw=W-pad*2;
+  function fitW(text, weight, fam, cap){ var fz=cap; for(; fz>=8; fz--){ ctx.font=weight+' '+fz+'px '+fam; if(ctx.measureText(text).width<=iw) break; } return fz; }
+  var WM='ARTISAN BY ROBERT';
+  var wmFs=fitW(WM,'500',DISP,Math.round(H*0.16));
+  var estFs=d.sub?fitW(d.sub,'italic 400',BODY,Math.round(H*0.15)):0;
+  // title (Cormorant) up to 2 lines, fit width
+  var tf=Math.round(H*0.185), titleLines=[d.title||''];
+  for(; tf>=Math.round(H*0.10); tf--){ ctx.font='600 '+tf+'px '+DISP; var ws=(d.title||'').split(' '),ln=[],cur=''; for(var i=0;i<ws.length;i++){var t=cur?cur+' '+ws[i]:ws[i]; if(ctx.measureText(t).width<=iw||!cur)cur=t; else{ln.push(cur);cur=ws[i];}} if(cur)ln.push(cur); if(ln.length<=2&&ln.every(function(l){return ctx.measureText(l).width<=iw;})){titleLines=ln;break;} }
+  // ingredients tokens + layout
   var toks=('Ingredients: '+(d.ingredients||[]).join(', ')).split(' ').map(function(w){return {t:w,b:_isAllergenWord(w)};});
-  var fs=Math.round(H*0.078), lines;
-  function layout(fsz){ var L=[[]],lw=0; ctx.font=fsz+'px '+BODY; var spc=ctx.measureText(' ').width;
+  function layoutIng(fsz){ var L=[[]],lw=0; ctx.font=fsz+'px '+BODY; var spc=ctx.measureText(' ').width;
     for(var i=0;i<toks.length;i++){ ctx.font=(toks[i].b?'500 ':'')+fsz+'px '+BODY; var ww=ctx.measureText(toks[i].t).width; var add=(L[L.length-1].length?spc:0)+ww; if(lw+add>iw&&L[L.length-1].length){L.push([]);lw=0;add=ww;} L[L.length-1].push(toks[i]); lw+=add; } return L; }
-  while(fs>=Math.round(H*0.05)){ lines=layout(fs); if(y+lines.length*(fs*1.32)<=H-pad)break; fs--; }
-  lines=layout(fs);
-  for(var li=0;li<lines.length;li++){ y+=fs; var x=pad; ctx.font=fs+'px '+BODY; var spc=ctx.measureText(' ').width;
-    for(var wi=0;wi<lines[li].length;wi++){ var tk=lines[li][wi]; ctx.font=(tk.b?'500 ':'')+fs+'px '+BODY; if(wi>0)x+=spc; ctx.fillText(tk.t,x,y); x+=ctx.measureText(tk.t).width; }
-    y+=Math.round(fs*0.32); }
+  // gaps
+  var gWordRule=Math.round(H*0.028), gRuleTitle=Math.round(H*0.045), gTitleLine=Math.round(tf*0.10), gTitleEst=Math.round(H*0.05), gEstRule=Math.round(H*0.04), gRuleIng=Math.round(H*0.04);
+  var titleH=titleLines.length*tf+(titleLines.length-1)*gTitleLine;
+  var headerH=wmFs+gWordRule+gRuleTitle+titleH+(estFs?(gTitleEst+estFs):0)+gEstRule+gRuleIng;
+  var availIng=(H-2*pad)-headerH;
+  // fit ingredients to FILL the remaining space: grow for short lists, shrink for long; never overflow
+  var maxIng=Math.round(H*0.085), minIng=Math.max(6,Math.round(H*0.03));
+  var ingFs=minIng, ingLines=layoutIng(minIng), ingLH=Math.round(minIng*1.32);
+  for(var ff=maxIng; ff>=minIng; ff--){ var LL=layoutIng(ff); var lh=Math.round(ff*1.32); if(LL.length*lh<=availIng || ff===minIng){ ingFs=ff; ingLines=LL; ingLH=lh; break; } }
+  var total=headerH+ingLines.length*ingLH;
+  var y=pad+Math.max(0, Math.round(((H-2*pad)-total)/2));
+  // wordmark
+  ctx.fillStyle='#000'; ctx.textAlign='center'; ctx.font='500 '+wmFs+'px '+DISP; y+=wmFs; ctx.fillText(WM, W/2, y);
+  y+=gWordRule; ctx.strokeStyle='#000'; ctx.lineWidth=Math.max(1.5,Math.round(H*0.008)); ctx.beginPath(); ctx.moveTo(W*0.16,y); ctx.lineTo(W*0.84,y); ctx.stroke();
+  y+=gRuleTitle;
+  for(var k=0;k<titleLines.length;k++){ ctx.font='600 '+tf+'px '+DISP; y+=tf; ctx.fillText(titleLines[k],W/2,y); if(k<titleLines.length-1)y+=gTitleLine; }
+  if(estFs){ y+=gTitleEst; ctx.font='italic 400 '+estFs+'px '+BODY; y+=estFs; ctx.fillText(d.sub,W/2,y); }
+  y+=gEstRule; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(pad,y); ctx.lineTo(W-pad,y); ctx.stroke();
+  y+=gRuleIng;
+  ctx.textAlign='left';
+  for(var li=0;li<ingLines.length;li++){ var by=y+ingFs; var x=pad; ctx.font=ingFs+'px '+BODY; var spc=ctx.measureText(' ').width;
+    for(var wi=0;wi<ingLines[li].length;wi++){ var tk=ingLines[li][wi]; ctx.font=(tk.b?'500 ':'')+ingFs+'px '+BODY; if(wi>0)x+=spc; ctx.fillText(tk.t,x,by); x+=ctx.measureText(tk.t).width; }
+    y+=ingLH; }
 }
 function renderCustomerLabelCanvas(d, orientation, scale){
   scale=scale||4; var W=orientation==='portrait'?240:360, H=orientation==='portrait'?360:240;
@@ -3260,7 +3274,7 @@ function openSalamiLabelDialog(prodForm, stage){
   var prev=document.createElement('img');
   prev.style.cssText='display:block;width:100%;max-width:300px;margin:0 auto 6px;border:1px solid #ddd;border-radius:6px;background:#fff;';
   card.appendChild(prev);
-  var hint=document.createElement('p'); hint.textContent='Press & hold the label to Save to Photos'; hint.style.cssText='text-align:center;color:#999;font-size:12px;margin:0 0 14px;'; card.appendChild(hint);
+  var hint=document.createElement('p'); hint.textContent='Use the green button below \u2192 then tap Save Image'; hint.style.cssText='text-align:center;color:#999;font-size:12px;margin:0 0 14px;'; card.appendChild(hint);
   var curFile=null;
   function labelFileName(){ return (labelType==='customer'?'custlabel_':'label_')+(d.batchCode||'')+(stage.childLetter||'')+'.png'; }
   function labelCountText(){
@@ -3297,13 +3311,24 @@ function openSalamiLabelDialog(prodForm, stage){
   psInp.addEventListener('input', function(e){ stage.perString=parseInt(e.target.value)||5; refresh(); });
   psWrap.appendChild(psLbl); psWrap.appendChild(psInp); card.appendChild(psWrap);
   var countLine=document.createElement('p'); countLine.style.cssText='margin:0 0 16px;font-size:13px;color:#185fa5;'; card.appendChild(countLine);
-  var shareBtn=document.createElement('button'); shareBtn.textContent='Share / Save label';
+  function dataURLtoFile(durl,name){ var a=durl.split(','),m=(a[0].match(/:(.*?);/)||[])[1]||'image/png',bs=atob(a[1]),n=bs.length,u=new Uint8Array(n); while(n--){u[n]=bs.charCodeAt(n);} return new File([u],name,{type:m}); }
+  var shareBtn=document.createElement('button'); shareBtn.textContent='Save label to Photos';
   shareBtn.style.cssText='width:100%;padding:15px;border:none;border-radius:10px;background:#27500a;color:#fff;font-size:17px;font-weight:600;cursor:pointer;';
   shareBtn.addEventListener('click', async function(){
+    var f=null;
+    try{ f = curFile || dataURLtoFile(prev.src, labelFileName()); }catch(e){ f=null; }
     try{
-      if(curFile && navigator.canShare && navigator.canShare({files:[curFile]})){ await navigator.share({files:[curFile], title:'Salami label'}); }
-      else { var w=window.open(); if(w){ w.document.write('<img src="'+prev.src+'" style="max-width:100%">'); } showToast('Press & hold the image to Save to Photos, then open Print Master'); }
-    }catch(e){}
+      if(f && navigator.canShare && navigator.canShare({files:[f]})){
+        await navigator.share({files:[f], title:'Salami label'});
+        return;
+      }
+    }catch(e){ if(e && e.name==='AbortError') return; }
+    // Fallback: open the image full-screen in Safari so it can be long-pressed
+    try{
+      var w=window.open('','_blank');
+      if(w){ w.document.write('<title>Label</title><body style="margin:0;padding:16px;background:#fff;text-align:center;font-family:sans-serif"><img src="'+prev.src+'" style="max-width:100%;border:1px solid #ddd"><p style="color:#444">Press &amp; hold the image, then Save to Photos</p></body>'); w.document.close(); }
+      else { showToast('Pop-up blocked. Screenshot the label, then import to Print Master.'); }
+    }catch(e){ showToast('Screenshot the label, then import it to Print Master.'); }
   });
   card.appendChild(shareBtn);
   var note=document.createElement('p'); note.style.cssText='margin:12px 0 0;font-size:12px;color:#888;line-height:1.5;';
