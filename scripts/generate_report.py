@@ -473,7 +473,7 @@ for _c in daily_checks:
     if _c.get('date'): _workday_dates.add(_c.get('date'))
 for _r in production_records:
     for _st in (_r.get('stages', []) or []):
-        if _st.get('type') == 'mince' and _st.get('date'): _workday_dates.add(_st.get('date'))
+        if _st.get('type') in ('mince','mix') and _st.get('date'): _workday_dates.add(_st.get('date'))
 _daily_dates = set(r.get('date','') for r in daily_records)
 # build a combined, de-duplicated day list: real daily records + synthetic work-day rows
 _day_rows = []
@@ -524,7 +524,7 @@ def _gather_mince_days():
     for rec in production_records:
         batch = rec.get('batchCode', '')
         for st in (rec.get('stages', []) or []):
-            if st.get('type') == 'mince':
+            if st.get('type') in ('mince','mix'):
                 days.append((st.get('date', ''), batch, st))
     days.sort(key=lambda x: x[0], reverse=True)
     return days
@@ -631,11 +631,6 @@ if production_records:
                 lines = rcp.get('lines', []) if isinstance(rcp, dict) else []
                 if lines:
                     story.append(Paragraph('<b>Child ' + clean(str(c.get('code',''))) + ' — ' + clean(rcp.get('name','')) + '</b>', ParagraphStyle('rch', fontSize=8, fontName=SERIFB, textColor=GOLDLBL, spaceAfter=2, spaceBefore=4, keepWithNext=1)))
-                    _pm = c.get('plateMeat'); _pf = c.get('plateFat'); _plate_bits = []
-                    if _pm and len(_pm) == 2: _plate_bits.append(f"meat 20mm {_pm[0]}% / 6mm {_pm[1]}%")
-                    if _pf and len(_pf) == 2: _plate_bits.append(f"fat 20mm {_pf[0]}% / 4mm {_pf[1]}%")
-                    if _plate_bits:
-                        story.append(Paragraph('Mince plates — ' + ' · '.join(_plate_bits), ParagraphStyle('plt', fontSize=7.5, fontName=SERIF, textColor=GOLDLBL, spaceAfter=2, keepWithNext=1)))
                     irows = [['Ingredient', 'Amount', 'Added']]
                     for ln in lines:
                         amt = ln.get('amount')
@@ -700,6 +695,15 @@ if production_records:
                             detail = f"meat {mk}kg + fat {fk}kg = {tk}kg total"
                         else:
                             detail = f"meat {mk}kg minced" if mk else 'minced'
+                elif stage == 'mix':
+                    cl = st_rec.get('childLetter')
+                    ch = next((c for c in (rec.get('children',[]) or []) if c.get('letter') == cl), None) if cl else None
+                    nm = (ch.get('recipe') or {}).get('name') if ch else None
+                    who = nm if nm else (f"Child {cl}" if cl else 'child')
+                    detail = f"{who} · " + ('blend mixed into meat' if st_rec.get('mixDone') else 'blend not yet mixed')
+                    skipped = [o.get('text','') for o in (st_rec.get('opening',[]) or []) if not o.get('done')]
+                    skipped += [o.get('text','') for o in (st_rec.get('closing',[]) or []) if not o.get('done')]
+                    if skipped: detail += ' · SKIPPED: ' + '; '.join(skipped)
                 elif stage == 'stuff_hang':
                     n = st_rec.get('count','')
                     ug = st_rec.get('unitGrams','')
@@ -716,7 +720,7 @@ if production_records:
                     if st_rec.get('finishDate'):
                         bits.append(f"est. ready {st_rec.get('finishDate')}")
                     detail = ' · '.join(bits)
-                stage_label = {'fatcalc':'Fat Calculator','saltcalc':'Salt Calculator','stuff_hang':'Stuffing & Hanging','mince':'Mince Day','defrost':'Defrost'}.get(stage, stage.replace('_',' ').title())
+                stage_label = {'fatcalc':'Fat Calculator','saltcalc':'Salt Calculator','stuff_hang':'Stuffing & Hanging','mince':'Mince Day','mix':'Mix into Meat','defrost':'Defrost'}.get(stage, stage.replace('_',' ').title())
                 detail_cell = Paragraph(clean(detail), ParagraphStyle('sdc', fontSize=7, leading=9)) if detail else ''
                 notes_cell = Paragraph(clean(st_rec.get('notes','')), ParagraphStyle('snc', fontSize=7, leading=9)) if st_rec.get('notes') else ''
                 srows.append([dstr, stage_label, detail_cell, notes_cell])
