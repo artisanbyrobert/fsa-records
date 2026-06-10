@@ -19,7 +19,7 @@
   );
 })();
 </script>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=EB+Garamond:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#FBF8F1;color:#2C2A26;font-size:14px;line-height:1.5;}
@@ -3215,51 +3215,43 @@ function customerLabelData(prodForm, stage){
 }
 function drawCustomerLabel(ctx,W,H,d){
   var DISP='"Cormorant Garamond",Georgia,serif', BODY='"EB Garamond",Georgia,serif';
-  ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);ctx.fillStyle='#000';
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);ctx.fillStyle='#000';ctx.textBaseline='alphabetic';
   var pad=Math.round(W*0.06), iw=W-pad*2;
-  function fitW(text, weight, fam, cap){ var fz=cap; for(; fz>=8; fz--){ ctx.font=weight+' '+fz+'px '+fam; if(ctx.measureText(text).width<=iw) break; } return fz; }
-  var WM='ARTISAN BY ROBERT';
-  var wmFs=fitW(WM,'500',DISP,Math.round(H*0.16));
-  var estFs=d.sub?fitW(d.sub,'italic 400',BODY,Math.round(H*0.15)):0;
-  // title (Cormorant) up to 2 lines, fit width
-  var tf=Math.round(H*0.185), titleLines=[d.title||''];
-  for(; tf>=Math.round(H*0.10); tf--){ ctx.font='600 '+tf+'px '+DISP; var ws=(d.title||'').split(' '),ln=[],cur=''; for(var i=0;i<ws.length;i++){var t=cur?cur+' '+ws[i]:ws[i]; if(ctx.measureText(t).width<=iw||!cur)cur=t; else{ln.push(cur);cur=ws[i];}} if(cur)ln.push(cur); if(ln.length<=2&&ln.every(function(l){return ctx.measureText(l).width<=iw;})){titleLines=ln;break;} }
-  // ingredients tokens + layout
-  var toks=('Ingredients: '+(d.ingredients||[]).join(', ')).split(' ').map(function(w){return {t:w,b:_isAllergenWord(w)};});
-  function layoutIng(fsz){ var L=[[]],lw=0; ctx.font=fsz+'px '+BODY; var spc=ctx.measureText(' ').width;
-    for(var i=0;i<toks.length;i++){ ctx.font=(toks[i].b?'500 ':'')+fsz+'px '+BODY; var ww=ctx.measureText(toks[i].t).width; var add=(L[L.length-1].length?spc:0)+ww; if(lw+add>iw&&L[L.length-1].length){L.push([]);lw=0;add=ww;} L[L.length-1].push(toks[i]); lw+=add; } return L; }
-  // gaps
-  var gWordRule=Math.round(H*0.028), gRuleTitle=Math.round(H*0.045), gTitleLine=Math.round(tf*0.10), gTitleEst=Math.round(H*0.05), gEstRule=Math.round(H*0.04), gRuleIng=Math.round(H*0.04);
-  var titleH=titleLines.length*tf+(titleLines.length-1)*gTitleLine;
-  var headerH=wmFs+gWordRule+gRuleTitle+titleH+(estFs?(gTitleEst+estFs):0)+gEstRule+gRuleIng;
+  function fitW(text,weight,fam,cap,min){ var fz=cap; for(; fz>=(min||8); fz--){ ctx.font=weight+' '+fz+'px '+fam; if(ctx.measureText(text).width<=iw) break; } return fz; }
+  function wrap(text,weight,fam,fz){ ctx.font=weight+' '+fz+'px '+fam; var ws=text.split(' '),L=[],cur=''; for(var i=0;i<ws.length;i++){var t=cur?cur+' '+ws[i]:ws[i]; if(ctx.measureText(t).width<=iw||!cur)cur=t; else{L.push(cur);cur=ws[i];}} if(cur)L.push(cur); return L; }
+  var wmFs=fitW('ARTISAN BY ROBERT','500',DISP,Math.round(H*0.05),12);
+  var tCap=Math.round(H*0.075), tMin=Math.round(H*0.042), tf=tCap, titleLines;
+  for(; tf>=tMin; tf--){ titleLines=wrap(d.title||'','600',DISP,tf); if(titleLines.length<=2) break; }
+  var estFs=d.sub?fitW(d.sub,'italic 400',BODY,Math.round(H*0.052),11):0;
+  var gWR=Math.round(H*0.016), gRT=Math.round(H*0.03), gTL=Math.round(tf*0.12), gTE=Math.round(H*0.022), gER=Math.round(H*0.028), gRI=Math.round(H*0.03);
+  var titleH=titleLines.length*tf+(titleLines.length-1)*gTL;
+  var headerH=wmFs+gWR+gRT+titleH+(estFs?(gTE+estFs):0)+gER+gRI;
   var availIng=(H-2*pad)-headerH;
-  // fit ingredients to FILL the remaining space: grow for short lists, shrink for long; never overflow
-  var maxIng=Math.round(H*0.085), minIng=Math.max(6,Math.round(H*0.03));
-  var ingFs=minIng, ingLines=layoutIng(minIng), ingLH=Math.round(minIng*1.32);
-  for(var ff=maxIng; ff>=minIng; ff--){ var LL=layoutIng(ff); var lh=Math.round(ff*1.32); if(LL.length*lh<=availIng || ff===minIng){ ingFs=ff; ingLines=LL; ingLH=lh; break; } }
-  var total=headerH+ingLines.length*ingLH;
-  var y=pad+Math.max(0, Math.round(((H-2*pad)-total)/2));
-  // wordmark
-  ctx.fillStyle='#000'; ctx.textAlign='center'; ctx.font='500 '+wmFs+'px '+DISP; y+=wmFs; ctx.fillText(WM, W/2, y);
-  y+=gWordRule; ctx.strokeStyle='#000'; ctx.lineWidth=Math.max(1.5,Math.round(H*0.008)); ctx.beginPath(); ctx.moveTo(W*0.16,y); ctx.lineTo(W*0.84,y); ctx.stroke();
-  y+=gRuleTitle;
-  for(var k=0;k<titleLines.length;k++){ ctx.font='600 '+tf+'px '+DISP; y+=tf; ctx.fillText(titleLines[k],W/2,y); if(k<titleLines.length-1)y+=gTitleLine; }
-  if(estFs){ y+=gTitleEst; ctx.font='italic 400 '+estFs+'px '+BODY; y+=estFs; ctx.fillText(d.sub,W/2,y); }
-  y+=gEstRule; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(pad,y); ctx.lineTo(W-pad,y); ctx.stroke();
-  y+=gRuleIng;
+  var toks=('Ingredients: '+(d.ingredients||[]).join(', ')).split(' ').map(function(w){return {t:w,b:_isAllergenWord(w)};});
+  function layoutIng(fsz){ var L=[[]],lw=0; for(var i=0;i<toks.length;i++){ ctx.font=(toks[i].b?'700 ':'400 ')+fsz+'px '+BODY; var ww=ctx.measureText(toks[i].t).width; ctx.font='400 '+fsz+'px '+BODY; var spc=ctx.measureText(' ').width; var add=(L[L.length-1].length?spc:0)+ww; if(lw+add>iw&&L[L.length-1].length){L.push([]);lw=0;add=ww;} L[L.length-1].push(toks[i]); lw+=add; } return L; }
+  var maxIng=Math.round(H*0.085), minIng=Math.round(H*0.036);
+  var ingFs=minIng, ingLines=layoutIng(minIng), ingLH=Math.round(minIng*1.34);
+  for(var ff=maxIng; ff>=minIng; ff--){ var LL=layoutIng(ff); var lh=Math.round(ff*1.34); if(LL.length*lh<=availIng){ ingFs=ff; ingLines=LL; ingLH=lh; break; } }
+  var y=pad+Math.max(0, Math.round(((H-2*pad)-(headerH+ingLines.length*ingLH))/2));
+  ctx.fillStyle='#000'; ctx.textAlign='center'; ctx.font='500 '+wmFs+'px '+DISP; y+=wmFs; ctx.fillText('ARTISAN BY ROBERT', W/2, y);
+  y+=gWR; ctx.strokeStyle='#000'; ctx.lineWidth=Math.max(1.2,Math.round(H*0.006)); ctx.beginPath(); ctx.moveTo(W*0.30,y); ctx.lineTo(W*0.70,y); ctx.stroke();
+  y+=gRT;
+  for(var k=0;k<titleLines.length;k++){ ctx.font='600 '+tf+'px '+DISP; y+=tf; ctx.fillText(titleLines[k],W/2,y); if(k<titleLines.length-1)y+=gTL; }
+  if(estFs){ y+=gTE; ctx.font='italic 400 '+estFs+'px '+BODY; y+=estFs; ctx.fillText(d.sub,W/2,y); }
+  y+=gER; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(pad,y); ctx.lineTo(W-pad,y); ctx.stroke();
+  y+=gRI;
   ctx.textAlign='left';
-  for(var li=0;li<ingLines.length;li++){ var by=y+ingFs; var x=pad; ctx.font=ingFs+'px '+BODY; var spc=ctx.measureText(' ').width;
-    for(var wi=0;wi<ingLines[li].length;wi++){ var tk=ingLines[li][wi]; ctx.font=(tk.b?'500 ':'')+ingFs+'px '+BODY; if(wi>0)x+=spc; ctx.fillText(tk.t,x,by); x+=ctx.measureText(tk.t).width; }
-    y+=ingLH; }
+  for(var li=0;li<ingLines.length;li++){ var by=y+ingFs; var x=pad; for(var wi=0;wi<ingLines[li].length;wi++){ var tk=ingLines[li][wi]; ctx.font=(tk.b?'700 ':'400 ')+ingFs+'px '+BODY; if(wi>0){ctx.font='400 '+ingFs+'px '+BODY; x+=ctx.measureText(' ').width; ctx.font=(tk.b?'700 ':'400 ')+ingFs+'px '+BODY;} ctx.fillText(tk.t,x,by); x+=ctx.measureText(tk.t).width; } y+=ingLH; }
 }
 function renderCustomerLabelCanvas(d, orientation, scale){
-  scale=scale||4; var W=orientation==='portrait'?240:360, H=orientation==='portrait'?360:240;
+  scale=scale||4; var W=orientation==='portrait'?240:400, H=orientation==='portrait'?400:240;
   var c=document.createElement('canvas'); c.width=W*scale; c.height=H*scale; var ctx=c.getContext('2d'); ctx.scale(scale,scale); drawCustomerLabel(ctx,W,H,d); return c;
 }
+
 function ensureSerifFonts(cb){
   try{
     if(document.fonts&&document.fonts.load){
-      Promise.all([document.fonts.load('600 40px "Cormorant Garamond"'),document.fonts.load('500 40px "Cormorant Garamond"'),document.fonts.load('400 20px "EB Garamond"'),document.fonts.load('500 20px "EB Garamond"'),document.fonts.load('italic 400 20px "EB Garamond"')]).then(function(){cb&&cb();}).catch(function(){cb&&cb();});
+      Promise.all([document.fonts.load('600 40px "Cormorant Garamond"'),document.fonts.load('500 40px "Cormorant Garamond"'),document.fonts.load('400 20px "EB Garamond"'),document.fonts.load('500 20px "EB Garamond"'),document.fonts.load('700 20px "EB Garamond"'),document.fonts.load('italic 400 20px "EB Garamond"')]).then(function(){cb&&cb();}).catch(function(){cb&&cb();});
     } else { cb&&cb(); }
   }catch(e){ cb&&cb(); }
 }
@@ -3796,14 +3788,7 @@ function renderProduction() {
     if (!items.length) return;
     const sec = div('');
     sec.appendChild(el('p', {style:"font-family:'Cormorant Garamond',Georgia,serif;font-size:16px;font-weight:600;color:#18342A;border-bottom:1.5px solid #C9A86A;padding-bottom:3px;margin:14px 0 8px;"}, title));
-    var show = items;
-    if (kind === 'hanging' && !prodHangingExpanded && items.length > 4) show = items.slice(0,4);
-    show.forEach(function(r){ sec.appendChild(productionCardSummary(r, kind)); });
-    if (kind === 'hanging' && items.length > 4) {
-      const more = el('button', {style:'background:none;border:none;color:#8A6D2F;font-size:12px;cursor:pointer;display:block;margin:4px auto 0;'}, prodHangingExpanded ? 'show less' : ('+ ' + (items.length-4) + ' more hanging \u2014 tap to expand'));
-      more.addEventListener('click', function(){ prodHangingExpanded = !prodHangingExpanded; renderProduction(); });
-      sec.appendChild(more);
-    }
+    items.forEach(function(r){ sec.appendChild(productionCardSummary(r, kind)); });
     v.appendChild(sec);
   }
 
@@ -3834,6 +3819,7 @@ function productionCardSummary(r, kind) {
   else if (kind === 'ready') { detail += (sticks ? ' \u00b7 ' + sticks + ' pieces' : '') + ' \u00b7 ready to deliver'; }
   else { detail += ' \u00b7 run ' + (r.runNumber || '?'); }
   card.appendChild(p('muted', detail));
+  (function(){ var kids=(r.children||[]); if(kids.length){ var s=kids.map(function(c){ var nm=(c.recipe&&c.recipe.name)?c.recipe.name:('Child '+c.letter); return c.letter+' '+nm+(c.stuffCount?(' ('+c.stuffCount+')'):''); }).join(' \u00b7 '); card.appendChild(el('p',{style:'font-size:12px;color:#3a6b2a;margin:2px 0 0;line-height:1.4;'}, s)); } })();
   card.addEventListener('click', function(){ openProductionRun(r.id); });
   return card;
 }
