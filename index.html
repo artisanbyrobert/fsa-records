@@ -4074,9 +4074,10 @@ function childProgress(c){
   var ticked = act.filter(function(l){ return l.addedDate; }).length;
   var blendMade = hasRecipe && (act.length===0 ? true : ticked===act.length);
   var minced = !!c.minced;
+  var mixed = !!c.mixed;
   var stuffed = !!c.stuffed;
   var vacPacked = !!c.vacPacked;
-  var step = vacPacked ? 6 : (stuffed ? 5 : (minced ? 4 : (blendMade ? 3 : (hasRecipe ? 2 : 1))));
+  var step = vacPacked ? 6 : (stuffed ? 5 : (mixed ? 4 : (blendMade ? 3 : (hasRecipe ? 2 : 1))));
   return {hasRecipe:hasRecipe, blendMade:blendMade, minced:minced, stuffed:stuffed, vacPacked:vacPacked, step:step, ticked:ticked, total:act.length};
 }
 function renderProductionForm() {
