@@ -1,3 +1,3 @@
 GREEN
-Last run: 2026-06-09T10:48:39.488416
-Reason: PDF FSA_Records_202526.pdf (77804 bytes) uploaded successfully. Records: intakes=27, daily=15, deliveries=1, pest=3, prod=7
+Last run: 2026-06-10T11:55:17.524660
+Reason: PDF FSA_Records_202526.pdf (90267 bytes) uploaded successfully. Records: intakes=27, daily=16, deliveries=1, pest=15, prod=10
