@@ -3966,7 +3966,8 @@ function openProductionRun(id) {
 // counted ingredient. "Actionable" = the dry spices you tick into the bowl.
 function recipeLineIsSalt(l){ return (l && l.name ? l.name.toString().toLowerCase() : '').indexOf('salt') >= 0; }
 function recipeLineIsMedium(l){ var n = (l && l.name ? l.name.toString().toLowerCase() : ''); return (n.indexOf('alcohol') >= 0 || n.indexOf('wine') >= 0 || n.indexOf('wash') >= 0) && !recipeLineIsSalt(l); }
-function recipeActionableLines(lines){ return (lines || []).filter(function(l){ return !recipeLineIsSalt(l) && !recipeLineIsMedium(l); }); }
+function recipeLineIsBlank(l){ return !(l && l.name != null && l.name.toString().trim()); }
+function recipeActionableLines(lines){ return (lines || []).filter(function(l){ return !recipeLineIsBlank(l) && !recipeLineIsSalt(l) && !recipeLineIsMedium(l); }); }
 
 // ── Make mode: big-button butchery checklist for one child ─────────────────
 // Tick each ingredient as it goes in; untick to undo. Each tick stamps its date
@@ -3986,7 +3987,7 @@ function renderMakeMode() {
   function mediumName(l){ var n = lc(l.name); if (n.indexOf('alcohol') >= 0 || n.indexOf('wash') >= 0) return 'alcohol >13%'; if (n.indexOf('wine') >= 0) return 'wine'; return l.name; }
   function amtStr(line){ return (line.type === 'asneeded' || line.amount == null || line.amount === '') ? 'as needed' : (line.amount + ' ' + (line.unit || 'g')); }
 
-  const lines = child.recipe.lines || [];
+  const lines = (child.recipe.lines || []).filter(function(l){ return !recipeLineIsBlank(l); });
   const saltLines = lines.filter(isSalt);
   const mediumLines = lines.filter(isMedium);
   const rest = lines.filter(function(l){ return !isSalt(l) && !isMedium(l); });
@@ -4072,6 +4073,9 @@ function renderMakeMode() {
     const banner = div(''); banner.style.cssText = 'margin-top:16px;background:#eaf3e4;color:#27500a;border:1px solid #27500a;border-radius:12px;padding:16px;text-align:center;font-size:17px;font-weight:600;';
     banner.appendChild(el('span', {}, '✓ All ingredients added to Child ' + child.code));
     v.appendChild(banner);
+    const fwd = el('button', {style:'margin-top:12px;width:100%;background:#27500a;color:#fff;border:none;border-radius:12px;padding:15px;font-size:16px;font-weight:600;cursor:pointer;'}, '③ Mix into meat →');
+    fwd.addEventListener('click', function(){ makeChildLetter = null; prodStageEdit = {type:'mix', date:today(), notes:'', childLetter:child.letter}; renderProductionForm(); });
+    v.appendChild(fwd);
   }
 }
 
@@ -4133,7 +4137,7 @@ function renderProductionForm() {
   if (prodForm.children && prodForm.children.length > 0) {
     card.appendChild(el('p', {style:'font-size:13px;font-weight:500;color:#27500a;margin:0 0 8px;'}, 'Children in this run (' + prodForm.children.length + ')'));
     const kidsWrap = div(''); kidsWrap.style.cssText = 'display:flex;flex-direction:column;gap:8px;margin-bottom:14px;';
-    const STEP_LABELS = ['Add the recipe', 'Make the blend', 'Mix into meat & mince', 'Stuff & hang', 'Hung'];
+    const STEP_LABELS = ['Add the recipe', 'Make the blend', 'Mix into meat', 'Stuff & hang', 'Hung'];
     prodForm.children.forEach(function(c){
       const pr = childProgress(c);
       const row = div(''); row.style.cssText = 'background:#f9fdf8;border:1px solid #d0e8c8;border-radius:10px;padding:11px 13px;';
@@ -4160,7 +4164,7 @@ function renderProductionForm() {
         var lblTxt, fn;
         if (pr.step===1){ lblTxt='\u2460 Add the recipe'; fn=function(){ prodStageEdit={type:'recipe', date:today(), notes:'', childLetter:c.letter}; renderProductionForm(); }; }
         else if (pr.step===2){ lblTxt='\u2461 Make the blend \u2014 ' + pr.ticked + ' of ' + pr.total + ' in'; fn=function(){ makeChildLetter=c.letter; renderMakeMode(); }; }
-        else if (pr.step===3){ lblTxt='\u2462 Mix into meat & mince'; fn=function(){ prodStageEdit={type:'mince', date:today(), notes:''}; renderProductionForm(); }; }
+        else if (pr.step===3){ lblTxt='\u2462 Mix into meat'; fn=function(){ prodStageEdit={type:'mix', date:today(), notes:'', childLetter:c.letter}; renderProductionForm(); }; }
         else { lblTxt='\u2463 Stuff & hang'; fn=function(){ prodStageEdit={type:'stuff_hang', date:today(), notes:'', childLetter:c.letter}; renderProductionForm(); }; }
         const mk = el('button', {style:'background:#27500a;color:#fff;border:none;border-radius:8px;padding:11px 14px;font-size:15px;font-weight:600;cursor:pointer;width:100%;line-height:1.35;'}, '\u25b6 '+lblTxt);
         mk.addEventListener('click', fn);
@@ -4229,13 +4233,14 @@ function renderProductionForm() {
 }
 
 function stageMeta(s){
-  const icon = {defrost:'\u2744\ufe0f', fatcalc:'\ud83e\uddee', recipe:'\ud83d\udccb', mince:'\ud83d\udd2a', stuff_hang:'\ud83c\udf2d'}[s.type] || '\u2022';
-  const typeName = {defrost:'Defrost', fatcalc:'Fat calculator', recipe:'Recipe', mince:'Prep, wash & mince', stuff_hang:'Stuffing & hanging'}[s.type] || s.type;
+  const icon = {defrost:'\u2744\ufe0f', fatcalc:'\ud83e\uddee', recipe:'\ud83d\udccb', mince:'\ud83d\udd2a', mix:'\ud83e\udd63', stuff_hang:'\ud83c\udf2d'}[s.type] || '\u2022';
+  const typeName = {defrost:'Defrost', fatcalc:'Fat calculator', recipe:'Recipe', mince:'Prep, wash & mince', mix:'Mix into meat', stuff_hang:'Stuffing & hanging'}[s.type] || s.type;
   let summary = '';
   if (s.type === 'defrost') summary = (s.meatKg ? s.meatKg + 'kg meat out' : '');
   else if (s.type === 'fatcalc') summary = (s.totalKg ? s.meatKg + 'kg meat + ' + s.fatKg + 'kg fat = ' + s.totalKg + 'kg (' + s.fatPercent + '%)' : '');
   else if (s.type === 'recipe') summary = (s.recipeName ? s.recipeName + (s.childLetter ? ' \u2192 ' + (prodForm.batchCode||'') + s.childLetter : '') : '');
   else if (s.type === 'mince') { const cw = s.childWork || {}; const n = Object.keys(cw).length; const mixed = Object.keys(cw).filter(function(k){return cw[k].mixed;}).length; summary = n ? (mixed + ' of ' + n + ' children mixed') : 'mince day'; }
+  else if (s.type === 'mix') { var _mx = (prodForm.children||[]).find(function(c){return c.letter===s.childLetter;}); var _mn = _mx && _mx.recipe && _mx.recipe.name ? _mx.recipe.name : ('Child ' + (prodForm.batchCode||'') + (s.childLetter||'')); summary = _mn + (s.mixDone ? ' \u00b7 blend mixed in' : ' \u00b7 not yet mixed'); }
   else if (s.type === 'stuff_hang') { var parts = []; if (s.childLetter) { var sc = (prodForm.children||[]).find(function(c){return c.letter===s.childLetter;}); parts.push(sc && sc.recipe && sc.recipe.name ? sc.recipe.name : ('Child ' + (prodForm.batchCode||'') + s.childLetter)); } if (s.count) parts.push(s.count + (s.unitGrams ? ' \u00d7 ' + s.unitGrams + 'g' : ' salami')); if (s.skinSize) parts.push(s.skinSize); if (s.finishDate) parts.push('ready ' + fmtDate(s.finishDate)); summary = parts.join(' \u00b7 '); }
   return {icon:icon, typeName:typeName, summary:summary};
 }
@@ -4286,6 +4291,7 @@ function openStageView(s){
   else if (s.type === 'fatcalc') { kv('Meat', s.meatKg ? s.meatKg + ' kg' : ''); kv('Fat added', s.fatKg ? s.fatKg + ' kg' : ''); kv('Fat %', s.fatPercent ? s.fatPercent + '%' : ''); kv('Total mix', s.totalKg ? s.totalKg + ' kg' : ''); }
   else if (s.type === 'recipe') { kv('Recipe', s.recipeName); if (s.childLetter) kv('Child', (prodForm.batchCode||'') + s.childLetter); (s.lines||[]).forEach(function(l){ if (l && l.name) kv(l.name, (l.amount!=null && l.amount!=='') ? (l.amount + (l.unit||'g')) : (l.type==='asneeded' ? 'as needed' : '')); }); }
   else if (s.type === 'mince') { var cw = s.childWork || {}; Object.keys(cw).forEach(function(k){ var w = cw[k] || {}; var bits = []; if (w.minced) bits.push('minced'); if (w.salted) bits.push('salted'); if (w.mixed) bits.push('mixed'); kv('Child ' + (prodForm.batchCode||'') + k, bits.join(', ') || '\u2014'); }); }
+  else if (s.type === 'mix') { var _mvc = (prodForm.children||[]).find(function(c){return c.letter===s.childLetter;}); kv('Child', (prodForm.batchCode||'') + (s.childLetter||'')); if (_mvc && _mvc.recipe && _mvc.recipe.name) kv('Flavour', _mvc.recipe.name); kv('Blend mixed in', s.mixDone ? 'Yes' : 'No'); }
   else if (s.type === 'stuff_hang') { if (s.childLetter){ var sc = (prodForm.children||[]).find(function(c){return c.letter===s.childLetter;}); kv('Flavour', sc && sc.recipe && sc.recipe.name ? sc.recipe.name : ('Child ' + (prodForm.batchCode||'') + s.childLetter)); } kv('Pieces', s.count ? (s.count + (s.unitGrams ? ' \u00d7 ' + s.unitGrams + ' g' : '')) : ''); kv('Skin', s.skinSize); kv('Hung', s.hangDate ? fmtDate(s.hangDate) : (s.date ? fmtDate(s.date) : '')); kv('Ready', s.finishDate ? fmtDate(s.finishDate) : ''); kv('On machine', s.machineG ? s.machineG + ' g' : ''); }
   if (s.notes) { var nb = div(''); nb.style.cssText = 'padding:11px 0 0;'; nb.appendChild(el('div', {style:'font-size:13px;color:#6b6557;margin-bottom:3px;'}, 'Note')); nb.appendChild(el('div', {style:'font-size:14px;color:#2C2A26;line-height:1.5;'}, s.notes)); box.appendChild(nb); }
   var cb = document.createElement('button'); cb.textContent = 'Close';
@@ -4350,7 +4356,7 @@ function renderStageForm() {
     }
   }
   const card = div('card');
-  const typeName = {defrost:'Defrost day', fatcalc:'Fat calculator', recipe:'Recipe', mince:'Prep, wash & mince day', stuff_hang:'Stuffing & hanging day'}[t] || t;
+  const typeName = {defrost:'Defrost day', fatcalc:'Fat calculator', recipe:'Recipe', mince:'Prep, wash & mince day', mix:'Mix into meat', stuff_hang:'Stuffing & hanging day'}[t] || t;
   card.appendChild(el('h3', {style:'font-size:16px;font-weight:600;margin:0 0 12px;'}, typeName));
 
   const dateField = div('field');
@@ -4631,7 +4637,7 @@ function renderStageForm() {
         const nm = (prodStageEdit.recipeName || '').trim();
         if (!nm) { showToast('Give the recipe a name first'); return; }
         const existing = recipeLibrary.find(function(r){ return r.name.toLowerCase() === nm.toLowerCase(); });
-        const ingredients = prodStageEdit.lines.map(function(l){ return {name:l.name, type:l.type, value:l.value, unit:l.unit, refAmt:l.refAmt, refMix:l.refMix}; });
+        const ingredients = prodStageEdit.lines.filter(function(l){ return !recipeLineIsBlank(l); }).map(function(l){ return {name:l.name, type:l.type, value:l.value, unit:l.unit, refAmt:l.refAmt, refMix:l.refMix}; });
         if (existing) { existing.ingredients = ingredients; }
         else { recipeLibrary.push({id:'rcp_'+Date.now(), name:nm, ingredients:ingredients}); }
         saveData();
@@ -4714,6 +4720,39 @@ function renderStageForm() {
     }
 
     checkList('4 · Closing / end of day', prodStageEdit.closing);
+  } else if (t === 'mix') {
+    // Per-child: mix the finished blend into the already-minced, salted meat.
+    // Not a re-mince. Carries its own opening/closing hygiene checks.
+    const children = prodForm.children || [];
+    const child = children.find(function(c){ return c.letter === prodStageEdit.childLetter; }) || children[0];
+    if (!prodStageEdit.opening) prodStageEdit.opening = MINCE_OPENING_CHECKS.map(function(x){ return {text:x, done:true}; });
+    if (!prodStageEdit.closing) prodStageEdit.closing = MINCE_CLOSING_CHECKS.map(function(x){ return {text:x, done:true}; });
+    if (prodStageEdit.mixDone == null) prodStageEdit.mixDone = false;
+    if (child) card.appendChild(el('p', {style:'font-size:14px;font-weight:600;margin:6px 0 2px;'}, 'Child ' + child.code + (child.recipe && child.recipe.name ? ' \u00b7 ' + child.recipe.name : '')));
+    card.appendChild(p('muted', 'Mix the finished blend through this child\u2019s minced meat. The meat is already minced and salted \u2014 this is just the blend going in.'));
+    function mixCheckList(title, arr) {
+      card.appendChild(el('p', {style:'font-size:14px;font-weight:600;color:#27500a;margin:14px 0 6px;'}, title));
+      card.appendChild(p('muted', 'Pre-ticked \u2014 untick anything you skipped.'));
+      const wrap = div(''); wrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
+      arr.forEach(function(item){
+        const row = el('button', {});
+        row.style.cssText = 'display:flex;align-items:center;gap:10px;width:100%;text-align:left;border-radius:8px;padding:10px 12px;font-size:14px;cursor:pointer;border:1px solid ' + (item.done?'#27500a':'#e0c9a0') + ';background:' + (item.done?'#eaf3e4':'#fff8f0') + ';';
+        row.appendChild(el('span', {style:'font-size:20px;flex-shrink:0;color:' + (item.done?'#27500a':'#bbb') + ';'}, item.done?'\u2611':'\u2610'));
+        row.appendChild(el('span', {style:'flex:1;' + (item.done?'color:#3a6b2a;':'color:#633806;')}, item.text));
+        row.addEventListener('click', function(){ item.done = !item.done; renderStageForm(); });
+        wrap.appendChild(row);
+      });
+      card.appendChild(wrap);
+    }
+    mixCheckList('1 · Opening checks', prodStageEdit.opening);
+    card.appendChild(el('p', {style:'font-size:14px;font-weight:600;color:#27500a;margin:16px 0 6px;'}, '2 · Mix the blend in'));
+    const mixRow = el('button', {});
+    mixRow.style.cssText = 'display:flex;align-items:center;gap:10px;width:100%;text-align:left;border-radius:8px;padding:12px;font-size:15px;cursor:pointer;border:2px solid ' + (prodStageEdit.mixDone?'#27500a':'#d0e8c8') + ';background:' + (prodStageEdit.mixDone?'#eaf3e4':'#fff') + ';';
+    mixRow.appendChild(el('span', {style:'font-size:22px;color:' + (prodStageEdit.mixDone?'#27500a':'#bbb') + ';'}, prodStageEdit.mixDone?'\u2611':'\u2610'));
+    mixRow.appendChild(el('span', {style:'flex:1;font-weight:600;'}, 'Blend mixed through the meat'));
+    mixRow.addEventListener('click', function(){ prodStageEdit.mixDone = !prodStageEdit.mixDone; renderStageForm(); });
+    card.appendChild(mixRow);
+    mixCheckList('3 · Closing / end of day', prodStageEdit.closing);
   } else if (t === 'stuff_hang') {
     function weeksLabel(w){ var s = (w === Math.floor(w)) ? String(w) : ((w - Math.floor(w) === 0.5) ? (Math.floor(w) || '') + '\u00BD' : String(w)); return s + ' week' + (w === 1 ? '' : 's'); }
     function skinByName(n){ return skinSizes.find(function(s){ return s.name === n; }); }
@@ -4840,7 +4879,7 @@ function renderStageForm() {
     const toSave = Object.assign({}, prodStageEdit);
     delete toSave.picker;
     if (!toSave.savedAt) toSave.savedAt = new Date().toISOString();  // real moment saved, for audit (separate from chosen date)
-    var _dedupe = {recipe:1, stuff_hang:1};
+    var _dedupe = {recipe:1, stuff_hang:1, mix:1};
     if (_dedupe[t] && toSave.childLetter) {
       var _ix = prodForm.stages.findIndex(function(st){ return st.type===t && st.childLetter===toSave.childLetter; });
       if (_ix >= 0) { prodForm.stages[_ix] = toSave; } else { prodForm.stages.push(toSave); }
@@ -4874,7 +4913,7 @@ function renderStageForm() {
         // store recipe with the final (possibly edited) amounts and the ratio definitions
         ch.recipe = {
           name: toSave.recipeName,
-          lines: (toSave.lines || []).map(function(l){ return {name:l.name, type:l.type, value:l.value, unit:l.unit, amount:l.amount, refAmt:l.refAmt, refMix:l.refMix}; })
+          lines: (toSave.lines || []).filter(function(l){ return !recipeLineIsBlank(l); }).map(function(l){ return {name:l.name, type:l.type, value:l.value, unit:l.unit, amount:l.amount, refAmt:l.refAmt, refMix:l.refMix}; })
         };
         const saltLine = (toSave.lines || []).find(function(l){ return l.name && l.name.toLowerCase() === 'salt'; });
         if (saltLine) { ch.saltGrams = saltLine.amount; }
@@ -4898,6 +4937,10 @@ function renderStageForm() {
         }
       });
     }
+    if (t === 'mix' && prodForm.children) {
+      var _mc = prodForm.children.find(function(c){ return c.letter === toSave.childLetter; });
+      if (_mc && toSave.mixDone) { _mc.mixed = true; _mc.mixedDate = toSave.date || today(); }
+    }
     if (t === 'stuff_hang' && prodForm.children) {
       var _sc = prodForm.children.find(function(c){ return c.letter === toSave.childLetter; });
       if (_sc) { _sc.stuffed = toSave.date || today(); _sc.stuffSkin = toSave.skinSize || null; _sc.stuffFinish = toSave.finishDate || null; _sc.stuffCount = toSave.count || 0; }
@@ -4914,8 +4957,20 @@ function renderStageForm() {
       if (existing) { existing.text = text; existing.dueDate = toSave.finishDate; existing.done = false; }
       else { generalTasks.push({id: taskId, text: text, addedDate: today(), dueDate: toSave.finishDate, done: false, kind: 'fsa', _vacpack: true}); }
     }
-    prodStageEdit = null;
-    saveAndStay();
+    if (t === 'mix' && toSave.childLetter) {
+      // Move FORWARD to Stuff & hang for the same child rather than back to the board.
+      prodStageEdit = null;
+      productionRecords = productionRecords.map(function(r){ return r.id === prodEditId ? Object.assign({}, prodForm) : r; });
+      saveData();
+      showToast('Saved');
+      var _fresh = productionRecords.find(function(r){ return r.id === prodEditId; });
+      if (_fresh) prodForm = JSON.parse(JSON.stringify(_fresh));
+      prodStageEdit = {type:'stuff_hang', date:today(), notes:'', childLetter:toSave.childLetter};
+      renderProductionForm();
+    } else {
+      prodStageEdit = null;
+      saveAndStay();
+    }
   });
   saveBar.appendChild(saveBtn);
   const cancelBtn = btn('', 'Cancel', function(){ prodStageEdit = null; renderProductionForm(); });
