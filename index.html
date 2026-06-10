@@ -332,6 +332,13 @@ async function loadData() {
 
 async function saveData() {
   try {
+    // Fold the live working copy of an open run back into the saved array BEFORE
+    // persisting. prodForm is a deep copy made on open; without this, any save
+    // triggered from a prodForm context (e.g. the make/tick screen) would write
+    // the stale pre-edit record over the cloud and lose the edits.
+    if (prodEditId && prodForm) {
+      productionRecords = productionRecords.map(function(r){ return r.id === prodEditId ? Object.assign({}, prodForm) : r; });
+    }
     showStatus('saving');
 
     for (const intake of intakes) {
