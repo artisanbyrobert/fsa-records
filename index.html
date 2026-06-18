@@ -3211,7 +3211,7 @@ function customerLabelData(prodForm, stage){
   var ingr=[];
   if(tot>0){ ingr.push(sp+' meat '+Math.round(meat/tot*100)+'%'); ingr.push('Organic pork fat '+Math.round(fat/tot*100)+'%'); }
   ingr=ingr.concat(sps);
-  return { title:(sp+' '+flav).trim(), species:sp, flavour:flav, sub:customerEstateName(prodForm), ingredients:ingr, batchCode:prodForm.batchCode||'' };
+  return { title:(sp+' '+flav).trim(), species:sp, flavour:flav, sub:customerEstateName(prodForm), ingredients:ingr, batchCode:(ch.code||((prodForm.batchCode||'')+(ch.letter||'')))||'' };
 }
 function drawCustomerLabel(ctx,W,H,d){
   var DISP='"Cormorant Garamond",Georgia,serif', BODY='"EB Garamond",Georgia,serif';
@@ -3227,13 +3227,14 @@ function drawCustomerLabel(ctx,W,H,d){
   var toks=('Ingredients: '+(d.ingredients||[]).join(', ')).split(' ').map(function(w){return {t:w,b:_isAllergenWord(w)};});
   function layoutIng(fsz){ var L=[[]],lw=0; for(var i=0;i<toks.length;i++){ ctx.font=(toks[i].b?'700 ':'400 ')+fsz+'px '+BODY; var ww=ctx.measureText(toks[i].t).width; ctx.font='400 '+fsz+'px '+BODY; var spc=ctx.measureText(' ').width; var add=(L[L.length-1].length?spc:0)+ww; if(lw+add>iw&&L[L.length-1].length){L.push([]);lw=0;add=ww;} L[L.length-1].push(toks[i]); lw+=add; } return L; }
   var gA=Math.round(H*0.02), gB=Math.round(H*0.03);
+  var batchH=(d.batchCode?Math.round(H*0.10)+gA:0);
   var headFixed=wmFs+gA+gB+estFs+gA+spFs+(flFs?gA+flFs:0)+gB+gB;
-  var availIng=(H-2*pad)-headFixed;
+  var availIng=(H-2*pad)-headFixed-batchH;
   var maxIng=Math.round(H*0.10), minIng=Math.round(H*0.045);
   var ingFs=minIng, ingLines=layoutIng(minIng), ingLH=Math.round(minIng*1.3);
   for(var ff=maxIng; ff>=minIng; ff--){ var LL=layoutIng(ff); var lh=Math.round(ff*1.3); if(LL.length*lh<=availIng){ ingFs=ff; ingLines=LL; ingLH=lh; break; } }
   var totalH=headFixed+ingLines.length*ingLH;
-  var y=pad+Math.max(0,Math.round(((H-2*pad)-totalH)/2));
+  var y=pad+Math.max(0,Math.round(((H-2*pad-batchH)-totalH)/2));
   ctx.textAlign='center'; ctx.fillStyle='#000';
   ctx.font='500 '+wmFs+'px '+DISP; y+=wmFs; ctx.fillText('ARTISAN BY ROBERT',W/2,y);
   y+=gA; ctx.strokeStyle='#000'; ctx.lineWidth=Math.max(1,Math.round(H*0.006)); ctx.beginPath(); ctx.moveTo(W*0.34,y); ctx.lineTo(W*0.66,y); ctx.stroke();
@@ -3244,6 +3245,7 @@ function drawCustomerLabel(ctx,W,H,d){
   y+=gB; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(pad,y); ctx.lineTo(W-pad,y); ctx.stroke(); y+=gB;
   ctx.textAlign='left';
   for(var li=0;li<ingLines.length;li++){ var by=y+ingFs,x=pad; for(var wi=0;wi<ingLines[li].length;wi++){ var tk=ingLines[li][wi]; ctx.font=(tk.b?'700 ':'400 ')+ingFs+'px '+BODY; if(wi>0){ctx.font='400 '+ingFs+'px '+BODY; x+=ctx.measureText(' ').width; ctx.font=(tk.b?'700 ':'400 ')+ingFs+'px '+BODY;} ctx.fillText(tk.t,x,by); x+=ctx.measureText(tk.t).width; } y+=ingLH; }
+  if(d.batchCode){ ctx.textAlign='center'; ctx.font='400 '+ingFs+'px '+BODY; ctx.fillStyle='#000'; ctx.fillText('Batch '+d.batchCode, W/2, H-pad); }
 }
 
 function renderCustomerLabelCanvas(d, orientation, scale){
@@ -3381,9 +3383,10 @@ function blankProductionRecord(batchCode, speciesName) {
 
 let dcForm = null;
 function newDcForm(date) {
+  var d = date || today();
   return {
-    id: 'dc_' + Date.now(),
-    date: date || today(),
+    id: 'dc_' + d.replace(/-/g,''),
+    date: d,
     opening: MINCE_OPENING_CHECKS.map(function(t){ return {text: t, done: true}; }),
     closing: MINCE_CLOSING_CHECKS.map(function(t){ return {text: t, done: true}; })
   };
@@ -3407,9 +3410,17 @@ function renderDailyChecks() {
   var dateRow = div(''); dateRow.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:14px;';
   dateRow.appendChild(el('label', {style:'font-weight:600;font-size:14px;'}, 'Date'));
   var dateInp = input({type:'date', value: dcForm.date});
-  dateInp.addEventListener('change', function(){ dcForm.date = dateInp.value; });
+  dateInp.addEventListener('change', function(){
+    var nd = dateInp.value; if (!nd) return;
+    var ex = dailyChecks.find(function(r){ return r.date === nd; });
+    dcForm = ex ? JSON.parse(JSON.stringify(ex)) : newDcForm(nd);
+    renderDailyChecks(); window.scrollTo(0,0);
+  });
   dateRow.appendChild(dateInp);
   card.appendChild(dateRow);
+
+  var dcStatus = el('span', {style:'font-size:13px;color:#3a6b2a;font-weight:600;'}, '');
+  function dcSave() { persistDcNow(dcStatus); }
 
   function group(title, list) {
     var wrap = div('');
@@ -3418,7 +3429,7 @@ function renderDailyChecks() {
       var rowL = el('label', {style:'display:flex;align-items:flex-start;gap:8px;padding:5px 0;font-size:14px;cursor:pointer;'});
       var cb = input({type:'checkbox'}); cb.checked = !!item.done;
       cb.style.cssText = 'margin-top:3px;width:18px;height:18px;flex-shrink:0;';
-      cb.addEventListener('change', function(){ item.done = cb.checked; });
+      cb.addEventListener('change', function(){ item.done = cb.checked; dcSave(); });
       rowL.appendChild(cb);
       rowL.appendChild(el('span', {}, item.text));
       wrap.appendChild(rowL);
@@ -3428,13 +3439,15 @@ function renderDailyChecks() {
   card.appendChild(group('Opening checks', dcForm.opening));
   card.appendChild(group('Closing checks', dcForm.closing));
 
-  var btnRow = div(''); btnRow.style.cssText = 'display:flex;gap:10px;margin-top:16px;';
-  var saveB = btn('', 'Save day', saveDailyChecks);
-  saveB.style.cssText = 'background:#3a6b2a;color:#fff;border-color:#3a6b2a;';
-  btnRow.appendChild(saveB);
-  btnRow.appendChild(btn('', 'Clear / new day', function(){ dcForm = newDcForm(); renderDailyChecks(); }));
+  var btnRow = div(''); btnRow.style.cssText = 'display:flex;gap:14px;align-items:center;margin-top:16px;';
+  var newB = btn('', '+ New day', function(){ dcForm = newDcForm(); renderDailyChecks(); window.scrollTo(0,0); });
+  btnRow.appendChild(newB);
+  btnRow.appendChild(dcStatus);
   card.appendChild(btnRow);
   v.appendChild(card);
+
+  // Save-as-you-go: today is recorded automatically on open, so a clean day needs no action
+  if (dcForm.date === today()) dcSave();
 
   v.appendChild(el('h3', {style:'font-size:15px;font-weight:600;margin:0 0 8px;'}, 'Recorded days'));
   var saved = dailyChecks.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
@@ -3453,15 +3466,22 @@ function renderDailyChecks() {
     v.appendChild(line);
   });
 }
-function saveDailyChecks() {
+function persistDcNow(statusEl) {
   if (!dcForm) return;
   var existing = dailyChecks.find(function(r){ return r.id === dcForm.id; });
   if (existing) Object.assign(existing, JSON.parse(JSON.stringify(dcForm)));
   else dailyChecks.push(JSON.parse(JSON.stringify(dcForm)));
-  saveData();
-  dcForm = newDcForm();
-  renderDailyChecks();
+  if (statusEl) { statusEl.textContent = 'Saving\u2026'; statusEl.style.color = '#888'; }
+  var rowId = 'dchk_' + dcForm.id;
+  var payload = Object.assign({}, JSON.parse(JSON.stringify(dcForm)), {_type:'dailychecks'});
+  Promise.resolve(sb.from('deliveries').upsert({id: rowId, data: payload}))
+    .then(function(res){
+      if (res && res.error) { if(statusEl){ statusEl.textContent='Save failed \u2014 check connection'; statusEl.style.color='#b00'; } }
+      else { if(statusEl){ statusEl.textContent='All changes saved \u2713'; statusEl.style.color='#3a6b2a'; } }
+    })
+    .catch(function(){ if(statusEl){ statusEl.textContent='Save failed \u2014 check connection'; statusEl.style.color='#b00'; } });
 }
+function saveDailyChecks() { persistDcNow(null); }
 
 // ── VENISON BREAKDOWN ─────────────────────────────────────────────────────────
 // A venison run = one whole-carcass intake split into product lanes (children).
