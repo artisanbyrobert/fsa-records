@@ -574,24 +574,31 @@ function makeDropdown(container, labelText, entities, selectedId, onSelect, onAd
 function renderTabs(activeTab) {
   const v = document.getElementById('view-tabs');
   v.innerHTML = '';
+  // ===== Stage 1 nav: 4 top menus + Admin sub-menu =====
+  const TOP = [['list','Intake'],['daily','Walkabout'],['prod','Production'],['admin','Admin']];
+  const ADMIN_GROUP = [['delivery','Finished Product'],['pest','Pest Control'],['clean','Periodic Cleans'],['wetmeat','Wet Meat'],['checks','Daily Checks'],['venison','Venison'],['manage','Manage']];
+  const adminIds = ADMIN_GROUP.map(a => a[0]);
+  const inAdmin = adminIds.indexOf(activeTab) !== -1;
+  function navGo(id) {
+    if (id === 'list') renderList();
+    else if (id === 'daily') renderDailyHome();
+    else if (id === 'prod') renderProduction();
+    else if (id === 'admin') renderDeliveryList();
+    else if (id === 'delivery') renderDeliveryList();
+    else if (id === 'wetmeat') renderWetMeat();
+    else if (id === 'pest') renderPestControl();
+    else if (id === 'clean') renderPeriodicCleans();
+    else if (id === 'checks') renderDailyChecks();
+    else if (id === 'venison') renderVenison();
+    else if (id === 'manage') renderManage();
+  }
   const bar = div('tab-bar');
-  bar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:0;margin-bottom:1.5rem;border-bottom:2px solid #E7DFCE;';
+  bar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:0;margin-bottom:' + (inAdmin ? '0.5rem' : '1.5rem') + ';border-bottom:2px solid #E7DFCE;';
   const tabsLeft = div('row');
   tabsLeft.style.gap = '0';
-  const tabs = [['list','Intake records'],['daily','Daily Record'],['delivery','Finished Product'],['wetmeat','Wet Meat'],['pest','Pest Control'],['prod','Production'],['clean','Periodic Cleans'],['checks','Daily Checks'],['venison','Venison'],['manage','Manage']];
-  for (const [id, label] of tabs) {
-    const b = btn(`tab-btn${activeTab===id?' active':''}`, label, () => {
-      if (id === 'list') renderList();
-      else if (id === 'daily') renderDailyHome();
-      else if (id === 'delivery') renderDeliveryList();
-      else if (id === 'wetmeat') renderWetMeat();
-      else if (id === 'pest') renderPestControl();
-      else if (id === 'prod') renderProduction();
-      else if (id === 'clean') renderPeriodicCleans();
-      else if (id === 'checks') renderDailyChecks();
-      else if (id === 'venison') renderVenison();
-      else renderManage();
-    });
+  for (const [id, label] of TOP) {
+    const isActive = (activeTab === id) || (id === 'admin' && inAdmin);
+    const b = btn(`tab-btn${isActive ? ' active' : ''}`, label, () => navGo(id));
     tabsLeft.appendChild(b);
   }
   bar.appendChild(tabsLeft);
@@ -599,6 +606,21 @@ function renderTabs(activeTab) {
   saveBtn.style.cssText = 'color:#3a6b2a;border-color:#3a6b2a;font-size:12px;padding:5px 12px;margin-bottom:2px;white-space:nowrap;flex-shrink:0;';
   bar.appendChild(saveBtn);
   v.appendChild(bar);
+  // Admin sub-menu row — only when an Admin screen is active
+  if (inAdmin) {
+    const sub = div('row');
+    sub.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:0;margin-bottom:1.25rem;padding:5px 6px;background:#F3ECDD;border-radius:0 0 8px 8px;';
+    const subLbl = document.createElement('span');
+    subLbl.textContent = 'Admin ▸';
+    subLbl.style.cssText = 'font-size:11px;color:#8A6D2F;font-weight:700;letter-spacing:0.5px;margin:0 8px 0 4px;';
+    sub.appendChild(subLbl);
+    for (const [id, label] of ADMIN_GROUP) {
+      const b = btn(`tab-btn${activeTab === id ? ' active' : ''}`, label, () => navGo(id));
+      b.style.fontSize = '12px';
+      sub.appendChild(b);
+    }
+    v.appendChild(sub);
+  }
   const existingPanel = document.getElementById('tasks-panel-global');
   if (existingPanel) existingPanel.remove();
   // Build outstanding tasks list — track parent record so we can mark done from here
@@ -886,7 +908,7 @@ function renderDailyHome() {
   renderTabs('daily');
   var landingD = document.createElement('div');
   landingD.style.cssText = 'text-align:center;padding:1rem 1rem 1rem;';
-  var titleD = document.createElement('h1'); titleD.style.cssText = 'font-size:20px;font-weight:600;margin:0 0 4px;'; titleD.textContent = 'Daily Records'; landingD.appendChild(titleD);
+  var titleD = document.createElement('h1'); titleD.style.cssText = 'font-size:20px;font-weight:600;margin:0 0 4px;'; titleD.textContent = 'Walkabout'; landingD.appendChild(titleD);
   var subD = document.createElement('p'); subD.style.cssText = 'font-size:13px;color:#888;margin:0 0 1.5rem;'; subD.textContent = 'Artisan by Robert'; landingD.appendChild(subD);
   var newBtnD = document.createElement('button');
   newBtnD.className = 'btn-primary';
@@ -917,7 +939,7 @@ function renderDailyRecordsList() {
   const hdrLeft = document.createElement('div');
   const hdrTitle = document.createElement('h2');
   hdrTitle.style.cssText = 'font-size:18px;font-weight:600;margin:0;';
-  hdrTitle.textContent = 'Daily records';
+  hdrTitle.textContent = 'Walkabout';
   hdrLeft.appendChild(hdrTitle);
   hdrEl.appendChild(hdrLeft);
   const hdrBtns = document.createElement('div');
@@ -1474,7 +1496,7 @@ function renderStepReview(container) {
       dailyRecords.push(rec);
     }
     saveData();
-    showToast('Daily record saved');
+    showToast('Walkabout saved');
     renderDailyHome();
   });
   saveBarEl.appendChild(backBtn2);
