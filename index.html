@@ -592,31 +592,40 @@ function renderTabs(activeTab) {
     else if (id === 'venison') renderVenison();
     else if (id === 'manage') renderManage();
   }
+  // pill styling (Option 1) — light house theme: ivory + gold accent, no deep fills
+  function pillStyle(active, isTop) {
+    var base = isTop
+      ? 'border-radius:16px;padding:7px 16px;margin:0 8px 6px 0;font-size:13px;cursor:pointer;white-space:nowrap;line-height:1.1;'
+      : 'border-radius:13px;padding:5px 13px;margin:0 6px 4px 0;font-size:12px;cursor:pointer;white-space:nowrap;line-height:1.1;';
+    if (active) return base + 'background:#F3ECDD;color:#18342A;border:1.5px solid #C9A86A;font-weight:600;';
+    return base + 'background:#fff;color:#6b6557;border:1px solid #E7DFCE;font-weight:500;';
+  }
   const bar = div('tab-bar');
-  bar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:0;margin-bottom:' + (inAdmin ? '0.5rem' : '1.5rem') + ';border-bottom:2px solid #E7DFCE;';
+  bar.style.cssText = 'display:flex;align-items:flex-start;justify-content:space-between;gap:0;margin-bottom:' + (inAdmin ? '0.5rem' : '1.25rem') + ';';
   const tabsLeft = div('row');
-  tabsLeft.style.gap = '0';
+  tabsLeft.style.cssText = 'display:flex;flex-wrap:wrap;gap:0;';
   for (const [id, label] of TOP) {
     const isActive = (activeTab === id) || (id === 'admin' && inAdmin);
-    const b = btn(`tab-btn${isActive ? ' active' : ''}`, label, () => navGo(id));
+    const b = btn('', label, () => navGo(id));
+    b.style.cssText = pillStyle(isActive, true);
     tabsLeft.appendChild(b);
   }
   bar.appendChild(tabsLeft);
   const saveBtn = btn('', '⬇ Save to Dropbox', exportData);
-  saveBtn.style.cssText = 'color:#3a6b2a;border-color:#3a6b2a;font-size:12px;padding:5px 12px;margin-bottom:2px;white-space:nowrap;flex-shrink:0;';
+  saveBtn.style.cssText = 'background:#fff;color:#3a6b2a;border:1px solid #b9d3ab;border-radius:16px;font-size:12px;padding:6px 14px;white-space:nowrap;flex-shrink:0;cursor:pointer;margin-top:1px;';
   bar.appendChild(saveBtn);
   v.appendChild(bar);
-  // Admin sub-menu row — only when an Admin screen is active
+  // Admin sub-menu pill row — only when an Admin screen is active
   if (inAdmin) {
     const sub = div('row');
-    sub.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:0;margin-bottom:1.25rem;padding:5px 6px;background:#F3ECDD;border-radius:0 0 8px 8px;';
+    sub.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:0;margin-bottom:1.25rem;padding:8px 10px;background:#F3ECDD;border-radius:10px;';
     const subLbl = document.createElement('span');
     subLbl.textContent = 'Admin ▸';
-    subLbl.style.cssText = 'font-size:11px;color:#8A6D2F;font-weight:700;letter-spacing:0.5px;margin:0 8px 0 4px;';
+    subLbl.style.cssText = 'font-size:11px;color:#8A6D2F;font-weight:700;letter-spacing:0.5px;margin:0 10px 4px 2px;';
     sub.appendChild(subLbl);
     for (const [id, label] of ADMIN_GROUP) {
-      const b = btn(`tab-btn${activeTab === id ? ' active' : ''}`, label, () => navGo(id));
-      b.style.fontSize = '12px';
+      const b = btn('', label, () => navGo(id));
+      b.style.cssText = pillStyle(activeTab === id, false);
       sub.appendChild(b);
     }
     v.appendChild(sub);
