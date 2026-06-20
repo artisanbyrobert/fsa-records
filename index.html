@@ -581,7 +581,7 @@ function renderTabs(activeTab) {
   const inAdmin = adminIds.indexOf(activeTab) !== -1;
   function navGo(id) {
     if (id === 'list') renderList();
-    else if (id === 'daily') renderDailyHome();
+    else if (id === 'daily') renderWalkabout();
     else if (id === 'prod') renderProduction();
     else if (id === 'admin') renderDeliveryList();
     else if (id === 'delivery') renderDeliveryList();
@@ -931,6 +931,82 @@ function renderDailyHome() {
   viewLinkD.addEventListener('click', function() { renderDailyRecordsList(); });
   landingD.appendChild(viewLinkD);
   vD.appendChild(landingD);
+}
+
+var walkForm = null;
+function newWalkForm() {
+  var now = new Date();
+  function p2(n){ return (n<10?'0':'')+n; }
+  var ds = now.getFullYear()+'-'+p2(now.getMonth()+1)+'-'+p2(now.getDate());
+  var ts = ''+now.getFullYear()+p2(now.getMonth()+1)+p2(now.getDate())+'_'+p2(now.getHours())+p2(now.getMinutes())+p2(now.getSeconds());
+  var checks = {};
+  MONITOR_CHECKS.forEach(function(c){ checks[c] = true; });
+  return { id: 'walk_'+ts, _type:'daily', dayTypeId:'monitor', date: ds,
+           time: p2(now.getHours())+':'+p2(now.getMinutes()),
+           monitorChecks: checks, monitorNotes:'', todoList:[] };
+}
+function persistWalk(statusEl) {
+  if (!walkForm) return;
+  if (statusEl) { statusEl.textContent = 'Saving\u2026'; statusEl.style.color = '#888'; }
+  var payload = JSON.parse(JSON.stringify(walkForm));
+  try {
+    if (typeof dailyRecords !== 'undefined' && dailyRecords) {
+      var ex = dailyRecords.find(function(r){ return r.id === walkForm.id; });
+      if (ex) Object.assign(ex, payload); else dailyRecords.push(payload);
+    }
+  } catch(e){}
+  Promise.resolve(sb.from('deliveries').upsert({id: walkForm.id, data: payload}))
+    .then(function(res){
+      if (res && res.error) { if(statusEl){ statusEl.textContent='Save failed \u2014 check connection'; statusEl.style.color='#b00'; } }
+      else { if(statusEl){ statusEl.textContent='All changes saved \u2713'; statusEl.style.color='#3a6b2a'; } }
+    })
+    .catch(function(){ if(statusEl){ statusEl.textContent='Save failed \u2014 check connection'; statusEl.style.color='#b00'; } });
+}
+function renderWalkabout() {
+  currentView = 'daily';
+  ['view-list','view-form','view-manage','view-wetmeat','view-delivery','view-pest','view-prod','view-clean','view-checks'].forEach(function(id){
+    var e = document.getElementById(id); if(e) e.style.display='none';
+  });
+  var v = document.getElementById('view-daily');
+  if (!v) return;
+  v.style.display = 'block'; v.innerHTML = '';
+  renderTabs('daily');
+  walkForm = newWalkForm();
+  var head = div(''); head.style.cssText='display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:4px 0 2px;flex-wrap:wrap;';
+  head.appendChild(el('h2',{style:'font-size:20px;font-weight:600;margin:0;'}, 'Walkabout'));
+  var status = el('span',{style:'font-size:12px;font-weight:600;color:#888;'}, '');
+  head.appendChild(status);
+  v.appendChild(head);
+  v.appendChild(el('p',{style:'font-size:12px;color:#888;margin:0 0 14px;'}, walkForm.date + ' \u00b7 ' + walkForm.time + ' \u00b7 untick anything that\u2019s an issue. Saves automatically.'));
+  function save(){ persistWalk(status); }
+  MONITOR_CHECKS.forEach(function(check){
+    var rowL = el('label',{style:'display:flex;align-items:flex-start;gap:10px;padding:12px 14px;margin-bottom:8px;border:1px solid #E7DFCE;border-radius:8px;font-size:14px;cursor:pointer;background:#fff;'});
+    var cb = input({type:'checkbox'}); cb.checked = true;
+    cb.style.cssText='margin-top:2px;width:18px;height:18px;flex-shrink:0;accent-color:#3a6b2a;';
+    cb.addEventListener('change', function(){ walkForm.monitorChecks[check] = cb.checked; save(); });
+    rowL.appendChild(cb);
+    rowL.appendChild(el('span',{}, check));
+    v.appendChild(rowL);
+  });
+  v.appendChild(el('p',{style:'font-size:11px;font-weight:700;color:#8A6D2F;letter-spacing:0.5px;margin:14px 0 6px;'}, 'NOTES'));
+  var notes = document.createElement('textarea');
+  notes.rows = 3; notes.value = '';
+  notes.placeholder = 'Anything you spotted on the round\u2026';
+  notes.style.cssText='width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #E7DFCE;border-radius:8px;font-family:inherit;font-size:14px;resize:vertical;min-height:64px;';
+  notes.addEventListener('input', function(){
+    walkForm.monitorNotes = notes.value;
+    notes.style.height='auto'; notes.style.height=(notes.scrollHeight)+'px';
+    save();
+  });
+  v.appendChild(notes);
+  var doneBtn = document.createElement('button');
+  doneBtn.textContent = 'Done \u2014 back to menu';
+  doneBtn.style.cssText='display:block;width:100%;margin:18px 0 8px;padding:13px;font-size:15px;font-weight:600;border:1.5px solid #C9A86A;border-radius:10px;background:#F3ECDD;color:#18342A;cursor:pointer;';
+  doneBtn.addEventListener('click', function(){ persistWalk(status); renderList(); window.scrollTo(0,0); });
+  v.appendChild(doneBtn);
+  var prev = el('button',{style:'background:none;border:none;color:#aaa;font-size:12px;cursor:pointer;text-decoration:underline;display:block;margin:6px auto 0;'}, 'View previous walkabouts & records');
+  prev.addEventListener('click', function(){ renderDailyRecordsList(); });
+  v.appendChild(prev);
 }
 
 function renderDailyRecordsList() {
@@ -5660,7 +5736,7 @@ function saveSession(){
 function sessionRouteTo(v){
   switch (v) {
     case 'prod': if (prodForm) renderProductionForm(); else renderProduction(); break;
-    case 'daily': renderDailyHome(); break;
+    case 'daily': renderWalkabout(); break;
     case 'form': if (form) renderForm(); else renderList(); break;
     case 'list-records': renderList('records'); break;
     case 'pest': renderPestControl(); break;
