@@ -1021,6 +1021,93 @@ function persistNotepad(statusEl, text) {
     })
     .catch(function(){ if(statusEl){statusEl.textContent='Save failed \u2014 check connection';statusEl.style.color='#b00';} });
 }
+function npCompress(file, cb) {
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var img = new Image();
+    img.onload = function(){
+      var max = 1200, w = img.width, h = img.height;
+      if (w >= h && w > max) { h = Math.round(h*max/w); w = max; }
+      else if (h > w && h > max) { w = Math.round(w*max/h); h = max; }
+      var c = document.createElement('canvas'); c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      try { cb(c.toDataURL('image/jpeg', 0.6)); } catch(err){ cb(null); }
+    };
+    img.onerror = function(){ cb(null); };
+    img.src = e.target.result;
+  };
+  reader.onerror = function(){ cb(null); };
+  reader.readAsDataURL(file);
+}
+function npSavePhoto(entry, statusEl) {
+  if (statusEl){ statusEl.textContent='Saving\u2026'; statusEl.style.color='#888'; }
+  var payload = Object.assign({_type:'notepad_photo'}, entry);
+  Promise.resolve(sb.from('deliveries').upsert({id: entry.id, data: payload}))
+    .then(function(res){
+      if (res && res.error){ if(statusEl){statusEl.textContent='Save failed';statusEl.style.color='#b00';} }
+      else { if(statusEl){statusEl.textContent='Saved \u2713';statusEl.style.color='#3a6b2a';} }
+    })
+    .catch(function(){ if(statusEl){statusEl.textContent='Save failed';statusEl.style.color='#b00';} });
+}
+function npDeletePhoto(id, cb) {
+  Promise.resolve(sb.from('deliveries').delete().eq('id', id)).then(function(){ if(cb)cb(); }).catch(function(){ if(cb)cb(); });
+}
+function npRenderEntry(entry) {
+  var card = div(''); card.style.cssText='border:1px solid #E7DFCE;border-radius:8px;padding:10px;margin-bottom:10px;background:#fff;';
+  var top = div(''); top.style.cssText='display:flex;gap:10px;';
+  var im = document.createElement('img'); im.src = entry.img;
+  im.style.cssText='width:92px;height:92px;object-fit:cover;border-radius:6px;border:1px solid #E7DFCE;flex-shrink:0;cursor:pointer;';
+  im.addEventListener('click', function(){ var w=window.open(); if(w){ w.document.write('<img src="'+entry.img+'" style="max-width:100%">'); } });
+  top.appendChild(im);
+  var fields = div(''); fields.style.cssText='flex:1;display:flex;flex-direction:column;gap:6px;min-width:0;';
+  var st = el('span',{style:'font-size:11px;font-weight:600;color:#3a6b2a;'}, 'Saved \u2713');
+  var qtyRow = div(''); qtyRow.style.cssText='display:flex;align-items:center;gap:6px;';
+  qtyRow.appendChild(el('label',{style:'font-size:12px;color:#8a8275;font-weight:600;width:30px;flex-shrink:0;'}, 'Qty'));
+  var qty = input({type:'text', value: entry.qty||''}); qty.placeholder='e.g. 25';
+  qty.style.cssText='flex:1;min-width:0;padding:6px 8px;border:1px solid #E7DFCE;border-radius:6px;font-size:13px;box-sizing:border-box;';
+  qty.addEventListener('input', function(){ entry.qty=qty.value; npSavePhoto(entry, st); });
+  qtyRow.appendChild(qty); fields.appendChild(qtyRow);
+  var notes = document.createElement('textarea'); notes.rows=2; notes.value=entry.notes||''; notes.placeholder='Notes about this label\u2026';
+  notes.style.cssText='width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #E7DFCE;border-radius:6px;font-size:13px;font-family:inherit;resize:vertical;';
+  notes.addEventListener('input', function(){ entry.notes=notes.value; npSavePhoto(entry, st); });
+  fields.appendChild(el('label',{style:'font-size:12px;color:#8a8275;font-weight:600;margin-top:2px;'}, 'Notes')); fields.appendChild(notes);
+  top.appendChild(fields); card.appendChild(top);
+  var bottom = div(''); bottom.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-top:6px;';
+  bottom.appendChild(st);
+  var del = el('button',{style:'background:none;border:none;color:#a05;font-size:12px;cursor:pointer;text-decoration:underline;'}, 'Delete');
+  del.addEventListener('click', function(){ if(window.confirm('Delete this photo?')){ npDeletePhoto(entry.id, function(){ card.remove(); }); } });
+  bottom.appendChild(del); card.appendChild(bottom);
+  return card;
+}
+function npAttachPhotos(v) {
+  v.appendChild(el('p',{style:'font-size:11px;font-weight:700;color:#8A6D2F;letter-spacing:0.5px;margin:22px 0 6px;'}, 'LABEL SNAPS'));
+  v.appendChild(el('p',{style:'font-size:12px;color:#888;margin:0 0 10px;'}, 'Snap an internal label, then add the qty and any notes. Photo and details save automatically.'));
+  var fileInp = document.createElement('input'); fileInp.type='file'; fileInp.accept='image/*'; fileInp.setAttribute('capture','environment'); fileInp.style.display='none';
+  var addBtn = document.createElement('button');
+  addBtn.textContent='\uD83D\uDCF7  Add label photo';
+  addBtn.style.cssText='display:block;width:100%;padding:12px;font-size:14px;font-weight:600;border:1.5px solid #C9A86A;border-radius:10px;background:#F3ECDD;color:#18342A;cursor:pointer;margin-bottom:8px;';
+  addBtn.addEventListener('click', function(){ fileInp.click(); });
+  var pstat = el('span',{style:'font-size:12px;font-weight:600;color:#888;display:block;margin-bottom:10px;min-height:14px;'}, '');
+  v.appendChild(addBtn); v.appendChild(fileInp); v.appendChild(pstat);
+  var photoList = div(''); v.appendChild(photoList);
+  fileInp.addEventListener('change', function(){
+    var f = fileInp.files && fileInp.files[0]; fileInp.value=''; if(!f) return;
+    pstat.textContent='Processing photo\u2026'; pstat.style.color='#888';
+    npCompress(f, function(dataUrl){
+      if(!dataUrl){ pstat.textContent='Photo failed \u2014 try again'; pstat.style.color='#b00'; return; }
+      var entry = {id:'npimg_'+Date.now(), img:dataUrl, qty:'', notes:'', createdAt:new Date().toISOString()};
+      var card = npRenderEntry(entry); photoList.insertBefore(card, photoList.firstChild);
+      pstat.textContent=''; npSavePhoto(entry, null);
+    });
+  });
+  Promise.resolve(sb.from('deliveries').select('id,data').like('id','npimg_%'))
+    .then(function(res){
+      var rows = ((res && res.data) || []).map(function(r){ return r.data; }).filter(Boolean);
+      rows.sort(function(a,b){ return (b.createdAt||'').localeCompare(a.createdAt||''); });
+      rows.forEach(function(d){ photoList.appendChild(npRenderEntry(d)); });
+    }).catch(function(){});
+}
+
 function renderNotepad() {
   currentView = 'notepad';
   ['view-list','view-form','view-manage','view-wetmeat','view-delivery','view-pest','view-prod','view-clean','view-checks','view-daily','view-venison'].forEach(function(id){ var e=document.getElementById(id); if(e) e.style.display='none'; });
@@ -1045,6 +1132,7 @@ function renderNotepad() {
     if (window.confirm('Clear the whole notepad? This cannot be undone.')) { ta.value=''; persistNotepad(status, ''); ta.style.height='auto'; ta.style.height='320px'; }
   });
   v.appendChild(clear);
+  npAttachPhotos(v);
   Promise.resolve(sb.from('deliveries').select('data').eq('id','notepad_main'))
     .then(function(res){
       var rows = (res && res.data) || [];
