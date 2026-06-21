@@ -1133,6 +1133,11 @@ function renderNotepad() {
   });
   v.appendChild(clear);
   npAttachPhotos(v);
+  var npDone = document.createElement('button');
+  npDone.textContent = 'Done \u2014 back to menu';
+  npDone.style.cssText='display:block;width:100%;margin:20px 0 8px;padding:13px;font-size:15px;font-weight:600;border:1.5px solid #C9A86A;border-radius:10px;background:#F3ECDD;color:#18342A;cursor:pointer;';
+  npDone.addEventListener('click', function(){ renderList(); window.scrollTo(0,0); });
+  v.appendChild(npDone);
   Promise.resolve(sb.from('deliveries').select('data').eq('id','notepad_main'))
     .then(function(res){
       var rows = (res && res.data) || [];
