@@ -152,6 +152,7 @@
   <div id="view-pest" style="display:none"></div>
   <div id="view-prod" style="display:none"></div>
   <div id="view-clean" style="display:none"></div>
+  <div id="view-notepad" style="display:none"></div>
   <div id="view-checks" style="display:none"></div>
   <div id="view-venison" style="display:none"></div>
 </div>
@@ -576,7 +577,7 @@ function renderTabs(activeTab) {
   v.innerHTML = '';
   // ===== Stage 1 nav: 4 top menus + Admin sub-menu =====
   const TOP = [['list','Intake'],['daily','Walkabout'],['prod','Production'],['admin','Admin']];
-  const ADMIN_GROUP = [['delivery','Finished Product'],['pest','Pest Control'],['clean','Periodic Cleans'],['wetmeat','Wet Meat'],['checks','Daily Checks'],['venison','Venison'],['manage','Manage']];
+  const ADMIN_GROUP = [['notepad','Notepad'],['delivery','Finished Product'],['pest','Pest Control'],['clean','Periodic Cleans'],['wetmeat','Wet Meat'],['checks','Daily Checks'],['venison','Venison'],['manage','Manage']];
   const adminIds = ADMIN_GROUP.map(a => a[0]);
   const inAdmin = adminIds.indexOf(activeTab) !== -1;
   function navGo(id) {
@@ -590,6 +591,7 @@ function renderTabs(activeTab) {
     else if (id === 'clean') renderPeriodicCleans();
     else if (id === 'checks') renderDailyChecks();
     else if (id === 'venison') renderVenison();
+    else if (id === 'notepad') renderNotepad();
     else if (id === 'manage') renderManage();
   }
   // pill styling (Option 1) — light house theme: ivory + gold accent, no deep fills
@@ -1007,6 +1009,59 @@ function renderWalkabout() {
   var prev = el('button',{style:'background:none;border:none;color:#aaa;font-size:12px;cursor:pointer;text-decoration:underline;display:block;margin:6px auto 0;'}, 'View previous walkabouts & records');
   prev.addEventListener('click', function(){ renderDailyRecordsList(); });
   v.appendChild(prev);
+}
+
+function persistNotepad(statusEl, text) {
+  if (statusEl) { statusEl.textContent='Saving\u2026'; statusEl.style.color='#888'; }
+  var payload = {_type:'notepad', text: text, updatedAt: new Date().toISOString()};
+  Promise.resolve(sb.from('deliveries').upsert({id:'notepad_main', data:payload}))
+    .then(function(res){
+      if (res && res.error) { if(statusEl){statusEl.textContent='Save failed \u2014 check connection';statusEl.style.color='#b00';} }
+      else { if(statusEl){statusEl.textContent='All changes saved \u2713';statusEl.style.color='#3a6b2a';} }
+    })
+    .catch(function(){ if(statusEl){statusEl.textContent='Save failed \u2014 check connection';statusEl.style.color='#b00';} });
+}
+function renderNotepad() {
+  currentView = 'notepad';
+  ['view-list','view-form','view-manage','view-wetmeat','view-delivery','view-pest','view-prod','view-clean','view-checks','view-daily','view-venison'].forEach(function(id){ var e=document.getElementById(id); if(e) e.style.display='none'; });
+  var v = document.getElementById('view-notepad');
+  if (!v) return;
+  v.style.display='block'; v.innerHTML='';
+  renderTabs('notepad');
+  var head = div(''); head.style.cssText='display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:4px 0 2px;flex-wrap:wrap;';
+  head.appendChild(el('h2',{style:'font-size:20px;font-weight:600;margin:0;'}, 'Notepad'));
+  var status = el('span',{style:'font-size:12px;font-weight:600;color:#888;'}, 'Loading\u2026');
+  head.appendChild(status);
+  v.appendChild(head);
+  v.appendChild(el('p',{style:'font-size:12px;color:#888;margin:0 0 12px;'}, 'Jot anything here \u2014 counts, notes from the bench, data to work on later. Saves automatically and syncs between your phone and your desk. Not included in the FSA report.'));
+  var ta = document.createElement('textarea');
+  ta.rows = 16;
+  ta.placeholder = 'Type your notes\u2026';
+  ta.style.cssText='width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid #E7DFCE;border-radius:8px;font-family:inherit;font-size:14px;line-height:1.5;resize:vertical;min-height:320px;background:#FCFAF5;';
+  ta.disabled = true;
+  v.appendChild(ta);
+  var clear = el('button',{style:'background:none;border:none;color:#bbb;font-size:12px;cursor:pointer;text-decoration:underline;display:block;margin:10px auto 0;'}, 'Clear notepad');
+  clear.addEventListener('click', function(){
+    if (window.confirm('Clear the whole notepad? This cannot be undone.')) { ta.value=''; persistNotepad(status, ''); ta.style.height='auto'; ta.style.height='320px'; }
+  });
+  v.appendChild(clear);
+  Promise.resolve(sb.from('deliveries').select('data').eq('id','notepad_main'))
+    .then(function(res){
+      var rows = (res && res.data) || [];
+      ta.value = (rows[0] && rows[0].data && rows[0].data.text) || '';
+      ta.disabled=false;
+      status.textContent='All changes saved \u2713'; status.style.color='#3a6b2a';
+      ta.style.height='auto'; ta.style.height=Math.max(320, ta.scrollHeight)+'px';
+    })
+    .catch(function(){ ta.disabled=false; status.textContent='Couldn\u2019t load \u2014 you can still type'; status.style.color='#b00'; });
+  var t=null;
+  ta.addEventListener('input', function(){
+    ta.style.height='auto'; ta.style.height=Math.max(320, ta.scrollHeight)+'px';
+    status.textContent='Saving\u2026'; status.style.color='#888';
+    if (t) clearTimeout(t);
+    var val = ta.value;
+    t = setTimeout(function(){ persistNotepad(status, val); }, 400);
+  });
 }
 
 function renderDailyRecordsList() {
@@ -5745,6 +5800,7 @@ function sessionRouteTo(v){
     case 'delivery': case 'delivery-form': renderDeliveryList(); break;
     case 'wetmeat': renderWetMeat(); break;
     case 'venison': (typeof renderVenison === 'function' ? renderVenison() : renderList()); break;
+    case 'notepad': renderNotepad(); break;
     case 'manage': renderManage(); break;
     default: renderList();
   }
