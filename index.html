@@ -3440,7 +3440,7 @@ function salamiLabelData(prodForm, stage){
 }
 function renderLabelCanvas(d, orientation, scale){
   scale=scale||4;
-  var W=orientation==='portrait'?240:360, H=orientation==='portrait'?360:240;
+  var W=orientation==='portrait'?240:400, H=orientation==='portrait'?400:240;
   var c=document.createElement('canvas'); c.width=W*scale; c.height=H*scale;
   var ctx=c.getContext('2d'); ctx.scale(scale,scale); drawSalamiLabel(ctx,W,H,d,orientation); return c;
 }
