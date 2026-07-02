@@ -1,34 +1,34 @@
-=== Run started 2026-07-01T00:01:22.695063 ===
+=== Run started 2026-07-02T00:02:26.009275 ===
 Python: 3.11.15 (main, Jun 16 2026, 21:41:52) [GCC 13.3.0]
 Working dir: /home/runner/work/fsa-records/fsa-records
 Script dir: /home/runner/work/fsa-records/fsa-records/scripts
 
-[2026-07-01 00:01:22] Script starting
-[2026-07-01 00:01:22] Pre-flight: checking env vars...
-[2026-07-01 00:01:22]   ok SUPABASE_URL present (40 chars)
-[2026-07-01 00:01:22]   ok SUPABASE_KEY present (208 chars)
-[2026-07-01 00:01:22]   ok DROPBOX_APP_KEY present (15 chars)
-[2026-07-01 00:01:22]   ok DROPBOX_APP_SECRET present (15 chars)
-[2026-07-01 00:01:22]   ok DROPBOX_REFRESH_TOKEN present (64 chars)
-[2026-07-01 00:01:22] Season code: 202526  →  filename: FSA_Records_202526.pdf
-[2026-07-01 00:01:22] Target filename: FSA_Records_202526.pdf
-[2026-07-01 00:01:22] Fetching from Supabase...
-[2026-07-01 00:01:22]   Fetching table: intakes
-[2026-07-01 00:01:24]     HTTP 200 (14047 bytes)
-[2026-07-01 00:01:24]   Fetching table: deliveries
-[2026-07-01 00:01:25]     HTTP 200 (2100686 bytes)
-[2026-07-01 00:01:25]   Fetching table: app_config
-[2026-07-01 00:01:26]     HTTP 200 (13192 bytes)
-[2026-07-01 00:01:26]   Records: intakes=29, daily=32, deliveries=1, pest=16, prod=9, checks=27, venison=3
-[2026-07-01 00:01:26] Building Production section (9 records)
-[2026-07-01 00:01:26] Building Pest Control section (16 records)
-[2026-07-01 00:01:26] Building PDF (184 story elements)
-[2026-07-01 00:01:26] ok PDF generated: FSA_Records_202526.pdf (102621 bytes)
-[2026-07-01 00:01:26] Reading PDF for Dropbox upload...
-[2026-07-01 00:01:26] Refreshing Dropbox access token...
-[2026-07-01 00:01:26]   Dropbox token HTTP 200
-[2026-07-01 00:01:26]   ok token refreshed
-[2026-07-01 00:01:26] Uploading to Dropbox: /FSA forms and records for emilys charcuterie/automated intake records/FSA_Records_202526.pdf
-[2026-07-01 00:01:27]   Dropbox HTTP 200
-[2026-07-01 00:01:27] ok Uploaded to Dropbox: /FSA forms and records for emilys charcuterie/automated intake records/FSA_Records_202526.pdf
-[2026-07-01 00:01:27] === Run completed successfully ===
+[2026-07-02 00:02:26] Script starting
+[2026-07-02 00:02:26] Pre-flight: checking env vars...
+[2026-07-02 00:02:26]   ok SUPABASE_URL present (40 chars)
+[2026-07-02 00:02:26]   ok SUPABASE_KEY present (208 chars)
+[2026-07-02 00:02:26]   ok DROPBOX_APP_KEY present (15 chars)
+[2026-07-02 00:02:26]   ok DROPBOX_APP_SECRET present (15 chars)
+[2026-07-02 00:02:26]   ok DROPBOX_REFRESH_TOKEN present (64 chars)
+[2026-07-02 00:02:26] Season code: 202526  →  filename: FSA_Records_202526.pdf
+[2026-07-02 00:02:26] Target filename: FSA_Records_202526.pdf
+[2026-07-02 00:02:26] Fetching from Supabase...
+[2026-07-02 00:02:26]   Fetching table: intakes
+[2026-07-02 00:02:27]     HTTP 200 (14047 bytes)
+[2026-07-02 00:02:27]   Fetching table: deliveries
+[2026-07-02 00:02:29]     HTTP 200 (2100686 bytes)
+[2026-07-02 00:02:29]   Fetching table: app_config
+[2026-07-02 00:02:29]     HTTP 200 (13192 bytes)
+[2026-07-02 00:02:29]   Records: intakes=29, daily=32, deliveries=1, pest=16, prod=9, checks=27, venison=3
+[2026-07-02 00:02:30] Building Production section (9 records)
+[2026-07-02 00:02:30] Building Pest Control section (16 records)
+[2026-07-02 00:02:30] Building PDF (184 story elements)
+[2026-07-02 00:02:30] ok PDF generated: FSA_Records_202526.pdf (102621 bytes)
+[2026-07-02 00:02:30] Reading PDF for Dropbox upload...
+[2026-07-02 00:02:30] Refreshing Dropbox access token...
+[2026-07-02 00:02:30]   Dropbox token HTTP 200
+[2026-07-02 00:02:30]   ok token refreshed
+[2026-07-02 00:02:30] Uploading to Dropbox: /FSA forms and records for emilys charcuterie/automated intake records/FSA_Records_202526.pdf
+[2026-07-02 00:02:33]   Dropbox HTTP 200
+[2026-07-02 00:02:33] ok Uploaded to Dropbox: /FSA forms and records for emilys charcuterie/automated intake records/FSA_Records_202526.pdf
+[2026-07-02 00:02:33] === Run completed successfully ===
