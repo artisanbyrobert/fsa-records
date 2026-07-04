@@ -331,6 +331,7 @@ async function loadData() {
   }
 }
 
+function _rowId(id, p){ id=String(id); var k=['daily_','walk_','dchk_','pest_','prod_','clean_','ven_']; for(var i=0;i<k.length;i++){ if(id.indexOf(k[i])===0) return id; } return p+id; }
 async function saveData() {
   try {
     // Fold the live working copy of an open run back into the saved array BEFORE
@@ -359,22 +360,22 @@ async function saveData() {
     await sb.from('app_config').upsert({key: 'generalTasks', data: generalTasks});
     await sb.from('app_config').upsert({key: 'skinSizes', data: skinSizes});
     for (const dr of dailyRecords) {
-      await sb.from('deliveries').upsert({id: 'daily_' + dr.id, data: {...dr, _type: 'daily'}});
+      await sb.from('deliveries').upsert({id: _rowId(dr.id,'daily_'), data: {...dr, _type: 'daily'}});
     }
     for (const pr of pestRecords) {
-      await sb.from('deliveries').upsert({id: 'pest_' + pr.id, data: {...pr, _type: 'pest'}});
+      await sb.from('deliveries').upsert({id: _rowId(pr.id,'pest_'), data: {...pr, _type: 'pest'}});
     }
     for (const r of productionRecords) {
-      await sb.from('deliveries').upsert({id: 'prod_' + r.id, data: {...r, _type: 'production'}});
+      await sb.from('deliveries').upsert({id: _rowId(r.id,'prod_'), data: {...r, _type: 'production'}});
     }
     for (const r of periodicCleans) {
-      await sb.from('deliveries').upsert({id: 'clean_' + r.id, data: {...r, _type: 'periodic_clean'}});
+      await sb.from('deliveries').upsert({id: _rowId(r.id,'clean_'), data: {...r, _type: 'periodic_clean'}});
     }
     for (const r of dailyChecks) {
-      await sb.from('deliveries').upsert({id: 'dchk_' + r.id, data: {...r, _type: 'dailychecks'}});
+      await sb.from('deliveries').upsert({id: _rowId(r.id,'dchk_'), data: {...r, _type: 'dailychecks'}});
     }
     for (const r of venisonRuns) {
-      await sb.from('deliveries').upsert({id: 'ven_' + r.id, data: {...r, _type: 'venison'}});
+      await sb.from('deliveries').upsert({id: _rowId(r.id,'ven_'), data: {...r, _type: 'venison'}});
     }
 
     showStatus('saved');
@@ -979,6 +980,7 @@ function renderWalkabout() {
   var status = el('span',{style:'font-size:12px;font-weight:600;color:#888;'}, '');
   head.appendChild(status);
   v.appendChild(head);
+  persistWalk(status); // save-on-open: a clean round is recorded the moment the screen opens
   v.appendChild(el('p',{style:'font-size:12px;color:#888;margin:0 0 14px;'}, walkForm.date + ' \u00b7 ' + walkForm.time + ' \u00b7 untick anything that\u2019s an issue. Saves automatically.'));
   function save(){ persistWalk(status); }
   MONITOR_CHECKS.forEach(function(check){
@@ -3727,7 +3729,7 @@ function persistDcNow(statusEl) {
   if (existing) Object.assign(existing, JSON.parse(JSON.stringify(dcForm)));
   else dailyChecks.push(JSON.parse(JSON.stringify(dcForm)));
   if (statusEl) { statusEl.textContent = 'Saving\u2026'; statusEl.style.color = '#888'; }
-  var rowId = 'dchk_' + dcForm.id;
+  var rowId = _rowId(dcForm.id, 'dchk_');
   var payload = Object.assign({}, JSON.parse(JSON.stringify(dcForm)), {_type:'dailychecks'});
   Promise.resolve(sb.from('deliveries').upsert({id: rowId, data: payload}))
     .then(function(res){
