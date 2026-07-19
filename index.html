@@ -2913,14 +2913,20 @@ let pestForm = null;
 let pestEditId = null;
 
 function blankPestRecord() {
-  const withStations = pestRecords
-    .filter(function(r){ return r.stations && r.stations.length > 0; })
-    .sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
-  const lastWithStations = withStations.length > 0 ? withStations[0] : null;
   const defaultStationNames = ['Under alu roof sheet','By red cabinet','Behind bench','By smoker','Under saw bench','By french doors','Under vice'];
-  const stations = lastWithStations
-    ? lastWithStations.stations.map(function(s) { return {id: uid(), name: s.name, status: '', notes: ''}; })
-    : defaultStationNames.map(function(n) { return {id: uid(), name: n, status: '', notes: ''}; });
+  // Seed the FULL station list every time: start from the canonical 7, then add
+  // any custom station ever recorded. A partial visit only saves the stations
+  // actually visited, so it must never be allowed to shrink the new-check list.
+  const names = defaultStationNames.slice();
+  pestRecords
+    .slice()
+    .sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); })
+    .forEach(function(r){
+      (r.stations || []).forEach(function(s){
+        if (s.name && names.indexOf(s.name) === -1) names.push(s.name);
+      });
+    });
+  const stations = names.map(function(n) { return {id: uid(), name: n, status: '', notes: ''}; });
   return {
     id: uid(),
     date: today(),
