@@ -3651,7 +3651,8 @@ function newDcForm(date) {
     id: 'dc_' + d.replace(/-/g,''),
     date: d,
     opening: MINCE_OPENING_CHECKS.map(function(t){ return {text: t, done: true}; }),
-    closing: MINCE_CLOSING_CHECKS.map(function(t){ return {text: t, done: true}; })
+    closing: MINCE_CLOSING_CHECKS.map(function(t){ return {text: t, done: true}; }),
+    cleanDown: {mincer: false, stuffer: false}
   };
 }
 function hideAllForChecks() {
@@ -3702,6 +3703,25 @@ function renderDailyChecks() {
   card.appendChild(group('Opening checks', dcForm.opening));
   card.appendChild(group('Closing checks', dcForm.closing));
 
+  if (!dcForm.cleanDown) dcForm.cleanDown = {mincer: false, stuffer: false};
+  function cleanDownGroup(){
+    var wrap = div('');
+    wrap.appendChild(el('h3', {style:'font-size:15px;font-weight:600;margin:12px 0 2px;color:#3a6b2a;'}, 'Equipment clean-down'));
+    wrap.appendChild(el('p', {style:'font-size:12px;color:#888;margin:0 0 4px;'}, 'Tick the machine you deep-cleaned today \u2014 mincer on a mince day, stuffer on a stuff day.'));
+    [['mincer','Mincer deep-clean completed (per procedure)'],['stuffer','Sausage stuffer deep-clean completed (per procedure)']].forEach(function(pair){
+      var keyName = pair[0];
+      var rowL = el('label', {style:'display:flex;align-items:flex-start;gap:8px;padding:5px 0;font-size:14px;cursor:pointer;'});
+      var cb = input({type:'checkbox'}); cb.checked = !!dcForm.cleanDown[keyName];
+      cb.style.cssText = 'margin-top:3px;width:18px;height:18px;flex-shrink:0;';
+      cb.addEventListener('change', function(){ dcForm.cleanDown[keyName] = cb.checked; dcSave(); });
+      rowL.appendChild(cb);
+      rowL.appendChild(el('span', {}, pair[1]));
+      wrap.appendChild(rowL);
+    });
+    return wrap;
+  }
+  card.appendChild(cleanDownGroup());
+
   var btnRow = div(''); btnRow.style.cssText = 'display:flex;gap:14px;align-items:center;margin-top:16px;';
   var newB = btn('', '+ New day', function(){ dcForm = newDcForm(); renderDailyChecks(); window.scrollTo(0,0); });
   btnRow.appendChild(newB);
@@ -3722,6 +3742,9 @@ function renderDailyChecks() {
     var left = div('');
     left.appendChild(el('span', {style:'font-weight:600;font-size:14px;'}, rec.date || '—'));
     left.appendChild(el('span', {style:'font-size:12px;color:#888;margin-left:12px;'}, 'Opening ' + od + '/' + ot + '  \u00b7  Closing ' + cd + '/' + ct));
+    var cdn = rec.cleanDown || {}; var cdParts = [];
+    if (cdn.mincer) cdParts.push('Mincer'); if (cdn.stuffer) cdParts.push('Stuffer');
+    if (cdParts.length) left.appendChild(el('span', {style:'font-size:12px;color:#3a6b2a;margin-left:12px;font-weight:600;'}, 'Clean-down: ' + cdParts.join(' + ')));
     line.appendChild(left);
     var ed = btn('', 'Edit', function(){ dcForm = JSON.parse(JSON.stringify(rec)); renderDailyChecks(); window.scrollTo(0,0); });
     ed.style.cssText = 'font-size:12px;padding:4px 12px;';
