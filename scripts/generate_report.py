@@ -582,6 +582,102 @@ _check_matrix(_check_days, 'closing', _close_labels,
     'Closing Checks',
     'End-of-day clean-down and shutdown checks for every work day (3-stage clean, UV cabinet, heaters off, etc.). Each row is one day; tick = done, cross = skipped.')
 
+# ── EQUIPMENT CLEAN-DOWN SECTION ──────────────────────────────────────────────
+# The two machine deep-clean procedures (locked SOPs), each followed by a dated
+# log of every completed clean-down. Dates come from dailychecks[].cleanDown.
+_log("Building Equipment Clean-Down section")
+add_section('Equipment Clean-Down',
+    'Cleaning method and completion record for the mincer and sausage stuffer. The mincer is deep-cleaned on every mince day, the stuffer on every stuff day. Each completed clean-down is dated beneath its procedure.')
+
+_CLEANDOWN_SOPS = [
+    ('mincer', 'Mincer - Deep Clean',
+     'Area: Dirty end / build room   Products: Ensure, Esteem, washup liquid, citric acid granules', [
+        'Spray sink and draining board with Ensure alcohol sanitiser (sink already cleaned). Wait 30 sec contact, leave to air dry.',
+        'Fill sink with hot water and 2 pumps washup liquid.',
+        'Disassemble mincer: remove blade collar, mincing disk, cutting blade. Remove meat debris before putting into sink.',
+        'Remove feed screw and separate the white nylon washer. Remove meat debris before putting into sink.',
+        'Remove mincing housing from motor body. Remove meat debris before putting into sink.',
+        'Wash all parts thoroughly, rinse, leave on drainer to drain.',
+        'Empty and rinse out sink.',
+        'Refill with water and 2 pumps Esteem sanitiser - minimum 30 sec contact time.',
+        'Re-wash and rinse all parts, leave to drain.',
+        'Spray all parts and leave to air dry for at least 30 sec.',
+        'Load parts into water boiler, add citric acid granules - check pH below 4.0, temperature minimum 82 deg C.',
+        'Soak minimum 5 minutes.',
+        'Remove and leave to air dry.',
+        'Cleaning cloths to washing machine 90 deg wash.',
+     ]),
+    ('stuffer', 'Sausage Stuffer - Deep Clean',
+     'Area: Build room   Products: Ensure, Esteem, washup liquid', [
+        'Spray sink and draining board with Ensure alcohol sanitiser (sink already cleaned). Wait 30 sec contact, leave to air dry.',
+        'Fill sink with hot water and 2 pumps washup liquid.',
+        'Disassemble stuffer: remove spout collar, spout, head plate. Remove meat debris before putting into sink.',
+        'Remove pusher disk and edge rubber seal using the plastic square (so as not to damage the rubber). Remove meat debris before putting into sink.',
+        'Spray inside machine body with Esteem, leave 30 sec.',
+        'Rinse clean with a damp cloth.',
+        'Spray inside body with Ensure alcohol spray and leave to air dry.',
+        'Wash all parts thoroughly, rinse, leave on drainer to drain.',
+        'Empty and rinse out sink.',
+        'Refill with water and 2 pumps Esteem sanitiser - minimum 30 sec contact time.',
+        'Re-wash and rinse all parts, leave to drain.',
+        'Spray all parts and leave to air dry for at least 30 sec.',
+        'Load all parts into blue tray, cover with water from the boiler - check temperature minimum 82 deg C.',
+        'Soak minimum 5 minutes.',
+        'Remove and leave to air dry.',
+        'Cleaning cloths to washing machine 90 deg wash.',
+     ]),
+]
+
+_cd_dates = {'mincer': [], 'stuffer': []}
+for _c in daily_checks:
+    _cd = _c.get('cleanDown') or {}
+    _dt = _c.get('date', '')
+    for _m in ('mincer', 'stuffer'):
+        if _cd.get(_m) and _dt:
+            _cd_dates[_m].append(_dt)
+for _m in _cd_dates:
+    _cd_dates[_m] = sorted(set(_cd_dates[_m]))
+
+def _cd_fmt(iso):
+    try:
+        _y, _mo, _d = str(iso).split('-')
+        _mn = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][int(_mo)-1]
+        return f"{int(_d)} {_mn} {_y}"
+    except Exception:
+        return clean(str(iso))
+
+_sop_h    = ParagraphStyle('cdsoph', fontName=SERIFB, fontSize=11,  textColor=GREEN,   spaceBefore=10, spaceAfter=1, keepWithNext=1)
+_sop_meta = ParagraphStyle('cdsopm', fontName=SERIF,  fontSize=8.5, textColor=GOLDLBL, spaceAfter=5,  keepWithNext=1)
+_sop_step = ParagraphStyle('cdsops', fontName=SERIF,  fontSize=9,   textColor=INK, leading=12, leftIndent=15, firstLineIndent=-12, spaceAfter=1)
+_cd_hdr   = ParagraphStyle('cdhdr',  fontName=SERIFB, fontSize=8,   textColor=GREEN)
+_cd_cell  = ParagraphStyle('cdcell', fontName=SERIF,  fontSize=8.5, leading=11)
+_cd_tick  = ParagraphStyle('cdtick', fontName=SERIFB, fontSize=9,   textColor=GREEN)
+
+for _key, _title, _meta, _steps in _CLEANDOWN_SOPS:
+    story.append(Paragraph(_title, _sop_h))
+    story.append(Paragraph(clean(_meta), _sop_meta))
+    for _i, _s in enumerate(_steps, 1):
+        story.append(Paragraph(str(_i) + '.&nbsp;&nbsp;' + clean(_s), _sop_step))
+    story.append(Spacer(1, 4))
+    _dates = _cd_dates.get(_key, [])
+    if _dates:
+        _rows = [[Paragraph('Date completed', _cd_hdr), Paragraph('Clean-down done (per procedure)', _cd_hdr)]]
+        for _d in _dates:
+            _rows.append([Paragraph(_cd_fmt(_d), _cd_cell), Paragraph('\u2713', _cd_tick)])
+        _ct = Table(_rows, colWidths=[40*mm, None])
+        _ct.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), SAND[0]),
+            ('LINEABOVE', (0,0), (-1,0), 0.8, GOLD), ('LINEBELOW', (0,0), (-1,0), 0.8, GOLD),
+            ('FONTNAME', (0,1), (-1,-1), SERIF), ('FONTSIZE', (0,0), (-1,-1), 8.5),
+            ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, ROWB]),
+            ('GRID', (0,0), (-1,-1), 0.35, HAIR),
+            ('LEFTPADDING', (0,0), (-1,-1), 5), ('TOPPADDING', (0,0), (-1,-1), 3),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('VALIGN', (0,0), (-1,-1), 'TOP')]))
+        story.append(_ct)
+    else:
+        story.append(Paragraph('No clean-downs recorded yet this season.', small))
+    story.append(Spacer(1, 6))
+
 # ── PRODUCTION SECTION ────────────────────────────────────────────────────────
 _log(f"Building Production section ({len(production_records)} records)")
 add_section('Production Records',
