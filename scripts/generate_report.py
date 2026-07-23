@@ -463,20 +463,25 @@ if intakes:
 else:
     story.append(Paragraph('No intake records found.', small))
 
-add_section('Daily Records',
-    'Day-by-day log, newest first. A <b>Monitor / walkabout</b> day checks: dehumidifier emptied; insectocutors working; no pest ingress; temperature against the wall thermometer; cloud temperature monitoring running; and that salami and cuts are drying well. A <b>Work day</b> (mince, stuffing, delivery or intake) instead has full opening and closing hygiene checks recorded \u2014 those days appear here marked \u201cWork day\u201d and the detail is in the Opening Checks, Closing Checks and Production Records sections.')
 cell_style = ParagraphStyle('cell', fontName=SERIF, fontSize=8, leading=10.5)
 header_style = ParagraphStyle('hdr', fontSize=7.5, textColor=GREEN, fontName=SERIFB)
 # dates that had opening/closing checks recorded (standalone daily checks + mince days) = work days
 _workday_dates = set()
+_workday_batch = {}
 for _c in daily_checks:
-    if _c.get('date'): _workday_dates.add(_c.get('date'))
+    if _c.get('date'):
+        _workday_dates.add(_c.get('date'))
+        if _c.get('batchCode'): _workday_batch[_c.get('date')] = _c.get('batchCode')
 for _r in production_records:
     for _st in (_r.get('stages', []) or []):
-        if _st.get('type') in ('mince','mix') and _st.get('date'): _workday_dates.add(_st.get('date'))
+        if _st.get('type') in ('mince','mix') and _st.get('date'):
+            _workday_dates.add(_st.get('date'))
+            _workday_batch.setdefault(_st.get('date'), _r.get('batchCode',''))
 _daily_dates = set(r.get('date','') for r in daily_records)
-# build a combined, de-duplicated day list: real daily records + synthetic work-day rows
-_day_rows = []
+
+# Monitor days and work days are recorded SEPARATELY, each with its own dates.
+_monitor_rows = []
+_work_rows = []
 for rec in daily_records:
     dt = rec.get('date','')
     open_tasks = [t['text'] for t in rec.get('todoList',[]) if not t.get('done')]
@@ -484,21 +489,41 @@ for rec in daily_records:
     notes_content = clean(rec.get('notes','') or rec.get('monitorNotes','') or '') or '-'
     day_type = rec.get('dayTypeId','').replace('-',' ').title() or 'Monitor'
     if dt in _workday_dates:
-        notes_content = (notes_content + ' ' if notes_content != '-' else '') + '<i>Work day \u2014 see Opening / Closing Checks &amp; Production Records.</i>'
-        day_type = day_type + ' (work day)'
-    _day_rows.append((dt, day_type, notes_content, tasks_content))
+        _work_rows.append((dt, _workday_batch.get(dt,'\u2014') or '\u2014', day_type, notes_content, tasks_content))
+    else:
+        _monitor_rows.append((dt, day_type, notes_content, tasks_content))
 for dt in sorted(_workday_dates - _daily_dates, reverse=True):
-    _day_rows.append((dt, 'Work day', '<i>Opening &amp; closing checks recorded \u2014 see Opening / Closing Checks &amp; Production Records.</i>', 'None'))
-_day_rows.sort(key=lambda x: x[0], reverse=True)
-if _day_rows:
-    rows = [[Paragraph('Date', header_style), Paragraph('Day Type', header_style), Paragraph('Notes', header_style), Paragraph('Outstanding Tasks', header_style)]]
-    for dt, day_type, notes_content, tasks_content in _day_rows:
-        rows.append([Paragraph(dt, cell_style), Paragraph(clean(day_type), cell_style), Paragraph(notes_content, cell_style), Paragraph(tasks_content, cell_style)])
-    t = Table(rows, colWidths=[20*mm, 42*mm, 91*mm, 74*mm], repeatRows=1)
+    _work_rows.append((dt, _workday_batch.get(dt,'\u2014') or '\u2014', 'Work day',
+                       '<i>Opening &amp; closing checks recorded \u2014 see Opening / Closing Checks &amp; Production Records.</i>', 'None'))
+_monitor_rows.sort(key=lambda x: x[0], reverse=True)
+_work_rows.sort(key=lambda x: x[0], reverse=True)
+
+def _day_table(rows, widths):
+    t = Table(rows, colWidths=widths, repeatRows=1)
     t.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), SAGE[0]), ('LINEABOVE', (0,0), (-1,0), 0.8, GOLD), ('LINEBELOW', (0,0), (-1,0), 0.8, GOLD), ('FONTNAME', (0,1), (-1,-1), SERIF), ('FONTSIZE', (0,0), (-1,-1), 8), ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]), ('GRID', (0,0), (-1,-1), 0.35, HAIR), ('LEFTPADDING', (0,0), (-1,-1), 4), ('TOPPADDING', (0,0), (-1,-1), 4), ('BOTTOMPADDING', (0,0), (-1,-1), 4), ('VALIGN', (0,0), (-1,-1), 'TOP')]))
-    story.append(t)
+    return t
+
+# ── MONITOR DAYS ──────────────────────────────────────────────────────────────
+add_section('Monitor Days',
+    'Non-production days, newest first. A <b>monitor / walkabout</b> day checks: dehumidifier emptied; insectocutors working; no pest ingress; temperature against the wall thermometer; cloud temperature monitoring running; and that salami and cuts are drying well. Work days are recorded separately in the next section.')
+if _monitor_rows:
+    rows = [[Paragraph('Date', header_style), Paragraph('Day Type', header_style), Paragraph('Notes', header_style), Paragraph('Outstanding Tasks', header_style)]]
+    for dt, day_type, notes_content, tasks_content in _monitor_rows:
+        rows.append([Paragraph(dt, cell_style), Paragraph(clean(day_type), cell_style), Paragraph(notes_content, cell_style), Paragraph(tasks_content, cell_style)])
+    story.append(_day_table(rows, [20*mm, 42*mm, 91*mm, 74*mm]))
 else:
-    story.append(Paragraph('No daily records found.', small))
+    story.append(Paragraph('No monitor days recorded yet.', small))
+
+# ── WORK DAYS ─────────────────────────────────────────────────────────────────
+add_section('Work Days',
+    'Production days, newest first \u2014 mince, stuffing, delivery or intake. Every work day carries full opening and closing hygiene checks; the detail is in the Opening Checks, Closing Checks, Equipment Clean-Down and Production Records sections.')
+if _work_rows:
+    rows = [[Paragraph('Date', header_style), Paragraph('Batch', header_style), Paragraph('Day Type', header_style), Paragraph('Notes', header_style), Paragraph('Outstanding Tasks', header_style)]]
+    for dt, batch, day_type, notes_content, tasks_content in _work_rows:
+        rows.append([Paragraph(dt, cell_style), Paragraph(clean(batch), cell_style), Paragraph(clean(day_type), cell_style), Paragraph(notes_content, cell_style), Paragraph(tasks_content, cell_style)])
+    story.append(_day_table(rows, [20*mm, 24*mm, 34*mm, 89*mm, 60*mm]))
+else:
+    story.append(Paragraph('No work days recorded yet.', small))
 
 # General quick-capture tasks (not tied to a record)
 _open_general = [t for t in general_tasks if not t.get('done') and t.get('kind') != 'app']
@@ -653,7 +678,9 @@ _cd_hdr   = ParagraphStyle('cdhdr',  fontName=SERIFB, fontSize=8,   textColor=GR
 _cd_cell  = ParagraphStyle('cdcell', fontName=SERIF,  fontSize=8.5, leading=11)
 _cd_tick  = ParagraphStyle('cdtick', fontName=SERIFB, fontSize=9,   textColor=GREEN)
 
-for _key, _title, _meta, _steps in _CLEANDOWN_SOPS:
+for _cd_i, (_key, _title, _meta, _steps) in enumerate(_CLEANDOWN_SOPS):
+    if _cd_i:                      # each machine's procedure starts on a clean page
+        story.append(PageBreak())
     story.append(Paragraph(_title, _sop_h))
     story.append(Paragraph(clean(_meta), _sop_meta))
     for _i, _s in enumerate(_steps, 1):
