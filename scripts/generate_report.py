@@ -443,7 +443,7 @@ intake_cell = ParagraphStyle('icell', fontName=SERIF, fontSize=8, leading=10.5)
 intake_hdr = ParagraphStyle('ihdr', fontSize=7.5, textColor=GREEN, fontName=SERIFB)
 if intakes:
     rows = [[Paragraph('Batch Code', intake_hdr), Paragraph('Date', intake_hdr), Paragraph('Estate', intake_hdr), Paragraph('Species', intake_hdr), Paragraph('Items', intake_hdr)]]
-    for rec in sorted(intakes, key=lambda x: x.get('date',''), reverse=True):
+    for rec in sorted(intakes, key=lambda x: (x.get('date') or ''), reverse=True):
         items_list = rec.get('items', [])
         items_str = '<br/>'.join([clean(f"{i.get('qty','')} {i.get('unit','')} {i.get('species','')}").strip() for i in items_list])
         species = ''
@@ -712,7 +712,7 @@ add_section('Production Records',
 
 if production_records:
     _prod_first = True
-    for rec in sorted(production_records, key=lambda x: x.get('startDate', x.get('processCode','')), reverse=True):
+    for rec in sorted(production_records, key=lambda x: (x.get('startDate') or x.get('processCode') or ''), reverse=True):
         if not _prod_first:
             story.append(PageBreak())
         _prod_first = False
@@ -870,7 +870,7 @@ def _vfmt(n):
     return f'{int(round(n)):,}' if n else '—'
 
 if venison_runs:
-    for run in sorted(venison_runs, key=lambda r: r.get('date', ''), reverse=True):
+    for run in sorted(venison_runs, key=lambda r: (r.get('date') or ''), reverse=True):
         ven_alias = run.get('alias','') or to_alias(run.get('estate',''))
         title = ("Venison Breakdown — " + str(run.get('batchCode', '(no batch)')) + " · " + str(ven_alias)).strip(' ·')
         add_section(title, 'Private kill — processed for the estate\u2019s own consumption.')
@@ -1000,7 +1000,7 @@ if pest_records:
         _bc = ParagraphStyle('bc', fontName=SERIF, fontSize=8, leading=10, alignment=1)
         _bd = ParagraphStyle('bd', fontName=SERIF, fontSize=8, leading=10)
         brows = [[Paragraph('Date', _bhl)] + [Paragraph(str(i+1), _bh) for i in range(len(_bait_stations))]]
-        for rec in sorted(pest_records, key=lambda x: x.get('date',''), reverse=True):
+        for rec in sorted(pest_records, key=lambda x: (x.get('date') or ''), reverse=True):
             _stt = {clean(s2.get('name','')): clean(s2.get('status','')) for s2 in (rec.get('stations', []) or [])}
             if not _stt: continue
             brows.append([Paragraph(clean(rec.get('date','')), _bd)] + [Paragraph(_stt.get(nm, '\u2013'), _bc) for nm in _bait_stations])
@@ -1033,7 +1033,7 @@ if pest_records:
         for loc in ins_locs: _h1 += [Paragraph(clean(prettify_name(loc)), _roomh), '', '', '']
         _h2 = [''] + [Paragraph(x, _subh) for _ in ins_locs for x in _sub]
         idata = [_h1, _h2]
-        for rec in sorted(pest_records, key=lambda x: x.get('date',''), reverse=True):
+        for rec in sorted(pest_records, key=lambda x: (x.get('date') or ''), reverse=True):
             ins = rec.get('insectocutors', {}) or {}
             if not ins: continue
             r = [Paragraph(clean(rec.get('date','')), ParagraphStyle('idd', fontName=SERIF, fontSize=8, leading=10))]
@@ -1069,7 +1069,7 @@ add_section('Finished Product / Delivery Records',
     'Finished salami, prosciutto and other products dispatched, by batch and destination. Completes the traceability chain from intake through production to the customer.')
 if deliveries:
     rows = [['Date', 'Batch', 'Destination', 'Notes']]
-    for rec in sorted(deliveries, key=lambda x: x.get('date',''), reverse=True):
+    for rec in sorted(deliveries, key=lambda x: (x.get('date') or ''), reverse=True):
         rows.append([rec.get('date',''), rec.get('batchCode',''), rec.get('destination', rec.get('processor','')), rec.get('notes','')[:60]])
     t = Table(rows, colWidths=[20*mm, 45*mm, 72*mm, 90*mm], repeatRows=1)
     t.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), SAGE[0]), ('LINEABOVE', (0,0), (-1,0), 0.8, GOLD), ('LINEBELOW', (0,0), (-1,0), 0.8, GOLD), ('TEXTCOLOR', (0,0), (-1,0), GREEN), ('FONTNAME', (0,0), (-1,0), SERIFB), ('FONTNAME', (0,1), (-1,-1), SERIF), ('FONTSIZE', (0,0), (-1,-1), 8.5), ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]), ('GRID', (0,0), (-1,-1), 0.35, HAIR), ('LEFTPADDING', (0,0), (-1,-1), 4), ('TOPPADDING', (0,0), (-1,-1), 4), ('BOTTOMPADDING', (0,0), (-1,-1), 4), ('VALIGN', (0,0), (-1,-1), 'TOP')]))
