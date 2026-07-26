@@ -436,6 +436,102 @@ summary_table.setStyle(lux_table_style(SAND, len(summary_rows)))
 story.append(summary_table)
 story.append(PageBreak())
 
+# ── HACCP PLAN: PHEASANT MEAT INTAKE ──────────────────────────────────────────
+# Sits at the START of the intake records, on its own page(s), with a trailing
+# page break so it never runs on into the intake table.
+_review_date = today.replace(year=today.year + 1).strftime('%d/%m/%Y')
+_ht    = ParagraphStyle('hac_t',    fontName=DISPLAY, fontSize=22, textColor=GREEN,   alignment=1, leading=24, spaceAfter=2)
+_hsub  = ParagraphStyle('hac_sub',  fontName=SERIF,   fontSize=11, textColor=GOLDLBL, alignment=1, spaceAfter=1)
+_hmeta = ParagraphStyle('hac_meta', fontName=SERIF,   fontSize=9,  textColor=MUTE,    alignment=1, spaceAfter=10)
+_hh    = ParagraphStyle('hac_h',    fontName=SERIFB,  fontSize=12, textColor=GREEN, spaceBefore=13, spaceAfter=3, keepWithNext=1)
+_hb    = ParagraphStyle('hac_b',    fontName=SERIF,   fontSize=10, textColor=INK, leading=13.5, spaceAfter=4)
+_hcell = ParagraphStyle('hac_cell', fontName=SERIF,   fontSize=9,  textColor=INK, leading=12)
+_hctr  = ParagraphStyle('hac_ctr',  fontName=SERIFB,  fontSize=9,  textColor=GREEN, alignment=1, leading=12)
+_hhdr  = ParagraphStyle('hac_hdr',  fontName=SERIFB,  fontSize=8.5,textColor=GREEN)
+_hkey  = ParagraphStyle('hac_key',  fontName=SERIFB,  fontSize=9,  textColor=GREEN, leading=12)
+
+def _hac_sec(title):
+    story.append(Paragraph(title, _hh))
+    _r = HRFlowable(width='100%', thickness=0.8, color=GOLD, spaceAfter=5); _r.keepWithNext = 1
+    story.append(_r)
+
+def _hac_table(rows, widths, header=True):
+    t = Table(rows, colWidths=widths, repeatRows=(1 if header else 0))
+    st = [('BACKGROUND', (0,0), (-1,0), SAGE[0]) if header else ('BACKGROUND',(0,0),(-1,0),colors.white),
+          ('LINEABOVE', (0,0), (-1,0), 0.8, GOLD), ('LINEBELOW', (0,0), (-1,0), 0.8, GOLD),
+          ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, ROWB]),
+          ('LINEBELOW', (0,1), (-1,-1), 0.35, HAIR),
+          ('GRID', (0,0), (-1,-1), 0.3, HAIR),
+          ('LEFTPADDING', (0,0), (-1,-1), 6), ('RIGHTPADDING', (0,0), (-1,-1), 6),
+          ('TOPPADDING', (0,0), (-1,-1), 5), ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+          ('VALIGN', (0,0), (-1,-1), 'TOP')]
+    t.setStyle(TableStyle(st))
+    return t
+
+story.append(Paragraph('HACCP Plan &mdash; Pheasant Meat Intake', _ht))
+story.append(HRFlowable(width='28%', thickness=1, color=GOLD, spaceAfter=6, spaceBefore=2, hAlign='CENTER'))
+story.append(Paragraph('Goods-in control &nbsp;&middot;&nbsp; separate from the Salami process plan', _hsub))
+story.append(Paragraph('Prepared by Robert Fry &nbsp;&middot;&nbsp; Revised ' + report_date + ' &nbsp;&middot;&nbsp; Review annually (next due ' + _review_date + ') &nbsp;&middot;&nbsp; FSA Licence UK2820', _hmeta))
+
+_hac_sec('1 &nbsp; Scope of Study')
+story.append(Paragraph('<b>Biological safety:</b> avoid introducing significant microbiological contamination onto any carcass, and reduce the potential for growth.', _hb))
+story.append(Paragraph('<b>Physical &amp; chemical safety:</b> avoid introducing physical and chemical contaminants onto any carcass.', _hb))
+
+_hac_sec('2 &nbsp; Process, Storage &amp; Customer')
+story.append(Paragraph('<b>Process:</b> receive meat in vac bags from the processor, ready for making into salami.', _hb))
+story.append(Paragraph('<b>Storage &amp; distribution:</b> either chilled for immediate use, or frozen for work later in the season.', _hb))
+story.append(Paragraph('<b>Use &amp; customer:</b> current client base is hunts and estates &mdash; birds collected from each shoot, then returned as salami for their members\u2019 own consumption. Online shop for public sale developing mid-2026.', _hb))
+
+_hac_sec('3 &nbsp; Process Flow Diagram')
+_flow = [
+  [Paragraph('Step', _hhdr), Paragraph('Process step', _hhdr), Paragraph('Key points', _hhdr)],
+  [Paragraph('1', _hctr), Paragraph('Intake meat &nbsp;<font color="#18342A"><b>(CCP 1)</b></font>', _hcell),
+     Paragraph('Take core temperature on arrival &mdash; probe <b>between packs</b> if frozen (&lt; -18\u00b0C), probe reading if chilled (&lt; 4\u00b0C). Check for damaged packaging. Remove all outer / shipping packaging at the door so only sealed vac packs pass through and outside contamination is not carried into storage.', _hcell)],
+  [Paragraph('2', _hctr), Paragraph('Record intake &amp; assign batch number', _hcell),
+     Paragraph('Enter delivery details on the intake record; the <b>app generates a unique batch number</b> (cannot be duplicated, reused or left blank). No meat stored or worked without a batch number.', _hcell)],
+  [Paragraph('3', _hctr), Paragraph('Move to storage', _hcell),
+     Paragraph('Chiller for imminent work, or freezer for work later in the season. Check airflow and fridge / freezer temperature against sensor. Store sealed vac packs only.', _hcell)],
+  [Paragraph('End', _hctr), Paragraph('Hand-off', _hcell),
+     Paragraph('Meat is held under its batch number in the estate pool, or passed directly to the Pheasant Salami process plan. Each intake keeps its own batch code; production runs draw from the pool and inherit the codes of the meat used.', _hcell)],
+]
+story.append(_hac_table(_flow, [24*mm, 78*mm, 165*mm]))
+
+_hac_sec('4 &nbsp; Hazard Analysis')
+_haz = [
+  [Paragraph('Step', _hhdr), Paragraph('Process', _hhdr), Paragraph('Food safety hazard &amp; cause', _hhdr), Paragraph('Likely', _hhdr), Paragraph('Severity', _hhdr), Paragraph('Control measures', _hhdr)],
+  [Paragraph('1', _hctr), Paragraph('Intake meat', _hcell), Paragraph('Bacterial growth from over-temperature meat; physical contamination from damaged packaging or from outer / shipping boxes carried into storage', _hcell), Paragraph('L', _hctr), Paragraph('H', _hctr), Paragraph('Core temp on arrival &mdash; between packs if frozen (&lt; -18\u00b0C), probe if chilled (&lt; 4\u00b0C). Check / reject damaged packaging. Remove outer packaging at the door. Log on intake record.', _hcell)],
+  [Paragraph('2', _hctr), Paragraph('Record &amp; batch', _hcell), Paragraph('Loss of traceability &mdash; meat that cannot be traced to source, date and processor', _hcell), Paragraph('L', _hctr), Paragraph('H', _hctr), Paragraph('Enter details on intake record; app generates a unique batch number. No meat stored or worked without one.', _hcell)],
+  [Paragraph('3', _hctr), Paragraph('Storage', _hcell), Paragraph('Bacterial growth from incorrect storage temperature; cross-contamination on handling', _hcell), Paragraph('L', _hctr), Paragraph('H', _hctr), Paragraph('Chiller or freezer as required. Check airflow and fridge / freezer temp against sensor. Store vac packs only.', _hcell)],
+]
+story.append(_hac_table(_haz, [16*mm, 34*mm, 74*mm, 16*mm, 20*mm, 107*mm]))
+
+_hac_sec('5 &nbsp; CCP Determination')
+_ccp = [
+  [Paragraph('Step', _hhdr), Paragraph('Does this step reduce the hazard to an acceptable level?', _hhdr), Paragraph('Could contamination increase to unacceptable levels here?', _hhdr), Paragraph('Will a later step reduce it to an acceptable level?', _hhdr), Paragraph('CCP?', _hhdr), Paragraph('Justification', _hhdr)],
+  [Paragraph('1 &nbsp; Intake meat', _hcell), Paragraph('Yes', _hctr), Paragraph('&mdash;', _hctr), Paragraph('&mdash;', _hctr), Paragraph('<b>CCP 1</b>', _hctr), Paragraph('The temperature check at the door is the control that confirms the meat is safe (chilled &lt; 4\u00b0C, frozen &lt; -18\u00b0C) and dirty outers are removed here. Contamination is controlled at this step.', _hcell)],
+  [Paragraph('2 &nbsp; Record &amp; batch', _hcell), Paragraph('No', _hctr), Paragraph('No', _hctr), Paragraph('&mdash;', _hctr), Paragraph('No', _hctr), Paragraph('A traceability control, not a food-safety-hazard reduction. Recording details and assigning a batch number does not expose or grow contamination. (Critical traceability control all the same.)', _hcell)],
+  [Paragraph('3 &nbsp; Storage', _hcell), Paragraph('No', _hctr), Paragraph('Yes', _hctr), Paragraph('Yes', _hctr), Paragraph('No', _hctr), Paragraph('Storage holds the meat; if the chiller / freezer ran warm, bacteria could grow over time, but later use &mdash; taken into the process, or frozen for future use &mdash; then controls it.', _hcell)],
+]
+story.append(_hac_table(_ccp, [40*mm, 16*mm, 16*mm, 16*mm, 24*mm, 155*mm]))
+
+_hac_sec('6 &nbsp; CCP Summary &mdash; CCP 1, Meat Intake')
+_sum = [
+  [Paragraph('Field', _hhdr), Paragraph('Detail', _hhdr)],
+  [Paragraph('Process step', _hkey), Paragraph('Step 1 &mdash; Meat intake', _hcell)],
+  [Paragraph('CCP No.', _hkey), Paragraph('1', _hcell)],
+  [Paragraph('Critical limit', _hkey), Paragraph('&lt; 4\u00b0C if chilled, or &lt; -18\u00b0C if frozen', _hcell)],
+  [Paragraph('Monitoring', _hkey), Paragraph('Core temperature check on every delivery &mdash; probe reading if chilled, between-pack probe if frozen. Frequency: every intake. Responsibility: Robert.', _hcell)],
+  [Paragraph('Records', _hkey), Paragraph('Intake record (app)', _hcell)],
+  [Paragraph('Corrective action', _hkey), Paragraph('Reject or isolate any delivery outside the limit; record the deviation and the action taken. Responsibility: Robert.', _hcell)],
+]
+story.append(_hac_table(_sum, [50*mm, 217*mm]))
+
+story.append(Spacer(1, 10))
+story.append(Paragraph('Prepared and signed off by: Robert Fry &nbsp;&nbsp;&middot;&nbsp;&nbsp; Date ' + report_date + ' &nbsp;&nbsp;&middot;&nbsp;&nbsp; Next review: ' + _review_date,
+    ParagraphStyle('hac_sign', fontName=SERIF, fontSize=9.5, textColor=INK)))
+story.append(PageBreak())
+# ── END HACCP PLAN ────────────────────────────────────────────────────────────
+
 add_section('Intake Records',
     'All raw meat brought in, by batch. Each batch carries its season code, intake date, source estate, species and weights. This is the start of the traceability chain — every finished product traces back to a batch here.',
     new_page=False)
