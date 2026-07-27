@@ -538,7 +538,7 @@ add_section('Intake Records',
 intake_cell = ParagraphStyle('icell', fontName=SERIF, fontSize=8, leading=10.5)
 intake_hdr = ParagraphStyle('ihdr', fontSize=7.5, textColor=GREEN, fontName=SERIFB)
 if intakes:
-    rows = [[Paragraph('Batch Code', intake_hdr), Paragraph('Date', intake_hdr), Paragraph('Estate', intake_hdr), Paragraph('Species', intake_hdr), Paragraph('Items', intake_hdr)]]
+    rows = [[Paragraph('Batch Code', intake_hdr), Paragraph('Date', intake_hdr), Paragraph('Estate', intake_hdr), Paragraph('Species', intake_hdr), Paragraph('Storage / Temp', intake_hdr), Paragraph('Items', intake_hdr)]]
     for rec in sorted(intakes, key=lambda x: (x.get('date') or ''), reverse=True):
         items_list = rec.get('items', [])
         items_str = '<br/>'.join([clean(f"{i.get('qty','')} {i.get('unit','')} {i.get('species','')}").strip() for i in items_list])
@@ -546,14 +546,27 @@ if intakes:
         if items_list:
             first = items_list[0]
             species = first.get('custom','') if first.get('species','') in ('Other','') else first.get('species','')
+        # derive storage/temp display: frozen = < -18C, chilled = < 4C
+        _storage_parts = []
+        for _it in items_list:
+            _st = (_it.get('storage') or '').strip().lower()
+            _tmp = (_it.get('temp') or '').strip()
+            if _st == 'frozen':
+                _storage_parts.append('Frozen &lt; -18\u00b0C' + (' (' + _tmp + '\u00b0C recorded)' if _tmp else ''))
+            elif _st == 'chilled':
+                _storage_parts.append('Chilled &lt; 4\u00b0C' + (' (' + _tmp + '\u00b0C recorded)' if _tmp else ''))
+            else:
+                _storage_parts.append(clean(_st) if _st else '?')
+        _storage_str = '<br/>'.join(dict.fromkeys(_storage_parts))  # deduplicate while preserving order
         rows.append([
             Paragraph(clean(rec.get('batchCode','')), intake_cell),
             Paragraph(rec.get('date',''), intake_cell),
             Paragraph(clean(get_estate(rec)), intake_cell),
             Paragraph(clean(species), intake_cell),
+            Paragraph(_storage_str, intake_cell),
             Paragraph(items_str, intake_cell)
         ])
-    t = Table(rows, colWidths=[30*mm, 20*mm, 40*mm, 22*mm, 115*mm], repeatRows=1)
+    t = Table(rows, colWidths=[28*mm, 18*mm, 36*mm, 20*mm, 34*mm, 91*mm], repeatRows=1)
     t.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), SAGE[0]), ('LINEABOVE', (0,0), (-1,0), 0.8, GOLD), ('LINEBELOW', (0,0), (-1,0), 0.8, GOLD), ('FONTNAME', (0,1), (-1,-1), SERIF), ('FONTSIZE', (0,0), (-1,-1), 8), ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]), ('GRID', (0,0), (-1,-1), 0.35, HAIR), ('LEFTPADDING', (0,0), (-1,-1), 4), ('TOPPADDING', (0,0), (-1,-1), 4), ('BOTTOMPADDING', (0,0), (-1,-1), 4), ('VALIGN', (0,0), (-1,-1), 'TOP')]))
     story.append(t)
 else:
