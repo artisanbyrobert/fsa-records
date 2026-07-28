@@ -814,6 +814,204 @@ for _cd_i, (_key, _title, _meta, _steps) in enumerate(_CLEANDOWN_SOPS):
         story.append(Paragraph('No clean-downs recorded yet this season.', small))
     story.append(Spacer(1, 6))
 
+# ── HACCP PLAN: PHEASANT / PARTRIDGE SALAMI ───────────────────────────────────
+# Sits at the START of the Production section, on its own page(s), with a
+# trailing page break so it never runs on into the production records.
+# Section 10 (Verification & Review) is deliberately omitted until the
+# outstanding lab / water / swab tests are completed.
+story.append(PageBreak())
+story.append(Paragraph('HACCP Plan &mdash; Pheasant &amp; Partridge Salami', _ht))
+story.append(HRFlowable(width='28%', thickness=1, color=GOLD, spaceAfter=6, spaceBefore=2, hAlign='CENTER'))
+story.append(Paragraph('Dried fermented salami &nbsp;&middot;&nbsp; separate from the Meat Intake plan', _hsub))
+story.append(Paragraph('Prepared by Robert Fry &nbsp;&middot;&nbsp; Revised ' + report_date + ' &nbsp;&middot;&nbsp; Review annually (next due ' + _review_date + ') &nbsp;&middot;&nbsp; FSA Licence UK2820', _hmeta))
+
+_hac_sec('1 &nbsp; Scope of Study')
+story.append(Paragraph('Dried, uncooked, fermented salami made from wild game birds &mdash; principally pheasant and partridge &mdash; blended with organic pork fat, salted, cased and air dried to shelf stability.', _hb))
+story.append(Paragraph('The plan begins where frozen game meat is drawn from storage and ends at vac-packed finished product held in ambient storage awaiting delivery.', _hb))
+story.append(Paragraph('<b>Not covered here:</b> meat intake (separate plan, in force from 26 July 2026), and venison prosciutto, cured loin and fillet, and pastrami (separate plans to follow).', _hb))
+
+_hac_sec('2 &nbsp; Product Description')
+_pd = [
+  [Paragraph('Item', _hhdr), Paragraph('Detail', _hhdr)],
+  [Paragraph('Product', _hkey), Paragraph('Dried fermented salami. Ready to eat, not cooked.', _hcell)],
+  [Paragraph('Meat', _hkey), Paragraph('Wild pheasant or partridge, previously frozen.', _hcell)],
+  [Paragraph('Fat', _hkey), Paragraph('Organic pork fat from a known farm via its own abattoir. Diced and stored in salt; alcohol washed before mince, which removes the storage salt, so no salt adjustment is required.', _hcell)],
+  [Paragraph('Curing agent', _hkey), Paragraph('Salt only, at 2.5% of combined meat and fat weight. <b>No nitrates or nitrites are used.</b>', _hcell)],
+  [Paragraph('Starter culture', _hkey), Paragraph('Flora Italiana, added at the blend stage (S3). Sugar in the recipe is the substrate for the culture, not a flavouring.', _hcell)],
+  [Paragraph('Alcohol', _hkey), Paragraph('Estate-produced wine above 13% ABV. A processing aid only &mdash; applied to the surface, then drained. It does not remain in the mix and is not an ingredient of the finished product.', _hcell)],
+  [Paragraph('Casing', _hkey), Paragraph('45 mm Devro collagen, or 65&ndash;68 mm beef.', _hcell)],
+  [Paragraph('Target wet weight', _hkey), Paragraph('230&ndash;260 g in 45 mm &nbsp;&middot;&nbsp; 400&ndash;530 g in 65&ndash;68 mm. Recorded per piece at stuffing.', _hcell)],
+  [Paragraph('Shelf stability', _hkey), Paragraph('Achieved by reduction of water activity to 0.82 or below.', _hcell)],
+  [Paragraph('Packaging &amp; storage', _hkey), Paragraph('Vacuum packed, then held in ambient storage below 18&deg;C.', _hcell)],
+]
+story.append(_hac_table(_pd, [42*mm, 225*mm]))
+
+_hac_sec('3 &nbsp; Intended Use &amp; Consumers')
+story.append(Paragraph('Ready to eat without further cooking. Supplied to shooting estates for consumption by estate members and their guests, and to private individuals. No current client resells to the public, and the product is not currently placed on the open retail market.', _hb))
+story.append(Paragraph('<b>Vulnerable groups:</b> the product is not marketed to infants, the elderly, pregnant women or the immunocompromised, but as a ready-to-eat cured product it may be consumed by them. The controls in this plan are set on that basis.', _hb))
+
+_hac_sec('4 &nbsp; Basis of the Plan &mdash; Why Cold, and Why No Nitrate')
+story.append(Paragraph('<b>No nitrate.</b> Salt is the sole curing agent by choice. Nitrate is therefore not available as a hurdle against pathogen growth during curing.', _hb))
+story.append(Paragraph('<b>Cold rather than ambient.</b> Standard salami is fermented at ambient, roughly 18&ndash;24&deg;C. Pheasant and partridge are effectively poultry and carry a significantly higher bacterial load than pork or beef, principally <i>Salmonella</i> and <i>Campylobacter</i>. Fermenting these at ambient without nitrate would allow those organisms to multiply during the critical early drying phase.', _hb))
+story.append(Paragraph('<b>The control.</b> Product is held below 4&deg;C from intake through the entire drying process, until water activity 0.82 is reached. This cold chain replaces the nitrate-and-ambient pathway. It is a deliberate, documented and more conservative approach, appropriate to the species used. Once 0.82 is reached the product is shelf stable and moves to ambient below 18&deg;C.', _hb))
+story.append(Paragraph('<b>The second hurdle.</b> Flora Italiana starter culture is added at the blend stage. It metabolises the added sugar and lowers pH through the cure, continuing once the product moves to ambient where the culture is most active. A falling pH is a recognised hurdle against <i>Listeria monocytogenes</i>, the organism of most concern in a chilled ready-to-eat product.', _hb))
+story.append(Paragraph('<b>Stated limitation.</b> pH is not currently measured or recorded. The hurdle is real and the mechanism is standard, but until pH is measured it is described here rather than monitored, and the plan does not depend on it. Water activity remains the primary control and the plan stands without the pH claim.', _hb))
+
+_hac_sec('5 &nbsp; Process Flow Diagram')
+_sflow = [
+  [Paragraph('Step', _hhdr), Paragraph('Process step', _hhdr), Paragraph('Temperature', _hhdr), Paragraph('Key points', _hhdr)],
+  [Paragraph('S1', _hctr), Paragraph('Draw from storage, defrost', _hcell), Paragraph('0&ndash;4&deg;C', _hctr),
+     Paragraph('Frozen meat transferred to chiller, approximately 3 days. <b>No ambient defrost is permitted.</b> Fat is held separately and joins at S2.', _hcell)],
+  [Paragraph('S2', _hctr), Paragraph('Alcohol wash, mince, salt', _hcell), Paragraph('below 4&deg;C', _hctr),
+     Paragraph('Wash meat in alcohol above 13% ABV, minimum 60 seconds contact, then drain (garlic blitzed into the alcohol first if the recipe requires it). Wash the diced salted fat the same way. Mince meat and fat together to recipe plate sizes. Add salt at 2.5% of combined weight. Record all contributing batch codes. Decide the number of children from the defrost size and the client order; each child takes its own code.', _hcell)],
+  [Paragraph('S3', _hctr), Paragraph('Make blend per child', _hcell), Paragraph('below 4&deg;C', _hctr),
+     Paragraph('Add order: sugar, then Flora Italiana starter culture, then garlic if used, then the remaining dry powders. Each ingredient ticked as it goes in. Blend mixed into the rested meat and fat.', _hcell)],
+  [Paragraph('S4', _hctr), Paragraph('Rest mixed blend', _hcell), Paragraph('below 4&deg;C', _hctr),
+     Paragraph('Standard 24 hours, may be shortened under time pressure. Quality control, not a safety step &mdash; it improves texture and filling consistency.', _hcell)],
+  [Paragraph('S5', _hctr), Paragraph('Stuff casings, hang', _hcell), Paragraph('below 4&deg;C', _hctr),
+     Paragraph('Stuffer deep-cleaned per SOP. Stuff to target wet weight and record it &mdash; this is the baseline the 40% weight loss is measured from. Apply the internal hanging label (batch code, alias, species, flavour, hang date) and hang on rails.', _hcell)],
+  [Paragraph('<b>S6</b>', _hctr), Paragraph('<b>Air dry to shelf stability &nbsp;<font color="#18342A">(CCP 1)</font></b>', _hcell), Paragraph('<b>below 4&deg;C throughout</b>', _hctr),
+     Paragraph('Cold chain maintained for the whole drying period. Dry until water activity is 0.82 or below <b>and</b> weight loss is 40% or more. Water activity meter is the primary measure, weight loss the secondary. Mould washed off with vinegar as required.', _hcell)],
+  [Paragraph('S7', _hctr), Paragraph('Move to ambient storage', _hcell), Paragraph('below 18&deg;C', _hctr),
+     Paragraph('Quality and presentation control, not a CCP. The 18&deg;C ceiling is set by pheasant fat, which is very soft and begins to liquefy around 20&deg;C, seeping into the vac pack and appearing oily. No minimum temperature.', _hcell)],
+  [Paragraph('S8', _hctr), Paragraph('Vac pack, label, store', _hcell), Paragraph('ambient below 18&deg;C', _hctr),
+     Paragraph('Vac pack the finished pieces. Apply the customer label: estate name, species, flavour, ingredients in descending weight order, allergens in bold, batch code and best before. Ambient storage pending delivery.', _hcell)],
+  [Paragraph('S9', _hctr), Paragraph('Lab test, positive release', _hcell), Paragraph('&mdash;', _hctr),
+     Paragraph('<b>Future requirement, not currently applicable.</b> Required before any onward sale to the public. All product currently goes to estate members for their own consumption.', _hcell)],
+]
+story.append(_hac_table(_sflow, [16*mm, 46*mm, 27*mm, 178*mm]))
+
+_hac_sec('6 &nbsp; Hazard Analysis')
+story.append(Paragraph('Hazard types: <b>B</b> biological &nbsp;&middot;&nbsp; <b>C</b> chemical &nbsp;&middot;&nbsp; <b>P</b> physical.', _hb))
+_shaz = [
+  [Paragraph('Step', _hhdr), Paragraph('Food safety hazard &amp; cause', _hhdr), Paragraph('Significant', _hhdr), Paragraph('Control measures', _hhdr), Paragraph('CCP?', _hhdr)],
+  [Paragraph('S1', _hctr), Paragraph('<b>B</b> &mdash; growth of <i>Salmonella</i>, <i>Campylobacter</i> and <i>Listeria</i> if the meat is defrosted warm', _hcell), Paragraph('Yes', _hctr),
+     Paragraph('Chiller defrost at 0&ndash;4&deg;C only; ambient defrost prohibited. Chiller temperature monitored on the daily checks.', _hcell), Paragraph('No &mdash; prerequisite', _hcell)],
+  [Paragraph('S1', _hctr), Paragraph('<b>P</b> &mdash; shot, bone fragment or feather carried through from processing', _hcell), Paragraph('Yes', _hctr),
+     Paragraph('Controlled at meat intake under the separate plan, and by visual inspection at mince.', _hcell), Paragraph('No &mdash; prerequisite', _hcell)],
+  [Paragraph('S2', _hctr), Paragraph('<b>B</b> &mdash; surface bacteria on meat and fat redistributed through the whole batch by mincing', _hcell), Paragraph('Yes', _hctr),
+     Paragraph('Alcohol wash above 13% ABV, minimum 60 seconds contact, applied to meat and fat <b>before</b> mincing, then drained. Reduces the surface load entering the mince. See note 6.1.', _hcell), Paragraph('No &mdash; hurdle, not a kill step', _hcell)],
+  [Paragraph('S2', _hctr), Paragraph('<b>B</b> &mdash; bacterial growth during handling', _hcell), Paragraph('Yes', _hctr),
+     Paragraph('All work held below 4&deg;C throughout.', _hcell), Paragraph('No &mdash; prerequisite', _hcell)],
+  [Paragraph('S2', _hctr), Paragraph('<b>C</b> &mdash; salt weighed incorrectly, weakening the cure', _hcell), Paragraph('Yes', _hctr),
+     Paragraph('Salt calculated at 2.5% of combined meat and fat weight by the app and recorded on the production record.', _hcell), Paragraph('No &mdash; verified at S6', _hcell)],
+  [Paragraph('S2', _hctr), Paragraph('<b>B / P</b> &mdash; cross-contamination from the mincer', _hcell), Paragraph('Yes', _hctr),
+     Paragraph('Mincer deep-cleaned to the SOP and the clean recorded.', _hcell), Paragraph('No &mdash; prerequisite', _hcell)],
+  [Paragraph('S3', _hctr), Paragraph('<b>C</b> &mdash; undeclared allergen in a spice blend', _hcell), Paragraph('Yes', _hctr),
+     Paragraph('Recipe held centrally in the app; ingredients ticked individually as added; allergens carried through to the customer label in bold. FSA allergen chart used in the manual paperwork.', _hcell), Paragraph('No &mdash; prerequisite', _hcell)],
+  [Paragraph('S3', _hctr), Paragraph('<b>B</b> &mdash; <i>Listeria monocytogenes</i> survival in a chilled ready-to-eat product', _hcell), Paragraph('Yes', _hctr),
+     Paragraph('Flora Italiana starter culture added here, with sugar as its substrate, lowering pH through the cure. An additional hurdle alongside salt, cold chain and water activity. See note 6.2.', _hcell), Paragraph('No &mdash; hurdle, not monitored', _hcell)],
+  [Paragraph('S3', _hctr), Paragraph('<b>C</b> &mdash; starter culture omitted, or ingredients added out of order', _hcell), Paragraph('Yes', _hctr),
+     Paragraph('Add order enforced tick-by-tick in the app: sugar, enzyme, garlic, then the remaining powders.', _hcell), Paragraph('No &mdash; recipe control', _hcell)],
+  [Paragraph('S4', _hctr), Paragraph('<b>B</b> &mdash; growth during the rest period', _hcell), Paragraph('Yes', _hctr),
+     Paragraph('Held below 4&deg;C. A texture and filling-consistency step, not a safety step.', _hcell), Paragraph('No', _hcell)],
+  [Paragraph('S5', _hctr), Paragraph('<b>B</b> &mdash; contamination from the stuffer', _hcell), Paragraph('Yes', _hctr),
+     Paragraph('Stuffer deep-cleaned to the SOP before use and the clean recorded.', _hcell), Paragraph('No &mdash; prerequisite', _hcell)],
+  [Paragraph('S5', _hctr), Paragraph('<b>B</b> &mdash; piece weight above target, so drying is slower than assumed', _hcell), Paragraph('Yes', _hctr),
+     Paragraph('Target wet weight per casing size; every piece weighed at stuffing and the wet weight recorded as the baseline for the 40% weight loss.', _hcell), Paragraph('No &mdash; input to CCP 1', _hcell)],
+  [Paragraph('<b>S6</b>', _hctr), Paragraph('<b>B</b> &mdash; survival or growth of <i>Salmonella</i>, <i>Campylobacter</i>, <i>Listeria</i> and <i>Staph. aureus</i>, and toxin formation, in a ready-to-eat product cured without nitrate', _hcell), Paragraph('<b>Yes</b>', _hctr),
+     Paragraph('<b>Cold chain below 4&deg;C throughout drying, together with reduction of water activity to 0.82 or below.</b>', _hcell), Paragraph('<b>YES &mdash; CCP 1</b>', _hcell)],
+  [Paragraph('S6', _hctr), Paragraph('<b>B</b> &mdash; surface mould growth', _hcell), Paragraph('Yes', _hctr),
+     Paragraph('Washed with vinegar as required. A corrective action, not routine. Excessive mould is flagged and investigated as poor upstream handling at estate or processor level.', _hcell), Paragraph('No &mdash; corrective action', _hcell)],
+  [Paragraph('S6', _hctr), Paragraph('<b>B</b> &mdash; spore-forming organisms (<i>Clostridium</i>, <i>Bacillus</i>), which the alcohol wash does not affect', _hcell), Paragraph('Yes', _hctr),
+     Paragraph('Controlled by water activity reduction and the cold chain, that is by CCP 1.', _hcell), Paragraph('Covered by CCP 1', _hcell)],
+  [Paragraph('S7', _hctr), Paragraph('<b>C</b> &mdash; pheasant fat softens and seeps, product appears oily', _hcell), Paragraph('No &mdash; quality', _hcell),
+     Paragraph('Upper limit 18&deg;C; pheasant fat begins to liquefy around 20&deg;C. No minimum temperature.', _hcell), Paragraph('No', _hcell)],
+  [Paragraph('S8', _hctr), Paragraph('<b>C</b> &mdash; incorrect allergen declaration reaching the customer', _hcell), Paragraph('Yes', _hctr),
+     Paragraph('Customer label generated from the stored recipe, allergens rendered bold, batch code carried on every label.', _hcell), Paragraph('No &mdash; prerequisite', _hcell)],
+  [Paragraph('S8', _hctr), Paragraph('<b>B</b> &mdash; contamination during packing', _hcell), Paragraph('Yes', _hctr),
+     Paragraph('Product is already shelf stable at this point. Clean handling to the SOP.', _hcell), Paragraph('No', _hcell)],
+]
+story.append(_hac_table(_shaz, [15*mm, 74*mm, 24*mm, 122*mm, 32*mm]))
+
+_hac_sec('6.1 &nbsp; Note &mdash; Why the Alcohol Wash Is Not a CCP')
+story.append(Paragraph('The wash reduces the bacterial load on the <b>surface of intact pieces</b>. It cannot reach organisms already within the muscle, and it does not act on spores. It is applied before mincing precisely because mincing would redistribute surface organisms throughout the batch, where a surface treatment can no longer reach them.', _hb))
+story.append(Paragraph('It is therefore a genuine hurdle, and it is monitored by contact time, but it is <b>not claimed as a kill step and not designated a CCP</b>. The step that delivers safety is S6.', _hb))
+_bac = [
+  [Paragraph('Organism reduced by the wash', _hhdr), Paragraph('Why it is relevant', _hhdr)],
+  [Paragraph('<i>Salmonella</i> spp.', _hkey), Paragraph('Primary concern with game birds. Surface contamination from gutting and processing.', _hcell)],
+  [Paragraph('<i>Campylobacter jejuni</i>', _hkey), Paragraph('Highly alcohol-sensitive. Common on game bird carcasses.', _hcell)],
+  [Paragraph('<i>E. coli</i>, including O157', _hkey), Paragraph('Surface contamination from gut contact during dressing.', _hcell)],
+  [Paragraph('<i>Listeria monocytogenes</i>', _hkey), Paragraph('Present in the processing environment and on raw meat surfaces.', _hcell)],
+  [Paragraph('<i>Staphylococcus aureus</i>', _hkey), Paragraph('Skin and handling contamination.', _hcell)],
+  [Paragraph('<i>Pseudomonas</i> spp.', _hkey), Paragraph('Spoilage organism. Reducing it extends shelf life as well as improving safety.', _hcell)],
+  [Paragraph('Not affected', _hkey), Paragraph('Bacterial spores (<i>Clostridium</i>, <i>Bacillus</i>), controlled instead by CCP 1. Viruses, not relevant to this product.', _hcell)],
+]
+story.append(_hac_table(_bac, [62*mm, 205*mm]))
+story.append(Spacer(1, 4))
+story.append(Paragraph('These are meat-associated organisms. They are not specific to poultry.', _hb))
+
+_hac_sec('6.2 &nbsp; Note &mdash; The Starter Culture as a Hurdle')
+story.append(Paragraph('Flora Italiana is added at S3 and metabolises the added sugar, lowering pH through the cure and on into ambient storage at S7. A falling pH is a recognised hurdle against <i>Listeria monocytogenes</i>.', _hb))
+story.append(Paragraph('It is treated here as a <b>supporting hurdle, not a control</b>, for one reason: pH is not currently measured or recorded. A hurdle that is not monitored cannot be verified. If pH measurement is introduced &mdash; a reading at hang and a reading at release, recorded on the production record &mdash; this becomes an evidenced hurdle and this note can be rewritten accordingly.', _hb))
+
+_hac_sec('7 &nbsp; CCP Determination')
+story.append(Paragraph('Applied to each significant hazard. <b>Q1</b> is a control measure in place? &nbsp;<b>Q2</b> is this step designed specifically to eliminate or reduce the hazard to an acceptable level? &nbsp;<b>Q3</b> could contamination occur or increase to unacceptable levels here? &nbsp;<b>Q4</b> will a later step eliminate or reduce it to an acceptable level?', _hb))
+_sccp = [
+  [Paragraph('Step', _hhdr), Paragraph('Q1', _hhdr), Paragraph('Q2', _hhdr), Paragraph('Q3', _hhdr), Paragraph('Q4', _hhdr), Paragraph('Outcome &amp; justification', _hhdr)],
+  [Paragraph('S1 &nbsp; Defrost', _hcell), Paragraph('Yes', _hctr), Paragraph('No', _hctr), Paragraph('Yes', _hctr), Paragraph('Yes &mdash; S6', _hctr),
+     Paragraph('Not a CCP. Growth is possible if the chiller runs warm, but S6 subsequently controls it. Managed by chiller monitoring as a prerequisite.', _hcell)],
+  [Paragraph('S2 &nbsp; Wash, mince, salt', _hcell), Paragraph('Yes', _hctr), Paragraph('No', _hctr), Paragraph('Yes', _hctr), Paragraph('Yes &mdash; S6', _hctr),
+     Paragraph('Not a CCP. The alcohol wash reduces surface load but does not eliminate the hazard, and does not reach spores or organisms within the muscle.', _hcell)],
+  [Paragraph('S3 &nbsp; Make blend', _hcell), Paragraph('Yes', _hctr), Paragraph('No', _hctr), Paragraph('No', _hctr), Paragraph('&mdash;', _hctr),
+     Paragraph('Not a CCP. The starter culture contributes a pH hurdle but is not monitored; allergen accuracy is a prerequisite control.', _hcell)],
+  [Paragraph('S4 &nbsp; Rest', _hcell), Paragraph('Yes', _hctr), Paragraph('No', _hctr), Paragraph('No', _hctr), Paragraph('&mdash;', _hctr),
+     Paragraph('Not a CCP. Held below 4&deg;C; a quality step affecting texture and filling consistency.', _hcell)],
+  [Paragraph('S5 &nbsp; Stuff and hang', _hcell), Paragraph('Yes', _hctr), Paragraph('No', _hctr), Paragraph('Yes', _hctr), Paragraph('Yes &mdash; S6', _hctr),
+     Paragraph('Not a CCP, but the recorded stuffed wet weight is an essential input to the CCP 1 weight-loss measure.', _hcell)],
+  [Paragraph('<b>S6 &nbsp; Air dry</b>', _hcell), Paragraph('<b>Yes</b>', _hctr), Paragraph('<b>Yes</b>', _hctr), Paragraph('<b>Yes</b>', _hctr), Paragraph('<b>No later step</b>', _hctr),
+     Paragraph('<b>CCP 1.</b> The only step at which a significant hazard is reduced to an acceptable level, and no subsequent step will do so. Sole critical control point.', _hcell)],
+  [Paragraph('S7 &nbsp; Ambient storage', _hcell), Paragraph('Yes', _hctr), Paragraph('No', _hctr), Paragraph('No', _hctr), Paragraph('&mdash;', _hctr),
+     Paragraph('Not a CCP. Product is already shelf stable; the temperature limit is a presentation control set by the behaviour of pheasant fat.', _hcell)],
+  [Paragraph('S8 &nbsp; Pack and label', _hcell), Paragraph('Yes', _hctr), Paragraph('No', _hctr), Paragraph('No', _hctr), Paragraph('&mdash;', _hctr),
+     Paragraph('Not a CCP. Allergen declaration accuracy is a prerequisite labelling control.', _hcell)],
+]
+story.append(_hac_table(_sccp, [40*mm, 14*mm, 14*mm, 14*mm, 24*mm, 161*mm]))
+
+_hac_sec('8 &nbsp; CCP Summary &mdash; CCP 1, Air Drying to Shelf Stability')
+_ssum = [
+  [Paragraph('Field', _hhdr), Paragraph('Detail', _hhdr)],
+  [Paragraph('Process step', _hkey), Paragraph('S6 &mdash; air drying', _hcell)],
+  [Paragraph('CCP No.', _hkey), Paragraph('1 &mdash; the only critical control point in this plan', _hcell)],
+  [Paragraph('Hazard', _hkey), Paragraph('Survival or growth of vegetative pathogens and spore-forming organisms in a ready-to-eat, uncooked product cured without nitrate.', _hcell)],
+  [Paragraph('Critical limit', _hkey), Paragraph('Water activity <b>0.82 or below</b>, <b>and</b> weight loss of <b>40% or more</b> from the recorded stuffed wet weight. Both must be met.', _hcell)],
+  [Paragraph('Supporting limit', _hkey), Paragraph('Product temperature below 4&deg;C for the whole of the drying period.', _hcell)],
+  [Paragraph('Monitoring', _hkey), Paragraph('Primary: water activity meter, read on a representative piece from the batch. Secondary: weight loss calculated against the stuffed wet weight recorded at S5. Frequency: weekly during drying, and both measures confirmed before the batch leaves drying. Responsibility: Robert.', _hcell)],
+  [Paragraph('Records', _hkey), Paragraph('Production record in the app, carried into this nightly audit report.', _hcell)],
+  [Paragraph('Corrective action', _hkey), Paragraph('If either limit is not met, <b>continue drying</b> and re-measure. The batch is not released from CCP 1 and does not proceed to S7 or S8 until both limits are met. Responsibility: Robert.', _hcell)],
+  [Paragraph('Corrective action &mdash; mould', _hkey), Paragraph('Wash with vinegar as required and record. Excessive mould is investigated as an upstream handling issue at estate or processor level, not simply treated.', _hcell)],
+  [Paragraph('Validation', _hkey), Paragraph('Water activity of 0.82 is the recognised threshold below which <i>Staphylococcus aureus</i> growth ceases and below which the product is shelf stable without refrigeration. The 40% weight loss figure is the practical, physically measurable corroboration of that reduction.', _hcell)],
+]
+story.append(_hac_table(_ssum, [45*mm, 222*mm]))
+
+_hac_sec('9 &nbsp; Prerequisite Programmes This Plan Relies On')
+for _pq in [
+  'Meat Intake HACCP plan, in force from 26 July 2026.',
+  'Equipment clean-down SOPs for the mincer and the stuffer, each recorded per use.',
+  'Daily opening and closing checks, including chiller and drying room temperatures.',
+  'Pest control programme, including bait stations and insectocutor.',
+  'Personal hygiene and staff training.',
+  'Traceability: every contributing batch code recorded on the production record at mince; the batch code carried on internal hanging labels and on every customer label.',
+  'Allergen control: recipes stored centrally, allergens declared in bold on customer labels, FSA allergen chart used in the manual paperwork.',
+  'Cleaning water supply and environmental monitoring.',
+]:
+    story.append(Paragraph('&bull;&nbsp;&nbsp;' + _pq, _hb))
+
+_last = []
+_last.append(Paragraph('10 &nbsp; Notes for the Next Revision', _hh))
+_last.append(HRFlowable(width='100%', thickness=0.8, color=GOLD, spaceAfter=5))
+_last.append(Paragraph('<b>pH measurement.</b> Flora Italiana is added at S3 and is expected to lower pH through the cure, giving a hurdle against <i>Listeria monocytogenes</i>. pH is not currently measured. Introducing a reading at hang and at release would turn a described effect into an evidenced hurdle.', _hb))
+_last.append(Paragraph('<b>Salt trial.</b> Batch 202627-20 was made at 2.3% salt rather than the 2.5% stated in this plan, and is under review at six weeks. If 2.3% is adopted, section 2 and the S2 hazard analysis must both be updated and the change justified.', _hb))
+_last.append(Paragraph('<b>Positive release.</b> S9 is not applicable while all product goes to estate members for their own consumption. It becomes a requirement before any client resells to the public.', _hb))
+_last.append(Spacer(1, 10))
+_last.append(Paragraph('Prepared and signed off by: Robert Fry &nbsp;&nbsp;&middot;&nbsp;&nbsp; Date ' + report_date + ' &nbsp;&nbsp;&middot;&nbsp;&nbsp; Next review: ' + _review_date,
+    ParagraphStyle('hac_sign2', fontName=SERIF, fontSize=9.5, textColor=INK)))
+# keep the closing notes and the sign-off on one page so the signature is never orphaned
+story.append(KeepTogether(_last))
+
+# (no trailing PageBreak — add_section('Production Records') supplies the page break)
+# ── END SALAMI HACCP PLAN ─────────────────────────────────────────────────────
+
 # ── PRODUCTION SECTION ────────────────────────────────────────────────────────
 _log(f"Building Production section ({len(production_records)} records)")
 add_section('Production Records',
