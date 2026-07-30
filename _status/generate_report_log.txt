@@ -1,35 +1,35 @@
-=== Run started 2026-07-29T23:55:26.486592 ===
+=== Run started 2026-07-30T23:56:14.576004 ===
 Python: 3.11.15 (main, Jun 16 2026, 21:41:52) [GCC 13.3.0]
 Working dir: /home/runner/work/fsa-records/fsa-records
 Script dir: /home/runner/work/fsa-records/fsa-records/scripts
 
-[2026-07-29 23:55:26] Script starting
-[2026-07-29 23:55:26] Pre-flight: checking env vars...
-[2026-07-29 23:55:26]   ok SUPABASE_URL present (40 chars)
-[2026-07-29 23:55:26]   ok SUPABASE_KEY present (208 chars)
-[2026-07-29 23:55:26]   ok DROPBOX_APP_KEY present (15 chars)
-[2026-07-29 23:55:26]   ok DROPBOX_APP_SECRET present (15 chars)
-[2026-07-29 23:55:26]   ok DROPBOX_REFRESH_TOKEN present (64 chars)
-[2026-07-29 23:55:26] Season code: 202526  →  filename: FSA_Records_202526.pdf
-[2026-07-29 23:55:26] Target filename: FSA_Records_202526.pdf
-[2026-07-29 23:55:26] Fetching from Supabase...
-[2026-07-29 23:55:26]   Fetching table: intakes
-[2026-07-29 23:55:27]     HTTP 200 (15743 bytes)
-[2026-07-29 23:55:27]   Fetching table: deliveries
-[2026-07-29 23:55:32]     HTTP 200 (2706901 bytes)
-[2026-07-29 23:55:32]   Fetching table: app_config
-[2026-07-29 23:55:32]     HTTP 200 (14863 bytes)
-[2026-07-29 23:55:32]   Records: intakes=31, daily=44, deliveries=1, pest=12, prod=15, checks=26, venison=4
-[2026-07-29 23:55:32] Building Equipment Clean-Down section
-[2026-07-29 23:55:32] Building Production section (15 records)
-[2026-07-29 23:55:33] Building Pest Control section (12 records)
-[2026-07-29 23:55:33] Building PDF (407 story elements)
-[2026-07-29 23:55:33] ok PDF generated: FSA_Records_202526.pdf (171219 bytes)
-[2026-07-29 23:55:33] Reading PDF for Dropbox upload...
-[2026-07-29 23:55:33] Refreshing Dropbox access token...
-[2026-07-29 23:55:33]   Dropbox token HTTP 200
-[2026-07-29 23:55:33]   ok token refreshed
-[2026-07-29 23:55:33] Uploading to Dropbox: /FSA forms and records for emilys charcuterie/automated intake records/FSA_Records_202526.pdf
-[2026-07-29 23:55:35]   Dropbox HTTP 200
-[2026-07-29 23:55:35] ok Uploaded to Dropbox: /FSA forms and records for emilys charcuterie/automated intake records/FSA_Records_202526.pdf
-[2026-07-29 23:55:35] === Run completed successfully ===
+[2026-07-30 23:56:14] Script starting
+[2026-07-30 23:56:14] Pre-flight: checking env vars...
+[2026-07-30 23:56:14]   ok SUPABASE_URL present (40 chars)
+[2026-07-30 23:56:14]   ok SUPABASE_KEY present (208 chars)
+[2026-07-30 23:56:14]   ok DROPBOX_APP_KEY present (15 chars)
+[2026-07-30 23:56:14]   ok DROPBOX_APP_SECRET present (15 chars)
+[2026-07-30 23:56:14]   ok DROPBOX_REFRESH_TOKEN present (64 chars)
+[2026-07-30 23:56:14] Season code: 202526  →  filename: FSA_Records_202526.pdf
+[2026-07-30 23:56:14] Target filename: FSA_Records_202526.pdf
+[2026-07-30 23:56:14] Fetching from Supabase...
+[2026-07-30 23:56:14]   Fetching table: intakes
+[2026-07-30 23:56:16]     HTTP 200 (15743 bytes)
+[2026-07-30 23:56:16]   Fetching table: deliveries
+[2026-07-30 23:56:18]     HTTP 200 (2733602 bytes)
+[2026-07-30 23:56:18]   Fetching table: app_config
+[2026-07-30 23:56:19]     HTTP 200 (17397 bytes)
+[2026-07-30 23:56:19]   Records: intakes=31, daily=45, deliveries=1, pest=12, prod=16, checks=27, venison=5
+[2026-07-30 23:56:19] Building Equipment Clean-Down section
+[2026-07-30 23:56:19] Building Production section (16 records)
+[2026-07-30 23:56:19] Building Pest Control section (12 records)
+[2026-07-30 23:56:19] Building PDF (436 story elements)
+[2026-07-30 23:56:20] ok PDF generated: FSA_Records_202526.pdf (182214 bytes)
+[2026-07-30 23:56:20] Reading PDF for Dropbox upload...
+[2026-07-30 23:56:20] Refreshing Dropbox access token...
+[2026-07-30 23:56:20]   Dropbox token HTTP 200
+[2026-07-30 23:56:20]   ok token refreshed
+[2026-07-30 23:56:20] Uploading to Dropbox: /FSA forms and records for emilys charcuterie/automated intake records/FSA_Records_202526.pdf
+[2026-07-30 23:56:21]   Dropbox HTTP 200
+[2026-07-30 23:56:21] ok Uploaded to Dropbox: /FSA forms and records for emilys charcuterie/automated intake records/FSA_Records_202526.pdf
+[2026-07-30 23:56:21] === Run completed successfully ===
