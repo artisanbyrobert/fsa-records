@@ -238,6 +238,7 @@ pest_records = [r['data'] for r in deliveries_raw if r.get('data') and r['data']
 production_records = [r['data'] for r in deliveries_raw if r.get('data') and r['data'].get('_type') == 'production']
 daily_checks = [r['data'] for r in deliveries_raw if r.get('data') and r['data'].get('_type') == 'dailychecks']
 venison_runs = [r['data'] for r in deliveries_raw if r.get('data') and r['data'].get('_type') == 'venison']
+periodic_cleans = [r['data'] for r in deliveries_raw if r.get('data') and r['data'].get('_type') == 'periodic_clean']
 _log(f"  Records: intakes={len(intakes)}, daily={len(daily_records)}, deliveries={len(deliveries)}, pest={len(pest_records)}, prod={len(production_records)}, checks={len(daily_checks)}, venison={len(venison_runs)}")
 
 estates = {}
@@ -532,6 +533,110 @@ story.append(Paragraph('Prepared and signed off by: Robert Fry &nbsp;&nbsp;&midd
 story.append(PageBreak())
 # ── END HACCP PLAN ────────────────────────────────────────────────────────────
 
+# ── RECORD PROVENANCE SUMMARY ─────────────────────────────────────────────────
+# Every record states how it came to exist. Absent = written on the day.
+# Four stamps: actual / reconstructed / estimated / inferred.
+_PROV_LABEL = {
+    'actual':        'Actual',
+    'reconstructed': 'Reconstructed',
+    'estimated':     'Estimated',
+    'inferred':      'Inferred',
+}
+_PROV_MARK = {'actual': '', 'reconstructed': 'R', 'estimated': 'E', 'inferred': 'I'}
+_PROV_MEANING = [
+    ('Actual',        'Written on, or close to, the day the work was done. This is the normal case and carries no marking.'),
+    ('Reconstructed', 'No record was made on the day. Entered later from standard operating practice, with the entry date, the person and any corroborating records stated.'),
+    ('Estimated',     'Derived by calculation from something that was measured. Sound for costing; not used as evidence for a critical control point.'),
+    ('Inferred',      'Taken from the recipe library or a comparable batch because no sheet exists. The weakest class, flagged for replacement.'),
+]
+
+def _prov(rec):
+    """Provenance stamp of a record. Anything unmarked is an actual, on-the-day record."""
+    if not isinstance(rec, dict):
+        return 'actual'
+    p = str(rec.get('provenance') or 'actual').strip().lower()
+    return p if p in _PROV_LABEL else 'actual'
+
+def _prov_mark(rec):
+    return _PROV_MARK.get(_prov(rec), '')
+
+_prov_pool = []
+for _r in intakes:            _prov_pool.append(('Intake',           _r.get('batchCode') or _r.get('id',''), _r.get('date',''), _r))
+for _r in daily_records:      _prov_pool.append(('Day record',       _r.get('batchCode') or '',              _r.get('date',''), _r))
+for _r in daily_checks:       _prov_pool.append(('Opening/closing',  _r.get('batchCode') or '',              _r.get('date',''), _r))
+for _r in production_records: _prov_pool.append(('Production',       _r.get('batchCode') or '',              _r.get('startDate',''), _r))
+for _r in venison_runs:       _prov_pool.append(('Venison',          _r.get('batchCode') or '',              _r.get('date',''), _r))
+for _r in pest_records:       _prov_pool.append(('Pest control',     '',                                     _r.get('date',''), _r))
+
+_prov_counts = {'actual': 0, 'reconstructed': 0, 'estimated': 0, 'inferred': 0}
+_prov_flagged = []
+for _kind, _code, _dt, _r in _prov_pool:
+    _p = _prov(_r)
+    _prov_counts[_p] += 1
+    if _p != 'actual':
+        _prov_flagged.append((_kind, _code, _dt, _p, _r))
+_prov_flagged.sort(key=lambda x: (x[2] or ''), reverse=True)
+_prov_total = sum(_prov_counts.values())
+
+_log(f"Building Record Provenance section ({_prov_total} records, {_prov_total - _prov_counts['actual']} flagged)")
+add_section('Record Provenance',
+    'How each record in this report came to exist. Records written on the day are shown as Actual and carry no marking. Anything entered later, calculated or taken from the library is stated openly below, with the date it was entered and what supports it. This section is published so that the status of every record is visible without having to be asked for.',
+    new_page=False)
+
+_pv_hdr  = ParagraphStyle('pvh',  fontSize=7.5, textColor=GREEN, fontName=SERIFB)
+_pv_cell = ParagraphStyle('pvc',  fontName=SERIF, fontSize=8, leading=10.5)
+_pv_num  = ParagraphStyle('pvn',  fontName=SERIF, fontSize=8, leading=10.5, alignment=2)
+
+_rows = [[Paragraph('Class', _pv_hdr), Paragraph('Records', _pv_hdr), Paragraph('What it means', _pv_hdr)]]
+for _lbl, _mean in _PROV_MEANING:
+    _key = _lbl.lower()
+    _rows.append([Paragraph(_lbl, _pv_cell), Paragraph(str(_prov_counts[_key]), _pv_num), Paragraph(_mean, _pv_cell)])
+_rows.append([Paragraph('<b>Total records</b>', _pv_cell), Paragraph('<b>%d</b>' % _prov_total, _pv_num), Paragraph('', _pv_cell)])
+_t = Table(_rows, colWidths=[34*mm, 22*mm, 211*mm], repeatRows=1)
+_t.setStyle(TableStyle([
+    ('BACKGROUND', (0,0), (-1,0), SAGE[0]),
+    ('LINEABOVE', (0,0), (-1,0), 0.8, GOLD), ('LINEBELOW', (0,0), (-1,0), 0.8, GOLD),
+    ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]),
+    ('GRID', (0,0), (-1,-1), 0.35, HAIR),
+    ('LEFTPADDING', (0,0), (-1,-1), 5), ('RIGHTPADDING', (0,0), (-1,-1), 5),
+    ('TOPPADDING', (0,0), (-1,-1), 4), ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+    ('VALIGN', (0,0), (-1,-1), 'TOP')]))
+story.append(_t)
+story.append(Spacer(1, 8))
+
+if _prov_flagged:
+    story.append(Paragraph('Records not written on the day', ParagraphStyle('pvsub', fontName=SERIFB, fontSize=10, textColor=GREEN, spaceAfter=4)))
+    _rows = [[Paragraph('Date', _pv_hdr), Paragraph('Record', _pv_hdr), Paragraph('Batch', _pv_hdr),
+              Paragraph('Class', _pv_hdr), Paragraph('Entered', _pv_hdr), Paragraph('By', _pv_hdr),
+              Paragraph('Basis and corroborating records', _pv_hdr)]]
+    for _kind, _code, _dt, _p, _r in _prov_flagged:
+        _corr = _r.get('provenanceCorroboration') or []
+        _note = clean(_r.get('provenanceNote') or 'No basis recorded.')
+        if _corr:
+            _note += '<br/><i>Corroborated by: ' + clean(', '.join([str(c) for c in _corr])) + '</i>'
+        _rows.append([
+            Paragraph(clean(_dt or '\u2014'), _pv_cell),
+            Paragraph(clean(_kind), _pv_cell),
+            Paragraph(clean(_code or '\u2014'), _pv_cell),
+            Paragraph(_PROV_LABEL[_p], _pv_cell),
+            Paragraph(clean(_r.get('provenanceDate') or '\u2014'), _pv_cell),
+            Paragraph(clean(_r.get('provenanceBy') or '\u2014'), _pv_cell),
+            Paragraph(_note, _pv_cell)])
+    _t = Table(_rows, colWidths=[20*mm, 26*mm, 24*mm, 26*mm, 21*mm, 24*mm, 126*mm], repeatRows=1)
+    _t.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), SAGE[0]),
+        ('LINEABOVE', (0,0), (-1,0), 0.8, GOLD), ('LINEBELOW', (0,0), (-1,0), 0.8, GOLD),
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]),
+        ('GRID', (0,0), (-1,-1), 0.35, HAIR),
+        ('LEFTPADDING', (0,0), (-1,-1), 5), ('RIGHTPADDING', (0,0), (-1,-1), 5),
+        ('TOPPADDING', (0,0), (-1,-1), 4), ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('VALIGN', (0,0), (-1,-1), 'TOP')]))
+    story.append(_t)
+else:
+    story.append(Paragraph('Every record in this report was written on the day. Nothing has been reconstructed, calculated or inferred.', small))
+story.append(Spacer(1, 6))
+# ── END RECORD PROVENANCE ─────────────────────────────────────────────────────
+
 add_section('Intake Records',
     'All raw meat brought in, by batch. Each batch carries its season code, intake date, source estate, species and weights. This is the start of the traceability chain — every finished product traces back to a batch here.',
     new_page=False)
@@ -671,20 +776,21 @@ def _check_matrix(days, key, fixed_labels, section_title, section_desc):
     # Use a stable column order from the fixed label list; shorten labels for headers
     hdr_style = ParagraphStyle('mxh', fontSize=6, textColor=GREEN, fontName=SERIFB, leading=7)
     cell_style2 = ParagraphStyle('mxc', fontSize=7, leading=8)
-    header = [Paragraph('Date', hdr_style), Paragraph('Batch', hdr_style)] + [Paragraph(clean(lbl), hdr_style) for lbl in fixed_labels]
+    header = [Paragraph('Date', hdr_style), Paragraph('Batch', hdr_style), Paragraph('Src', hdr_style)] + [Paragraph(clean(lbl), hdr_style) for lbl in fixed_labels]
     rows = [header]
     for dt, batch, st in days:
         items = {i.get('text',''): i.get('done') for i in (st.get(key, []) or [])}
-        row = [Paragraph(clean(dt), cell_style2), Paragraph(clean(batch), cell_style2)]
+        row = [Paragraph(clean(dt), cell_style2), Paragraph(clean(batch), cell_style2),
+               Paragraph(_prov_mark(st), ParagraphStyle('pvm', fontSize=7, alignment=1, fontName=SERIFB, textColor=GOLDLBL))]
         for lbl in fixed_labels:
             done = items.get(lbl)
             mark = '✓' if done else ('✗' if done is False else '–')
             row.append(Paragraph(mark, ParagraphStyle('mk', fontSize=8, alignment=1, textColor=(GREEN if done else (colors.HexColor('#a32d2d') if done is False else colors.grey)))))
         rows.append(row)
     n = len(fixed_labels)
-    date_w, batch_w = 20*mm, 26*mm
-    avail = 267*mm - date_w - batch_w
-    col_w = [date_w, batch_w] + [avail / n] * n
+    date_w, batch_w, src_w = 20*mm, 26*mm, 8*mm
+    avail = 267*mm - date_w - batch_w - src_w
+    col_w = [date_w, batch_w, src_w] + [avail / n] * n
     t = Table(rows, colWidths=col_w, repeatRows=1)
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), SAGE[0]), ('LINEABOVE', (0,0), (-1,0), 0.8, GOLD), ('LINEBELOW', (0,0), (-1,0), 0.8, GOLD), ('FONTSIZE', (0,0), (-1,-1), 6),
@@ -694,6 +800,10 @@ def _check_matrix(days, key, fixed_labels, section_title, section_desc):
         ('TOPPADDING', (0,0), (-1,-1), 3), ('BOTTOMPADDING', (0,0), (-1,-1), 3),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE')]))
     story.append(t)
+    story.append(Spacer(1, 3))
+    story.append(Paragraph('Src column: blank = record written on the day. '
+                           'R = reconstructed later, E = estimated, I = inferred. '
+                           'Full basis for every marked record is given in the Record Provenance section.', small))
 
 _mince_days = _gather_mince_days()
 # Standalone daily-check records (decoupled from mince day) join the same matrices.
@@ -813,6 +923,55 @@ for _cd_i, (_key, _title, _meta, _steps) in enumerate(_CLEANDOWN_SOPS):
     else:
         story.append(Paragraph('No clean-downs recorded yet this season.', small))
     story.append(Spacer(1, 6))
+
+
+# ── PERIODIC DEEP CLEANS ──────────────────────────────────────────────────────
+# Whole-premises deep cleans, separate from the per-machine clean-downs above.
+_log(f"Building Periodic Deep Clean section ({len(periodic_cleans)} records)")
+story.append(PageBreak())
+add_section('Periodic Deep Cleans',
+    'Whole-premises deep cleans covering floors, fabric, fixed equipment and the winery. These are separate from the per-machine clean-downs, which run with each mince and stuff day.',
+    new_page=False)
+
+_pc_hdr  = ParagraphStyle('pchdr',  fontName=SERIFB, fontSize=8.5, textColor=GREEN)
+_pc_cell = ParagraphStyle('pccell', fontName=SERIF,  fontSize=8.5, leading=11)
+
+if periodic_cleans:
+    _pcs = sorted(periodic_cleans, key=lambda x: x.get('date') or '', reverse=True)
+    _rows = [[Paragraph('Date', _pc_hdr), Paragraph('Clean', _pc_hdr),
+              Paragraph('Areas and equipment covered', _pc_hdr), Paragraph('Source', _pc_hdr)]]
+    for _p in _pcs:
+        _areas = []
+        for _t in (_p.get('tasks') or []):
+            _items = _t.get('items') or []
+            _areas.append('<b>' + clean(str(_t.get('area',''))) + ':</b> ' +
+                          clean(', '.join([str(i).split(' - ticked')[0] for i in _items])))
+        _src = _PROV_LABEL.get(_prov(_p), 'Actual')
+        _rows.append([
+            Paragraph(_cd_fmt(_p.get('date','')), _pc_cell),
+            Paragraph(clean(_p.get('name','Periodic deep clean')), _pc_cell),
+            Paragraph('<br/>'.join(_areas) if _areas else clean(str(_p.get('note',''))), _pc_cell),
+            Paragraph(_src, _pc_cell)])
+    _pt = Table(_rows, colWidths=[24*mm, 44*mm, 168*mm, 31*mm], repeatRows=1)
+    _pt.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), SAGE[0]),
+        ('LINEABOVE', (0,0), (-1,0), 0.8, GOLD), ('LINEBELOW', (0,0), (-1,0), 0.8, GOLD),
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]),
+        ('GRID', (0,0), (-1,-1), 0.35, HAIR),
+        ('LEFTPADDING', (0,0), (-1,-1), 5), ('RIGHTPADDING', (0,0), (-1,-1), 5),
+        ('TOPPADDING', (0,0), (-1,-1), 4), ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('VALIGN', (0,0), (-1,-1), 'TOP')]))
+    story.append(_pt)
+    story.append(Spacer(1, 5))
+    for _p in _pcs:
+        _extra = _p.get('instructionsLeft') or []
+        if _extra:
+            story.append(Paragraph('<b>' + _cd_fmt(_p.get('date','')) + '</b> &mdash; notes on the sheet: ' +
+                                   clean('; '.join([str(x) for x in _extra])), small))
+else:
+    story.append(Paragraph('No periodic deep cleans recorded yet this season.', small))
+story.append(Spacer(1, 6))
+# ── END PERIODIC DEEP CLEANS ──────────────────────────────────────────────────
 
 # ── HACCP PLAN: PHEASANT / PARTRIDGE SALAMI ───────────────────────────────────
 # Sits at the START of the Production section, on its own page(s), with a
