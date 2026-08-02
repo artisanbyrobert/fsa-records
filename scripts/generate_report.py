@@ -31,14 +31,32 @@
        FSA_Records_<season_code>.pdf
        (e.g. FSA_Records_202526.pdf for Sept 2025 - Aug 2026 game season.
        One growing PDF per season, overwritten nightly — no 365-file proliferation.)
-    4. ALWAYS at exit — even on crash — pushes run_status.txt + generate_report_log.txt
+    4. BEFORE building the PDF, saves a full JSON snapshot of every Supabase
+       record to Dropbox at:
+       /FSA forms and records for emilys charcuterie/automated intake records/backups/
+         supabase_latest.json          — newest snapshot, overwritten nightly
+         supabase_<mon..sun>.json      — rolling 7-day history, self-overwriting
+         supabase_month_YYYY-MM.json   — one archive per calendar month
+       Fixed file count. No unbounded growth. No deletes ever issued.
+       The backup runs FIRST on purpose: a PDF can be rebuilt from the data,
+       the data cannot be rebuilt from the PDF.
+    5. ALWAYS at exit — even on crash — pushes run_status.txt + generate_report_log.txt
        to artisanbyrobert/fsa-records/_status/ on GitHub (if GITHUB_TOKEN set)
 
   SUCCESS LOOKS LIKE:
     - generate_report_log.txt written next to this script with all ok lines
     - run_status.txt written next to this script with single line: GREEN
     - PDF file >5KB exists locally and in Dropbox
+    - supabase_latest.json refreshed in Dropbox backups/ folder
     - _status/run_status.txt updated on GitHub showing GREEN + record counts
+      + a "Backup:" line naming the snapshot size and row counts
+
+  BACKUP SAFETY RULE:
+    The backup will REFUSE to upload and leave the previous good files untouched
+    if any Supabase table returns empty, or if fewer than MIN_DELIVERIES rows
+    come back, or if the built snapshot fails to re-parse. A failed fetch must
+    never be allowed to overwrite a good backup with an empty one. That case
+    reports AMBER, not GREEN, so it is visible the next morning.
 
   ON FAILURE:
     - run_status.txt contains RED + plain-English reason
@@ -240,6 +258,131 @@ daily_checks = [r['data'] for r in deliveries_raw if r.get('data') and r['data']
 venison_runs = [r['data'] for r in deliveries_raw if r.get('data') and r['data'].get('_type') == 'venison']
 periodic_cleans = [r['data'] for r in deliveries_raw if r.get('data') and r['data'].get('_type') == 'periodic_clean']
 _log(f"  Records: intakes={len(intakes)}, daily={len(daily_records)}, deliveries={len(deliveries)}, pest={len(pest_records)}, prod={len(production_records)}, checks={len(daily_checks)}, venison={len(venison_runs)}")
+
+# ── NIGHTLY DATA BACKUP ───────────────────────────────────────────────────────
+# Added 01/08/2026. Runs here, before the PDF is built, deliberately: if the PDF
+# build crashes later the snapshot has already been taken and uploaded.
+#
+# Retention is by fixed filename, not by deleting old files:
+#   supabase_latest.json         overwritten every night
+#   supabase_mon..sun.json       7 rolling days, each overwrites itself weekly
+#   supabase_month_YYYY-MM.json  rewritten daily within the month, so the file
+#                                left behind is that month's final state
+# Steady state is 8 files plus one per month. Nothing is ever deleted.
+MIN_DELIVERIES = 50          # sanity floor; live count was 211 on 01/08/2026
+BACKUP_OK = False
+BACKUP_MSG = "not attempted"
+DBX_TOKEN = None
+
+def _run_backup():
+    global BACKUP_OK, BACKUP_MSG, DBX_TOKEN
+    _log("Backup: building Supabase snapshot...")
+
+    # GUARD 1 — a failed fetch returns [] and must never overwrite a good backup
+    if not intakes_raw or not deliveries_raw or not config_raw:
+        BACKUP_MSG = ("SKIPPED - a Supabase table returned empty "
+                      f"(intakes={len(intakes_raw)}, deliveries={len(deliveries_raw)}, "
+                      f"app_config={len(config_raw)}). Previous backups left untouched.")
+        _log("!!! Backup " + BACKUP_MSG)
+        return
+
+    # GUARD 2 — short fetch means a partial read, not a real shrink
+    if len(deliveries_raw) < MIN_DELIVERIES:
+        BACKUP_MSG = (f"SKIPPED - only {len(deliveries_raw)} delivery rows fetched, "
+                      f"floor is {MIN_DELIVERIES}. Previous backups left untouched.")
+        _log("!!! Backup " + BACKUP_MSG)
+        return
+
+    snapshot = {
+        'exportedAt': datetime.now().isoformat(),
+        'source': 'generate_report.py nightly job',
+        'warning': 'A backup is a SNAPSHOT. Live Supabase is always authoritative for writing.',
+        'counts': {
+            'intakes': len(intakes_raw),
+            'deliveries': len(deliveries_raw),
+            'app_config': len(config_raw),
+        },
+        'intakes': intakes_raw,
+        'deliveries': deliveries_raw,
+        'app_config': config_raw,
+    }
+
+    try:
+        blob = json.dumps(snapshot, ensure_ascii=False, indent=1).encode('utf-8')
+    except Exception as e:
+        BACKUP_MSG = f"SKIPPED - could not serialise snapshot: {e}"
+        _log("!!! Backup " + BACKUP_MSG)
+        return
+
+    # GUARD 3 — verify the bytes we are about to upload actually re-parse
+    try:
+        check = json.loads(blob.decode('utf-8'))
+        assert len(check['intakes']) == len(intakes_raw)
+        assert len(check['deliveries']) == len(deliveries_raw)
+        assert len(check['app_config']) == len(config_raw)
+    except Exception as e:
+        BACKUP_MSG = f"SKIPPED - snapshot failed self-verification: {e}"
+        _log("!!! Backup " + BACKUP_MSG)
+        return
+
+    _log(f"  Snapshot built and verified: {len(blob)} bytes")
+
+    try:
+        DBX_TOKEN = get_dropbox_token()
+    except Exception as e:
+        BACKUP_MSG = f"FAILED - could not get Dropbox token: {e}"
+        _log("!!! Backup " + BACKUP_MSG)
+        return
+
+    base = '/FSA forms and records for emilys charcuterie/automated intake records/backups'
+    targets = [
+        ('latest',  f"{base}/supabase_latest.json"),
+        ('weekday', f"{base}/supabase_{today.strftime('%a').lower()}.json"),
+        ('month',   f"{base}/supabase_month_{today.strftime('%Y-%m')}.json"),
+    ]
+
+    written = []
+    failed = []
+    for label, path in targets:
+        try:
+            up_headers = {
+                'Authorization': f'Bearer {DBX_TOKEN}',
+                'Content-Type': 'application/octet-stream',
+                'Dropbox-API-Arg': json.dumps({
+                    'path': path, 'mode': 'overwrite', 'autorename': False, 'mute': True
+                }),
+            }
+            rb = requests.post('https://content.dropboxapi.com/2/files/upload',
+                               headers=up_headers, data=blob, timeout=120)
+            if rb.ok:
+                _log(f"  ok backup uploaded: {path}")
+                written.append(label)
+            else:
+                _log(f"  !!! backup upload failed ({label}): HTTP {rb.status_code} {rb.text[:200]}")
+                failed.append(f"{label} HTTP {rb.status_code}")
+        except Exception as e:
+            _log(f"  !!! backup upload error ({label}): {e}")
+            failed.append(f"{label} {e}")
+
+    # 'latest' is the one that must land. The other two are history.
+    if 'latest' in written:
+        BACKUP_OK = True
+        BACKUP_MSG = (f"OK - {len(blob)} bytes, "
+                      f"intakes={len(intakes_raw)}, deliveries={len(deliveries_raw)}, "
+                      f"app_config={len(config_raw)}, files={'+'.join(written)}")
+        if failed:
+            BACKUP_MSG += f" (partial: {'; '.join(failed)})"
+    else:
+        BACKUP_MSG = f"FAILED - supabase_latest.json did not upload: {'; '.join(failed)}"
+    _log("Backup: " + BACKUP_MSG)
+
+try:
+    _run_backup()
+except Exception as _be:
+    # A backup problem must never stop the FSA PDF being produced.
+    BACKUP_MSG = f"FAILED - unexpected error: {_be}"
+    _log("!!! Backup " + BACKUP_MSG)
+# ── END NIGHTLY DATA BACKUP ───────────────────────────────────────────────────
 
 estates = {}
 for row in config_raw:
@@ -1585,7 +1728,7 @@ _log(f"ok PDF generated: {filename} ({os.path.getsize(filename)} bytes)")
 print(f"PDF generated: {filename}")
 
 _log("Reading PDF for Dropbox upload...")
-access_token = get_dropbox_token()
+access_token = DBX_TOKEN if DBX_TOKEN else get_dropbox_token()
 with open(filename, 'rb') as f:
     pdf_data = f.read()
 
@@ -1598,8 +1741,15 @@ if r.ok:
     _log(f"ok Uploaded to Dropbox: {dropbox_path}")
     print(f"Uploaded to Dropbox: {dropbox_path}")
     # ── SUCCESS — write GREEN status (Rule 4) ─────────────────────────────────
-    _write_status("GREEN", f"PDF {filename} ({len(pdf_data)} bytes) uploaded successfully. Records: intakes={len(intakes)}, daily={len(daily_records)}, deliveries={len(deliveries)}, pest={len(pest_records)}, prod={len(production_records)}")
-    _log("=== Run completed successfully ===")
+    _level = "GREEN" if BACKUP_OK else "AMBER"
+    _reason = (f"PDF {filename} ({len(pdf_data)} bytes) uploaded successfully. "
+               f"Records: intakes={len(intakes)}, daily={len(daily_records)}, "
+               f"deliveries={len(deliveries)}, pest={len(pest_records)}, "
+               f"prod={len(production_records)}\nBackup: {BACKUP_MSG}")
+    if not BACKUP_OK:
+        _reason += "\nAMBER because the PDF is fine but the data backup did not land."
+    _write_status(_level, _reason)
+    _log(f"=== Run completed ({_level}) ===")
 else:
     err = f"Dropbox upload failed: HTTP {r.status_code} {r.text[:200]}"
     _log(f"!!! {err}")
