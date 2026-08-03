@@ -889,11 +889,18 @@ if _open_general or _done_general:
     add_section('General Tasks',
         'Quick-capture jobs not tied to a specific day or batch (e.g. supplies to order). Open tasks are outstanding; done tasks show the date completed. App-development notes are excluded from this record.')
     grows = [['Task', 'Added', 'Status']]
+    # Cells MUST be Paragraph objects. A raw string is drawn on one line and
+    # overruns into the next column - that was the overlapping text on the
+    # General Tasks page reported 03/08/2026.
     for t in _open_general:
-        grows.append([clean(t.get('text','')), clean(str(t.get('addedDate',''))), 'Open'])
+        grows.append([Paragraph(clean(t.get('text','')), cell_style),
+                      Paragraph(clean(str(t.get('addedDate',''))), cell_style),
+                      Paragraph('Open', cell_style)])
     for t in _done_general:
-        grows.append([clean(t.get('text','')), clean(str(t.get('addedDate',''))), 'Done ' + clean(str(t.get('doneDate','')))])
-    gt = Table(grows, colWidths=[130*mm, 45*mm, 49*mm], repeatRows=1)
+        grows.append([Paragraph(clean(t.get('text','')), cell_style),
+                      Paragraph(clean(str(t.get('addedDate',''))), cell_style),
+                      Paragraph('Done ' + clean(str(t.get('doneDate',''))), cell_style)])
+    gt = Table(grows, colWidths=[154*mm, 30*mm, 40*mm], repeatRows=1)
     gt.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), SAGE[0]), ('LINEABOVE', (0,0), (-1,0), 0.8, GOLD), ('LINEBELOW', (0,0), (-1,0), 0.8, GOLD), ('TEXTCOLOR', (0,0), (-1,0), GREEN), ('FONTNAME', (0,0), (-1,0), SERIFB), ('FONTNAME', (0,1), (-1,-1), SERIF), ('FONTSIZE', (0,0), (-1,-1), 8), ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]), ('GRID', (0,0), (-1,-1), 0.35, HAIR), ('LEFTPADDING', (0,0), (-1,-1), 4), ('TOPPADDING', (0,0), (-1,-1), 3), ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('VALIGN', (0,0), (-1,-1), 'TOP')]))
     story.append(gt)
 
@@ -1372,7 +1379,9 @@ if production_records:
                         else:
                             amt_str = f"{amt} {unit}".strip()
                         added = clean(str(ln.get('addedDate',''))) or '-'
-                        irows.append([clean(ln.get('name','')), amt_str, added])
+                        irows.append([Paragraph(clean(ln.get('name','')), cell_style),
+                                      Paragraph(amt_str, cell_style),
+                                      Paragraph(added, cell_style)])
                     it = Table(irows, colWidths=[110*mm, 64*mm, 50*mm], repeatRows=1)
                     it.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), SAGE[0]), ('LINEABOVE', (0,0), (-1,0), 0.8, GOLD), ('LINEBELOW', (0,0), (-1,0), 0.8, GOLD), ('TEXTCOLOR', (0,0), (-1,0), GREEN), ('FONTNAME', (0,0), (-1,0), SERIFB), ('FONTNAME', (0,1), (-1,-1), SERIF), ('FONTSIZE', (0,0), (-1,-1), 8), ('GRID', (0,0), (-1,-1), 0.35, HAIR), ('LEFTPADDING', (0,0), (-1,-1), 4), ('TOPPADDING', (0,0), (-1,-1), 2), ('BOTTOMPADDING', (0,0), (-1,-1), 2)]))
                     story.append(it)
@@ -1679,7 +1688,10 @@ add_section('Finished Product / Delivery Records',
 if deliveries:
     rows = [['Date', 'Batch', 'Destination', 'Notes']]
     for rec in sorted(deliveries, key=lambda x: (x.get('date') or ''), reverse=True):
-        rows.append([rec.get('date',''), rec.get('batchCode',''), rec.get('destination', rec.get('processor','')), rec.get('notes','')[:60]])
+        rows.append([Paragraph(clean(str(rec.get('date',''))), cell_style),
+                     Paragraph(clean(str(rec.get('batchCode',''))), cell_style),
+                     Paragraph(clean(str(rec.get('destination', rec.get('processor','')))), cell_style),
+                     Paragraph(clean(str(rec.get('notes','') or '')), cell_style)])
     t = Table(rows, colWidths=[20*mm, 45*mm, 72*mm, 90*mm], repeatRows=1)
     t.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), SAGE[0]), ('LINEABOVE', (0,0), (-1,0), 0.8, GOLD), ('LINEBELOW', (0,0), (-1,0), 0.8, GOLD), ('TEXTCOLOR', (0,0), (-1,0), GREEN), ('FONTNAME', (0,0), (-1,0), SERIFB), ('FONTNAME', (0,1), (-1,-1), SERIF), ('FONTSIZE', (0,0), (-1,-1), 8.5), ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]), ('GRID', (0,0), (-1,-1), 0.35, HAIR), ('LEFTPADDING', (0,0), (-1,-1), 4), ('TOPPADDING', (0,0), (-1,-1), 4), ('BOTTOMPADDING', (0,0), (-1,-1), 4), ('VALIGN', (0,0), (-1,-1), 'TOP')]))
     story.append(t)
