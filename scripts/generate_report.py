@@ -419,7 +419,14 @@ ESTATE_ALIASES = {
     'cold aston':'Gary', 'cold aston - gary':'Gary',
     'belvoir':'Caroline', 'belvoir castle':'Caroline',
     'lees court':'Elizabeth',
+    # Added 03/08/2026: these estates were printing their REAL names in the audit
+    # PDF because they had no alias on file. Found via the delivery section.
+    'hoddington':'Sam', 'wormsley':'Joe', 'stowell park':'James',
+    'st clair':'Alex',
 }
+# Estates still with NO alias on file - their real name will print. Flagged to Robert
+# 03/08/2026: g h sons, corbury estate, pevril, edward, derbyshire sporting,
+# richard croft sporting.
 def to_alias(name):
     if not name: return name
     key = str(name).strip().lower()
@@ -1686,13 +1693,36 @@ else:
 add_section('Finished Product / Delivery Records',
     'Finished salami, prosciutto and other products dispatched, by batch and destination. Completes the traceability chain from intake through production to the customer.')
 if deliveries:
-    rows = [['Date', 'Batch', 'Destination', 'Notes']]
+    rows = [['Date', 'Batch', 'Destination', 'Products dispatched', 'Notes']]
     for rec in sorted(deliveries, key=lambda x: (x.get('date') or ''), reverse=True):
+        # The app writes batchCodes (a LIST) and clientId. Older code here read
+        # batchCode / destination / processor, which the app never writes, so
+        # every delivery printed with three empty columns. Fixed 03/08/2026.
+        _bc = rec.get('batchCodes') or rec.get('batchCode') or ''
+        if isinstance(_bc, list):
+            _bc = ', '.join([str(x) for x in _bc if x])
+        _dest = ''
+        _cid = rec.get('clientId') or ''
+        if _cid and estates.get(_cid):
+            _dest = to_alias(estates.get(_cid))
+        if not _dest:
+            _dest = get_estate(rec)
+        if not _dest or _dest == '—':
+            _dest = clean(str(rec.get('destination', rec.get('processor','')) or ''))
+        _fl = []
+        for f in (rec.get('flavours') or []):
+            nm = str(f.get('name','') or '').strip()
+            if not nm:
+                continue
+            q = str(f.get('qty','') or '').strip()
+            u = str(f.get('unit','') or '').strip()
+            _fl.append(f"{nm} {q} {u}".strip() if q else nm)
         rows.append([Paragraph(clean(str(rec.get('date',''))), cell_style),
-                     Paragraph(clean(str(rec.get('batchCode',''))), cell_style),
-                     Paragraph(clean(str(rec.get('destination', rec.get('processor','')))), cell_style),
+                     Paragraph(clean(str(_bc)), cell_style),
+                     Paragraph(clean(str(_dest)), cell_style),
+                     Paragraph(clean('; '.join(_fl)), cell_style),
                      Paragraph(clean(str(rec.get('notes','') or '')), cell_style)])
-    t = Table(rows, colWidths=[20*mm, 45*mm, 72*mm, 90*mm], repeatRows=1)
+    t = Table(rows, colWidths=[20*mm, 42*mm, 34*mm, 66*mm, 65*mm], repeatRows=1)
     t.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), SAGE[0]), ('LINEABOVE', (0,0), (-1,0), 0.8, GOLD), ('LINEBELOW', (0,0), (-1,0), 0.8, GOLD), ('TEXTCOLOR', (0,0), (-1,0), GREEN), ('FONTNAME', (0,0), (-1,0), SERIFB), ('FONTNAME', (0,1), (-1,-1), SERIF), ('FONTSIZE', (0,0), (-1,-1), 8.5), ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]), ('GRID', (0,0), (-1,-1), 0.35, HAIR), ('LEFTPADDING', (0,0), (-1,-1), 4), ('TOPPADDING', (0,0), (-1,-1), 4), ('BOTTOMPADDING', (0,0), (-1,-1), 4), ('VALIGN', (0,0), (-1,-1), 'TOP')]))
     story.append(t)
 else:
