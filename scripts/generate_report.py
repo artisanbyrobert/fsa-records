@@ -1498,7 +1498,17 @@ if venison_runs:
     for run in sorted(venison_runs, key=lambda r: (r.get('date') or ''), reverse=True):
         ven_alias = run.get('alias','') or to_alias(run.get('estate',''))
         title = ("Venison Breakdown — " + str(run.get('batchCode', '(no batch)')) + " · " + str(ven_alias)).strip(' ·')
-        add_section(title, 'Private kill — processed for the estate\u2019s own consumption.')
+        # Subtitle must state the true provenance. Bought-in meat is NOT a private
+        # kill - saying so on an FSA record misstates provenance. Fixed 06/08/2026.
+        _end_use = "Processed for the estate\u2019s own consumption \u2014 not for sale to the public."
+        if run.get('sourceType') == 'bought_in':
+            _sup = str(run.get('supplier', '') or 'an approved supplier')
+            _fsa = str(run.get('supplierFSA', '') or '')
+            _srcline = ("Meat bought in from " + _sup + (" (" + _fsa + ")" if _fsa else "")
+                        + ", an FSA-approved establishment. " + _end_use)
+        else:
+            _srcline = "Private kill. " + _end_use
+        add_section(title, _srcline)
         lanes = sorted(run.get('lanes', []), key=lambda l: VEN_ORDER.index(l['key']) if l.get('key') in VEN_ORDER else 99)
         for lane in lanes:
             is_salami_frozen = (lane.get('calc') == 'salami' and lane.get('frozen'))
@@ -1546,6 +1556,82 @@ if venison_runs:
                 tstyle.append(('LINEABOVE', (0, total_idx), (-1, total_idx), 0.6, GREEN))
             t.setStyle(TableStyle(tstyle))
             story.append(t)
+
+            # ── DRYING LOG (added 06/08/2026) ─────────────────────────────────
+            # Every weighing taken during drying, oldest first, with loss against
+            # the start weight and the forecast finish computed at that point.
+            # This is the record that lets the forecast get better over time.
+            _dlog = lane.get('dryingLog') or []
+            if _dlog:
+                story.append(Spacer(1, 5*mm))
+                story.append(Paragraph('Drying log', ven_lane_h))
+                story.append(Spacer(1, 2*mm))
+                _dd = [[Paragraph(c, ven_hdr) for c in
+                        ['Weighed', 'Component', 'Start (g)', 'Now (g)', 'Lost (g)', 'Loss %', 'Scale']]]
+                for _e in sorted(_dlog, key=lambda x: str(x.get('date',''))):
+                    for _rd in _e.get('readings', []):
+                        _s = _vg(_rd.get('startG')); _n = _vg(_rd.get('grams'))
+                        _lp = _rd.get('lossPct')
+                        _lp = f'{float(_lp):.1f}%' if _lp not in (None, '') else (
+                              f'{100*(_s-_n)/_s:.1f}%' if _s else '\u2014')
+                        _dd.append([Paragraph(clean(str(_e.get('date',''))), ven_cell),
+                                    Paragraph(clean(str(_rd.get('component',''))), ven_cell),
+                                    Paragraph(_vfmt(_s), ven_cell), Paragraph(_vfmt(_n), ven_cell),
+                                    Paragraph(_vfmt(_s-_n) if _s else '\u2014', ven_cell),
+                                    Paragraph(_lp, ven_cell),
+                                    Paragraph(clean(str(_e.get('scale',''))), ven_cell)])
+                _dt = Table(_dd, colWidths=[22*mm, 74*mm, 24*mm, 24*mm, 24*mm, 20*mm, 38*mm], repeatRows=1)
+                _dt.setStyle(TableStyle([
+                    ('BACKGROUND', (0,0), (-1,0), SAGE[0]),
+                    ('LINEABOVE', (0,0), (-1,0), 0.8, GOLD), ('LINEBELOW', (0,0), (-1,0), 0.8, GOLD),
+                    ('FONTNAME', (0,1), (-1,-1), SERIF), ('FONTSIZE', (0,0), (-1,-1), 8.5),
+                    ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]),
+                    ('GRID', (0,0), (-1,-1), 0.35, HAIR), ('LEFTPADDING', (0,0), (-1,-1), 4),
+                    ('TOPPADDING', (0,0), (-1,-1), 4), ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+                    ('VALIGN', (0,0), (-1,-1), 'TOP')]))
+                story.append(_dt)
+                for _e in sorted(_dlog, key=lambda x: str(x.get('date',''))):
+                    if _e.get('note'):
+                        story.append(Paragraph('<b>' + clean(str(_e.get('date',''))) + ':</b> '
+                                               + clean(str(_e['note'])), ven_stat))
+
+            # ── FORECAST ──────────────────────────────────────────────────────
+            _fc = lane.get('forecast') or {}
+            _tg = _fc.get('targets') or {}
+            if _tg:
+                story.append(Spacer(1, 5*mm))
+                story.append(Paragraph('Forecast finish', ven_lane_h))
+                story.append(Spacer(1, 2*mm))
+                _fd = [[Paragraph(c, ven_hdr) for c in
+                        ['Component', 'Target loss', 'Finishes at (g)', 'Still to lose (g)', 'Expected ready']]]
+                for _pk in sorted(_tg.keys()):
+                    _label = _pk.replace('pct', '%')
+                    for _cname, _v in (_tg[_pk] or {}).items():
+                        if not _v: continue
+                        _when = _v.get('projectedDate') or _v.get('status') or '\u2014'
+                        _lin = _v.get('projectedDateLinear')
+                        if _lin and _lin != _v.get('projectedDate'):
+                            _when = str(_when) + ' (earliest ' + str(_lin) + ')'
+                        _fd.append([Paragraph(clean(str(_cname)), ven_cell),
+                                    Paragraph(_label, ven_cell),
+                                    Paragraph(_vfmt(_v.get('targetG')), ven_cell),
+                                    Paragraph(_vfmt(_v.get('gramsToGo')) if _v.get('gramsToGo') else '\u2014', ven_cell),
+                                    Paragraph(clean(str(_when)), ven_cell)])
+                if len(_fd) > 1:
+                    _ft = Table(_fd, colWidths=[74*mm, 24*mm, 30*mm, 30*mm, 68*mm], repeatRows=1)
+                    _ft.setStyle(TableStyle([
+                        ('BACKGROUND', (0,0), (-1,0), SAGE[0]),
+                        ('LINEABOVE', (0,0), (-1,0), 0.8, GOLD), ('LINEBELOW', (0,0), (-1,0), 0.8, GOLD),
+                        ('FONTNAME', (0,1), (-1,-1), SERIF), ('FONTSIZE', (0,0), (-1,-1), 8.5),
+                        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]),
+                        ('GRID', (0,0), (-1,-1), 0.35, HAIR), ('LEFTPADDING', (0,0), (-1,-1), 4),
+                        ('TOPPADDING', (0,0), (-1,-1), 4), ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+                        ('VALIGN', (0,0), (-1,-1), 'TOP')]))
+                    story.append(_ft)
+                    story.append(Paragraph(
+                        'Projected from the weighings above. Dates assume drying continues to slow as it has so far; '
+                        'the earliest date is the straight-line case. Weight loss is a guide, not the test \u2014 confirm '
+                        'texture by hand before packing as finished.', ven_stat))
 
 # ── PEST CONTROL SECTION ──────────────────────────────────────────────────────
 _log(f"Building Pest Control section ({len(pest_records)} records)")
