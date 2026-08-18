@@ -3477,38 +3477,134 @@ function customerLabelData(prodForm, stage){
   return { title:(sp+' '+flav).trim(), species:sp, flavour:flav, sub:customerEstateName(prodForm), ingredients:ingr, batchCode:(ch.code||((prodForm.batchCode||'')+(ch.letter||'')))||'' };
 }
 function drawCustomerLabel(ctx,W,H,d){
+  // THREE-BAND GRID - locked spec ref_label_grid_customer, ported into the app 18/08/2026.
+  // Replaces the old fit-what-is-left renderer whose ingredient floor was 1.38 mm,
+  // below the 2.5 mm legal minimum, and which let a long ingredient list squeeze
+  // the product name down to the same size as the small print.
+  //
+  //   TOP    0.15 : ARTISAN BY ROBERT + hairline rule
+  //   MIDDLE 0.47 : estate, then species + flavour
+  //   BOTTOM 0.38 : ingredients (never below 2.5 mm), then the batch line
+  //
+  // Type is sized to FILL its band. 50 x 30 mm = 400 x 240 px at 8 dots/mm.
   var DISP='"Cormorant Garamond",Georgia,serif', BODY='"EB Garamond",Georgia,serif';
-  ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);ctx.fillStyle='#000';ctx.textBaseline='alphabetic';
-  var pad=Math.round(Math.min(W,H)*0.05), iw=W-pad*2;
-  function fitW(t,w,f,cap,min){ var fz=cap; for(;fz>=(min||8);fz--){ctx.font=w+' '+fz+'px '+f; if(ctx.measureText(t).width<=iw)break;} return fz; }
-  var sp=d.species||((d.title||'').trim().split(/\s+/)[0]||'');
-  var fl=d.flavour||((d.title||'').trim().split(/\s+/).slice(1).join(' '));
-  var wmFs=fitW('ARTISAN BY ROBERT','500',DISP,Math.round(H*0.072),10);
-  var estFs=d.sub?fitW(d.sub,'italic 400',BODY,Math.round(H*0.185),14):0;
-  var spFs=fitW(sp,'600',DISP,Math.round(H*0.135),12);
-  var flFs=fl?fitW(fl,'600',DISP,Math.round(H*0.105),10):0;
-  var toks=('Ingredients: '+(d.ingredients||[]).join(', ')).split(' ').map(function(w){return {t:w,b:_isAllergenWord(w)};});
-  function layoutIng(fsz){ var L=[[]],lw=0; for(var i=0;i<toks.length;i++){ ctx.font=(toks[i].b?'700 ':'400 ')+fsz+'px '+BODY; var ww=ctx.measureText(toks[i].t).width; ctx.font='400 '+fsz+'px '+BODY; var spc=ctx.measureText(' ').width; var add=(L[L.length-1].length?spc:0)+ww; if(lw+add>iw&&L[L.length-1].length){L.push([]);lw=0;add=ww;} L[L.length-1].push(toks[i]); lw+=add; } return L; }
-  var gA=Math.round(H*0.02), gB=Math.round(H*0.03);
-  var batchH=(d.batchCode?Math.round(H*0.10)+gA:0);
-  var headFixed=wmFs+gA+gB+estFs+gA+spFs+(flFs?gA+flFs:0)+gB+gB;
-  var availIng=(H-2*pad)-headFixed-batchH;
-  var maxIng=Math.round(H*0.10), minIng=Math.round(H*0.045);
-  var ingFs=minIng, ingLines=layoutIng(minIng), ingLH=Math.round(minIng*1.3);
-  for(var ff=maxIng; ff>=minIng; ff--){ var LL=layoutIng(ff); var lh=Math.round(ff*1.3); if(LL.length*lh<=availIng){ ingFs=ff; ingLines=LL; ingLH=lh; break; } }
-  var totalH=headFixed+ingLines.length*ingLH;
-  var y=pad+Math.max(0,Math.round(((H-2*pad-batchH)-totalH)/2));
-  ctx.textAlign='center'; ctx.fillStyle='#000';
-  ctx.font='500 '+wmFs+'px '+DISP; y+=wmFs; ctx.fillText('ARTISAN BY ROBERT',W/2,y);
-  y+=gA; ctx.strokeStyle='#000'; ctx.lineWidth=Math.max(1,Math.round(H*0.006)); ctx.beginPath(); ctx.moveTo(W*0.34,y); ctx.lineTo(W*0.66,y); ctx.stroke();
-  y+=gB;
-  if(estFs){ ctx.font='italic 400 '+estFs+'px '+BODY; y+=estFs; ctx.fillText(d.sub,W/2,y); y+=gA; }
-  ctx.font='600 '+spFs+'px '+DISP; y+=spFs; ctx.fillText(sp,W/2,y);
-  if(flFs){ y+=gA; ctx.font='600 '+flFs+'px '+DISP; y+=flFs; ctx.fillText(fl,W/2,y); }
-  y+=gB; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(pad,y); ctx.lineTo(W-pad,y); ctx.stroke(); y+=gB;
+  var G={bands:[0.15,0.47,0.38],estateRel:1.00,productRel:0.76,lineLead:1.16,
+         estateCapMM:5.5,wordmarkRel:0.44,ingFloorMM:2.5};
+  var px=W/50;                                  // dots per mm on the 50 mm width
+  var side=Math.round(1.5*px), inner=W-side*2;
+  var b0=H*G.bands[0], b1=H*G.bands[1];
+  var FLOOR=Math.ceil(G.ingFloorMM*px);
+
+  function fitW(text,weight,fam,maxW,cap,min){
+    for(var f=cap; f>=min; f-=0.5){ ctx.font=weight+' '+f+'px '+fam;
+      if(ctx.measureText(text).width<=maxW) return f; }
+    return min;
+  }
+  function dropDanglers(L){
+    for(var i=0;i<L.length-1;i++){ var p=L[i].split(' '), last=p[p.length-1];
+      if(last==='&'||last==='and'||last==='-'){ p.pop(); L[i]=p.join(' '); L[i+1]=last+' '+L[i+1]; } }
+    return L;
+  }
+  function wrapPlain(text,weight,fam,fsz,maxW){
+    ctx.font=weight+' '+fsz+'px '+fam;
+    var w=text.split(' '), L=[], cur='';
+    for(var i=0;i<w.length;i++){ var t=cur?cur+' '+w[i]:w[i];
+      if(ctx.measureText(t).width<=maxW||!cur){cur=t;} else {L.push(cur);cur=w[i];} }
+    if(cur) L.push(cur);
+    return dropDanglers(L);
+  }
+  function measTok(a,fsz){
+    var w=0;
+    for(var i=0;i<a.length;i++){
+      ctx.font=(a[i].b?'700 ':'400 ')+fsz+'px '+BODY; w+=ctx.measureText(a[i].t).width;
+      if(i){ ctx.font='400 '+fsz+'px '+BODY; w+=ctx.measureText(' ').width; }
+    }
+    return w;
+  }
+  function wrapTokens(toks,fsz,maxW){
+    // Balanced two-line break, preferring a break after a comma. Greedy wrapping
+    // orphans a single word; splitting mid-ingredient reads worse than uneven lines.
+    if(measTok(toks,fsz)>maxW){
+      var best=null;
+      for(var i=1;i<toks.length;i++){
+        var a=toks.slice(0,i), b=toks.slice(i), wa=measTok(a,fsz), wb=measTok(b,fsz);
+        if(wa<=maxW&&wb<=maxW){
+          var atComma=/[,;]$/.test(a[a.length-1].t);
+          var score=Math.max(wa,wb)-(atComma?maxW:0);
+          if(!best||score<best.w) best={L:[a,b],w:score};
+        }
+      }
+      if(best) return best.L;
+    }
+    var L=[[]], lw=0;
+    for(var j=0;j<toks.length;j++){
+      ctx.font=(toks[j].b?'700 ':'400 ')+fsz+'px '+BODY;
+      var ww=ctx.measureText(toks[j].t).width;
+      ctx.font='400 '+fsz+'px '+BODY;
+      var sp=ctx.measureText(' ').width;
+      var add=(L[L.length-1].length?sp:0)+ww;
+      if(lw+add>maxW&&L[L.length-1].length){ L.push([]); lw=0; add=ww; }
+      L[L.length-1].push(toks[j]); lw+=add;
+    }
+    return L;
+  }
+
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#000'; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+
+  // TOP BAND - wordmark and rule
+  var wmFs=fitW('ARTISAN BY ROBERT','500',DISP,inner*0.80,Math.round(b0*G.wordmarkRel),8);
+  var wmY=Math.round(b0*0.62);
+  ctx.font='500 '+wmFs+'px '+DISP;
+  ctx.fillText('ARTISAN BY ROBERT',W/2,wmY);
+  ctx.strokeStyle='#000'; ctx.lineWidth=Math.max(1,Math.round(px*0.12));
+  var rY=wmY+Math.round(wmFs*0.52);
+  ctx.beginPath(); ctx.moveTo(W*0.33,rY); ctx.lineTo(W*0.67,rY); ctx.stroke();
+
+  // MIDDLE BAND - solve for the number of product lines actually needed
+  var MID=Math.round(px*0.9), h=b1-MID*2;
+  var product=((d.species?d.species+' ':'')+(d.flavour||'')).trim();
+  var estFs=0, prodFs=0, prLines=[];
+  for(var n=1;n<=2;n++){
+    var rel=(d.sub?G.estateRel:0)+(product?G.productRel*n:0);
+    var base=h/(rel*G.lineLead);
+    estFs=d.sub?Math.min(Math.round(base*G.estateRel),Math.round(G.estateCapMM*px)):0;
+    prodFs=product?Math.round(base*G.productRel):0;
+    if(d.sub) estFs=Math.min(estFs,fitW(d.sub,'italic 400',BODY,inner,estFs,8));
+    prLines=product?wrapPlain(product,'600',DISP,prodFs,inner):[];
+    if(prLines.length<=n) break;
+  }
+  var y=b0+MID;
+  if(d.sub){ ctx.font='italic 400 '+estFs+'px '+BODY; y+=estFs; ctx.fillText(d.sub,W/2,y); }
+  ctx.font='600 '+prodFs+'px '+DISP;
+  for(var pi=0;pi<prLines.length;pi++){ y+=Math.round(prodFs*G.lineLead); ctx.fillText(prLines[pi],W/2,y); }
+
+  // BOTTOM BAND - ingredients then the batch line
+  var names=[]; (d.ingredients||[]).forEach(function(x){ if(x) names.push(x); });
+  var toks=('Ingredients: '+names.join(', ')).split(' ').map(function(w){
+    return {t:w,b:(typeof _isAllergenWord==='function')?_isAllergenWord(w):false}; });
+  var batchTxt=d.batchCode?('Batch '+d.batchCode+(d.batchCode2?('  \u00b7  '+d.batchCode2):'')):'';
+  var BOT=Math.round(px*0.25), BM=Math.round(px*1.4);
+  var avail=H*G.bands[2]-BOT-BM;
+  var ingFs=FLOOR, ingL=wrapTokens(toks,FLOOR,inner), ingLH=Math.round(FLOOR*1.28);
+  for(var f2=Math.round(avail*0.40); f2>FLOOR; f2-=0.5){
+    var LL=wrapTokens(toks,f2,inner), lh=Math.round(f2*1.28);
+    if(LL.length*lh+(batchTxt?Math.round(f2)+4:0)<=avail){ ingFs=f2; ingL=LL; ingLH=lh; break; }
+  }
+  var batchFs=batchTxt?Math.round(ingFs):0;
+  var by=b0+b1+BOT;
   ctx.textAlign='left';
-  for(var li=0;li<ingLines.length;li++){ var by=y+ingFs,x=pad; for(var wi=0;wi<ingLines[li].length;wi++){ var tk=ingLines[li][wi]; ctx.font=(tk.b?'700 ':'400 ')+ingFs+'px '+BODY; if(wi>0){ctx.font='400 '+ingFs+'px '+BODY; x+=ctx.measureText(' ').width; ctx.font=(tk.b?'700 ':'400 ')+ingFs+'px '+BODY;} ctx.fillText(tk.t,x,by); x+=ctx.measureText(tk.t).width; } y+=ingLH; }
-  if(d.batchCode){ ctx.textAlign='center'; ctx.font='400 '+ingFs+'px '+BODY; ctx.fillStyle='#000'; ctx.fillText('Batch '+d.batchCode, W/2, H-pad); }
+  for(var li=0;li<ingL.length;li++){
+    var ln=ingL[li], x=Math.round((W-measTok(ln,ingFs))/2), base2=by+ingFs;
+    for(var wi=0;wi<ln.length;wi++){
+      if(wi){ ctx.font='400 '+ingFs+'px '+BODY; x+=ctx.measureText(' ').width; }
+      ctx.font=(ln[wi].b?'700 ':'400 ')+ingFs+'px '+BODY;
+      ctx.fillText(ln[wi].t,x,base2); x+=ctx.measureText(ln[wi].t).width;
+    }
+    by+=ingLH;
+  }
+  if(batchTxt){ ctx.textAlign='center'; ctx.font='400 '+batchFs+'px '+BODY; ctx.fillStyle='#000';
+    ctx.fillText(batchTxt,W/2,H-BM); }
 }
 
 function renderCustomerLabelCanvas(d, orientation, scale){
