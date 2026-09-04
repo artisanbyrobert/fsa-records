@@ -217,7 +217,11 @@ def get_season_code(d):
     close_yy = str(open_year + 1)[-2:]
     return f"{open_year}{close_yy}"
 
-season_code = get_season_code(today)
+# SEASON_CODE lets a run target a past season - set it as a workflow input or an
+# env var. Without it the script behaves exactly as before and uses today's date.
+# Added 04/09/2026 so FSA_Records_202526.pdf could be rebuilt after commercial
+# tasks were stripped out of generalTasks.
+season_code = os.environ.get('SEASON_CODE', '').strip() or get_season_code(today)
 filename = f"FSA_Records_{season_code}.pdf"
 _log(f"Season code: {season_code}  →  filename: {filename}")
 _log(f"Target filename: {filename}")
