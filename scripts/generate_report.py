@@ -1655,14 +1655,14 @@ Dried, uncooked, whole-muscle cured meat: venison prosciutto from the boned haun
 
 Begins at boned whole muscle leaving Plan A. Ends at vac-packed finished product held in ambient storage awaiting delivery.
 
-**Scope note — bresaola.** Bresaola is made from farmed beef, not wild game. The premises approval is for wild game. The process below is identical, but the scope question is open with the EHO and is listed in section B10. Do not read this plan as an assertion that farmed beef is within approval.
+**Bresaola.** Beef, not wild game. Made for private use, not for sale to the public. The process is identical to the venison whole muscle described below and is controlled by the same CCP.
 
 ## B2. Product description
 
 | | |
 |---|---|
 | Product | Dried, uncooked, whole-muscle cured meat, ready to eat |
-| Meat | Wild deer (haunch, loin, fillet); farmed beef for bresaola |
+| Meat | Wild deer (haunch, loin, fillet); beef for bresaola, private use only |
 | Curing agent | **Salt only** |
 | Salt rate | **2.5 per cent** of the raw weight into cure — confirmed 6 September 2026 |
 | **Nitrates / nitrites** | **None used** |
@@ -1955,11 +1955,10 @@ Neither amendment changes CCP 1 of the salami plan. Water activity and weight lo
 # APPENDIX 3 — Open items
 
 1. **EHO scope — own-kill route.** Estate own-kill venison entering UK 2820 and returning to the supplying estate. Needs an answer in writing. Robert's call on when to raise it.
-2. **EHO scope — farmed beef.** Bresaola from beef in a wild game approval. Same conversation.
-3. **Salt meter.** Deferred until the lab panel returns.
-4. **Nduja.** Not covered by any plan. Written once the first batch is finished and there is something to describe.
-5. **Salami plan amendments.** Salt 2.2 per cent, and venison admitted to scope — see Annex S.
-6. **Water activity on the rack.** Case hardening means a crust reading is not a core reading. Method for taking the reading on a cut face should be written into the drying SOP.
+2. **Salt meter.** Deferred until the lab panel returns.
+3. **Nduja.** Not covered by any plan. Written once the first batch is finished and there is something to describe.
+4. **Salami plan amendments.** Salt 2.2 per cent, and venison admitted to scope — see Annex S.
+5. **Water activity on the rack.** Case hardening means a crust reading is not a core reading. Method for taking the reading on a cut face should be written into the drying SOP.
 
 ---
 
