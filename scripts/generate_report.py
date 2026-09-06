@@ -492,6 +492,15 @@ _regfont('Cor',  'Cormorant-SemiBold.ttf')
 # graceful fallback so a missing font never breaks the nightly run
 SERIF   = 'EBG'   if _HAS_EBG else 'Helvetica'
 SERIFB  = 'EBGsb' if _HAS_EBG else 'Helvetica-Bold'
+# Without a family mapping, <b> inside a Paragraph has no bold face to switch to
+# and reportlab silently renders it in the regular weight - every <b> tag in this
+# report was doing nothing. Mapping bold to the SemiBold instance fixes them all.
+# Found and fixed 06/09/2026.
+if _HAS_EBG:
+    try:
+        pdfmetrics.registerFontFamily('EBG', normal='EBG', bold='EBGsb', italic='EBG', boldItalic='EBGsb')
+    except Exception as _e:
+        _log(f"font family mapping failed ({_e}) - bold tags will render regular")
 DISPLAY = 'Cor'   if 'Cor' in pdfmetrics.getRegisteredFontNames() else SERIFB
 
 doc = SimpleDocTemplate(filename, pagesize=landscape(A4), rightMargin=15*mm, leftMargin=15*mm, topMargin=24*mm, bottomMargin=16*mm)
@@ -1489,7 +1498,9 @@ else:
 # is a copy of it. If the Supabase record changes, change this too.
 import re as _re
 
-VENISON_HACCP_MD = r"""**Legal basis.** Assimilated Regulation (EC) 852/2004 Article 5 - procedures based on the seven HACCP principles, proportionate to the business. Assimilated Regulation (EC) 853/2004 Annex III Section IV - wild game meat: Chapter II paragraph 5 sets the chilling limit for large wild game at not more than 7 \u00b0C throughout the meat; the 4 \u00b0C figure applies to small wild game under Chapter III paragraph 4.
+VENISON_HACCP_MD = r"""**Private estate kill for the estate's own use. Not for sale to the public.**
+
+**Legal basis.** Assimilated Regulation (EC) 852/2004 Article 5 - procedures based on the seven HACCP principles, proportionate to the business. Assimilated Regulation (EC) 853/2004 Annex III Section IV - wild game meat: Chapter II paragraph 5 sets the chilling limit for large wild game at not more than 7 °C throughout the meat; the 4 °C figure applies to small wild game under Chapter III paragraph 4.
 
 ## 0. How this document is organised
 
@@ -1952,11 +1963,70 @@ Neither amendment changes CCP 1 of the salami plan. Water activity and weight lo
 
 ---
 
+# APPENDIX 4 — Carcass handover declaration
+
+**Private estate kill for the estate's own use. Not for sale to the public.**
+
+**In force from Thursday 10 September 2026, first used on the Wilton Estate collection.**
+
+## Why this sheet exists
+
+While reviewing the HACCP for the coming 2026/27 season, and having only just started taking estate own-kill venison for the estate's own use, a number of unknowns were highlighted. Every plan in this document depends on work done at the estate before the carcass is ever seen: how quickly it was gralloched, whether the gut leaked, whether the larder was fly-proof and cold, whether anyone smoked while handling it. None of that was recorded. It was assumed.
+
+The assumption is not unreasonable — but it is not evidence, and it is not a control. Gamekeepers and hunters are trained by their peers, and that training is built around game that will be **cooked**. Nothing made here is cooked. There is no kill step in prosciutto, cured loin, bresaola or salami, and pastrami is cooked long after the decisions that matter have already been made in the field.
+
+So this establishment asks for its own declaration, in addition to the trained person's declaration required by law, and it is completed and signed at the point of collection.
+
+## What the sheet says at the top
+
+> Nothing we make from this carcass is cooked. There is no cooking step to make it safe. It is salted, dried and eaten as it is. That means we depend on you, in the field and in the larder, for the parts we cannot control. Tick each line honestly. A blank is not a problem — it tells us what to trim or reject. A wrong tick is.
+
+## What is declared
+
+| # | Declared by the hunter or gamekeeper | Why it is asked |
+|---|---|---|
+| 1 | Gralloched as soon as possible after the shot | The longer stomach and intestines stay in, the more gut bacteria move into the meat |
+| 2 | No gut contents or bladder leaked onto the inside of the carcass | If it has, we can trim — but only if we know where |
+| 3 | Carcass kept clear of droppings, soil, dogs and wildlife | Anything on the outside ends up on the meat when it is skinned |
+| 4 | Head shot, or neck clear of blood trauma | Head shot preferred; a clean neck means the neck muscle can be used rather than binned |
+| 5 | Shot damage and bruising limited, and noted if not | Bruised and bloodshot meat cannot be cured, and we need to know before cutting |
+| 6 | Hung in a fly-proof larder or chiller, no flies on the carcass | One fly laying eggs in a wound ruins a carcass. The enclosure is a separate control from the chilling |
+| 7 | Larder holding below 7 °C, temperature read and written on the sheet | The legal figure for large wild game. Warm meat grows bacteria that curing cannot remove |
+| 8 | If skinned: skinned inside the fly-proof chiller or prep room | Not outside, not in the yard, not in a vehicle |
+| 9 | Knives, saw, hooks and surfaces cleaned before and after | Cross-contamination from the previous carcass is invisible and travels |
+| 10 | No smoking while gutting, de-heading, skinning or handling | Nicotine goes into the flesh and stays there |
+| 11 | Nothing abnormal before or after the shot — behaviour, condition, viscera | If anything looked wrong the sheet is not signed; the estate rings Robert instead |
+| 12 | Trained person's declaration completed and with the carcass | Legal requirement under 853/2004 Annex III Section IV, and the paperwork this establishment is audited on |
+
+The sheet also records the carcass details (estate, species, sex, date and time of kill, tag number, larder temperature, shot placement), a free-text line for anything else the estate wants to tell us, and the signature and trained person number of whoever hands the carcass over.
+
+## What this establishment records on the same sheet
+
+Carcass temperature probed at collection, accepted or rejected, batch code, who collected it, signature and date. That is the monitoring record for **CCP 1**, and it now sits on the same piece of paper as the estate's own declaration.
+
+## How it is used
+
+| | |
+|---|---|
+| Frequency | One sheet per carcass, every collection, from 10 September 2026 |
+| Completed by | The estate hunter or gamekeeper, at the larder, before loading |
+| Countersigned by | Robert Fry, at collection |
+| Held with | The intake record for that batch code |
+| A blank or unticked line | Not a rejection in itself. It directs the inspection of the carcass and may lead to extra trimming, or to rejection under CCP 1 |
+| Repeated failure from one estate | Reviewed with the estate before the next collection, per the CCP 1 corrective action |
+
+**Status.** Paper form, version 1, in use from the Wilton Estate collection on 10 September 2026. It will be reviewed after the first few collections and reworded where lines are queried or left blank. It is not built into the app.
+
+---
+
 *Drafted 6 September 2026 from the process confirmed in `ref_haccp_venison_design`. Status: DRAFT. Not approved. Not in the nightly audit PDF.*
 """
 
 _hh3 = ParagraphStyle('hac_h3', fontName=SERIFB, fontSize=10, textColor=GOLDLBL,
                       spaceBefore=9, spaceAfter=2, keepWithNext=1)
+_hquote = ParagraphStyle('hac_quote', fontName=SERIF, fontSize=10, textColor=GREEN,
+                         leading=14, spaceBefore=3, spaceAfter=5, leftIndent=10, rightIndent=10,
+                         borderPadding=4)
 _hbul = ParagraphStyle('hac_bul', fontName=SERIF, fontSize=10, textColor=INK,
                        leading=13.5, spaceAfter=3, leftIndent=8)
 
@@ -2035,6 +2105,8 @@ def _md_flow(md):
             story.append(Paragraph(_md_inline(ln[2:]), _ht))
             story.append(HRFlowable(width='28%', thickness=1, color=GOLD,
                                     spaceAfter=6, spaceBefore=2, hAlign='CENTER'))
+        elif ln.lstrip().startswith('> '):
+            story.append(Paragraph(_md_inline(ln.lstrip()[2:]), _hquote))
         elif ln.lstrip().startswith('- '):
             story.append(Paragraph('\u2022&nbsp;&nbsp;' + _md_inline(ln.lstrip()[2:]), _hbul))
         elif _re.match(r'^\d+\.\s', ln.strip()):
