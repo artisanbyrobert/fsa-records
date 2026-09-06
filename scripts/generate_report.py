@@ -1482,6 +1482,579 @@ if production_records:
 else:
     story.append(Paragraph('No production runs recorded yet.', small))
 
+# ── HACCP PLANS: VENISON ──────────────────────────────────────────────────────
+# Added 06/09/2026. Sits at the START of the venison section, ahead of the
+# breakdown records, mirroring how the intake plan sits ahead of intake records.
+# Source of truth is ref_haccp_venison_plan in Supabase; VENISON_HACCP_MD below
+# is a copy of it. If the Supabase record changes, change this too.
+import re as _re
+
+VENISON_HACCP_MD = r"""**Legal basis.** Assimilated Regulation (EC) 852/2004 Article 5 - procedures based on the seven HACCP principles, proportionate to the business. Assimilated Regulation (EC) 853/2004 Annex III Section IV - wild game meat: Chapter II paragraph 5 sets the chilling limit for large wild game at not more than 7 \u00b0C throughout the meat; the 4 \u00b0C figure applies to small wild game under Chapter III paragraph 4.
+
+## 0. How this document is organised
+
+Four documents in one file, because the process is one process and splitting it would repeat the same prerequisites four times.
+
+| Part | Covers | Critical control points |
+|---|---|---|
+| **Plan A** | Venison intake and breakdown — collection, transport, primals, boning, trim segregation, private-use diversion | CCP 1 — temperature at receipt |
+| **Plan B** | Whole muscle — prosciutto, cured loin, fillet, bresaola | CCP 2 — air dry to shelf stability |
+| **Plan C** | Pastrami — cooked, chilled, sliced, frozen | CCP 3 — cook · CCP 4 — chill |
+| **Annex S** | Venison entering the existing salami plan | Salami CCP 1, unchanged |
+
+Every product made from venison starts in Plan A and then follows exactly one of B, C or Annex S. The process flow diagram (the venison process flow diagram held with this plan) is the single-page picture of the same thing and forms part of this document.
+
+**Four products, four plans, no fourth salami plan.** Venison salami is the same process as pheasant salami with a different species and a different intake route. It is handled as an annex to the salami plan rather than a separate plan, which is the proportionate approach under 852/2004 Article 5.
+
+---
+
+# PLAN A — Venison intake and breakdown
+
+## A1. Scope
+
+Covers wild deer — fallow, muntjac, roe, red — from the point of collection from the estate larder to the point at which boned, trimmed, segregated meat enters Plan B, Plan C or Annex S.
+
+Begins: at the estate chilled larder, at collection.
+Ends: at boned primals and segregated trim, held at 3 °C, ready for salting.
+
+**Not covered:** the killing, gralloching and initial examination, which are the responsibility of the estate's trained person; and everything downstream of boning, which is Plan B, Plan C or Annex S.
+
+## A2. Product description
+
+| | |
+|---|---|
+| Species | Wild fallow, muntjac, roe and red deer — large wild game |
+| Source | Shooting estates, own kill, examined by the estate's trained person |
+| Condition at collection | Whole carcass, skinned, gralloched, hung in a chilled insect-proof larder |
+| Transport | Chill box with frozen 2 L water bottles, Robert's own vehicle |
+| Primals produced | Forequarter (shoulders, neck, ribs), saddle (loins, fillets), haunch (legs, rump) |
+| Trim | Taken from all three primals, segregated for salami |
+| Waste | All venison fat, bone, neck trauma meat and rejected meat |
+| Holding after breakdown | 3 °C, working temperature below 4 °C throughout |
+
+## A3. Intended use and consumers
+
+Venison entering this plan becomes ready-to-eat cured product supplied to shooting estates for consumption by estate members and their guests, and to private individuals. It is not currently placed on the open retail market.
+
+Roughly 99 per cent of venison handled is estate own-kill returning to the estate that shot it. Any public-facing sale route runs via a game dealer or via Vicars Game, not direct.
+
+**Vulnerable groups:** the product is not marketed to infants, the elderly, pregnant women or the immunocompromised, but as a ready-to-eat cured product it may be eaten by them. Controls are set accordingly.
+
+## A4. The three things an inspector will ask first
+
+**1. Where does the carcass come from, and who declared it fit?**
+Estate own-kill, examined in the field by the estate's trained person under 853/2004 Annex III Section IV Chapter I. A numbered trained person's declaration must accompany the body, giving date, time and place of killing. No declaration, no acceptance — that is the first line of the intake record.
+
+**2. Is the legal route into UK 2820 settled?**
+**No, and this plan says so plainly.** Estate own-kill venison entering an approved establishment, processed, and returned to the estate that supplied it, is a scope question that has to be answered by the EHO in writing. It is open, it is recorded in `ref_haccp_gap_analysis`, and this plan is drafted on the assumption that it will be resolved before any product covered by it is sold rather than returned. Nothing in Plans A to C depends on the answer; the scope line does.
+
+**3. Why 7 °C at the larder and not 4 °C?**
+7 °C is the legal chilling figure for large wild game — 853/2004 Annex III Section IV Chapter II paragraph 5. The 4 °C figure belongs to small wild game, Chapter III paragraph 4, and applies to the pheasant and partridge side of this business, not to deer. Once the carcass is inside UK 2820 the house limit is tighter than the law: primals hang at 3 °C and work is done below 4 °C.
+
+The **insect-proof enclosure** at the estate larder is a separate requirement from the temperature and is not satisfied by it. Flies are controlled by the enclosure; bacteria by the chill.
+
+## A5. Process flow
+
+| Step | Process | Temperature |
+|---|---|---|
+| A1 | Estate larder — carcass skinned, hung, insect-proof enclosure | 7 °C or below |
+| **A2** | **Acceptance and loading — declaration checked, carcass temperature taken and recorded — CCP 1** | **7 °C or below throughout the meat** |
+| A3 | Transport — chill box with frozen 2 L bottles, no heaping | 7 °C or below |
+| A4 | Arrival at UK 2820 — temperature recorded again, carcass hung | 3 °C |
+| A5 | Breakdown into primals — forequarter, saddle, haunch | below 4 °C |
+| A6 | Boning — aitchbone out of the haunch, legs boned, shoulders boned and rolled | below 4 °C |
+| A7 | Trim segregation — trim from all three primals to the salami route; venison fat, bone, damaged and rejected meat out | below 4 °C |
+| A8 | Alcohol wash — every whole chunk washed in alcohol above 13 per cent ABV, then drained | below 4 °C |
+
+Product then leaves this plan: whole muscle to **Plan B**, boned shoulders to **Plan C**, trim to **Annex S**.
+
+## A6. Hazard analysis
+
+Hazard types: **B** biological · **C** chemical · **P** physical.
+
+| Step | Hazard | Significant? | Control measure | CCP? |
+|---|---|---|---|---|
+| A1 larder | **B** Growth of *Salmonella*, *E. coli*, *Listeria* on the carcass surface if the larder is warm or overloaded | Yes | Estate larder held at 7 °C or below. Temperature seen and recorded at collection. Carcass rejected if warm. | Controlled at A2 |
+| A1 | **B/P** Fly strike, larvae, contamination by vermin | Yes | Insect-proof enclosure at the larder — a condition of collection, checked on every visit and recorded | No — prerequisite (supplier condition) |
+| A1 | **B** Poor field hygiene — gut spillage, delayed gralloch | Yes | Trained person's declaration required. Gralloch and skin condition inspected at collection; carcass rejected if contaminated. | No — prerequisite (supplier standard) |
+| A1 | **C** Taint from tobacco smoke during gutting, skinning or de-heading | Yes (quality and taint) | Standing collection briefing to estates: no smoking while handling the carcass | No — supplier briefing |
+| **A2 acceptance** | **B Growth and toxin formation, principally *Staphylococcus aureus*, following temperature abuse before or during collection** | **Yes** | **Carcass temperature probed and recorded at acceptance. Legal limit 7 °C throughout the meat.** | **CCP 1 — see A8** |
+| A2 | **B** Unfit animal accepted — disease, abnormal behaviour, environmental contamination | Yes | Numbered trained person's declaration checked and filed against the intake record. No declaration, no acceptance. | No — prerequisite (documented intake check) |
+| A3 transport | **B** Temperature rise in transit | Yes | Insulated chill box with frozen 2 L bottles, no heaping, direct journey. Temperature recorded again on arrival at A4. | Covered by CCP 1 |
+| A4 arrival | **B** Growth during hanging | Yes | Butchery fridge at 3 °C, monitored on the daily checks | No — prerequisite (chiller monitoring) |
+| A5 breakdown | **B** Cross-contamination from hide, hair, saw or hands onto exposed muscle | Yes | Skinned carcass only; clean-down SOP for saw, knives and surfaces; hand hygiene; work below 4 °C | No — prerequisite (clean-down and hygiene SOPs) |
+| A5 | **P** Bone dust and saw fragments in exposed meat | Yes | Visual inspection at boning; wiped surfaces; damaged surface trimmed away | No — prerequisite |
+| A6 boning | **C** Lead residue around the wound channel from expanding ammunition | Yes | Wound channel and bruised tissue cut out generously and binned at A7, not trimmed into salami. Head-shot animals checked for neck trauma. | No — corrective at A7 |
+| A6 | **P** Shot, bullet fragment, hair, bone chip | Yes | Visual inspection of every piece at boning; damaged tissue removed | No — prerequisite |
+| A7 segregation | **B** Damaged, bloodshot or rejected meat entering product | Yes | Bones, neck trauma meat, rejected meat and all venison fat diverted to the private-use freezer. Never into product. Diversion is recorded. | No — segregation control |
+| A7 | **B** Trim held warm while primals are worked | Yes | Trim boxed and returned to 3 °C between primals; work below 4 °C | No — prerequisite |
+| A8 alcohol wash | **B** Surface bacteria carried forward into the cure or the mince | Yes | Wash in alcohol above 13 per cent ABV, minimum 60 seconds contact, applied before mincing or salting, then drained | No — hurdle, not a kill step. See A7.1 |
+| A8 | **C** Alcohol residue as an undeclared ingredient | No | Processing aid, drained off, not an ingredient of the finished product | No |
+| all | **B** *Trichinella* | No | Not a hazard in deer. Applies to wild boar and other porcine species, which this establishment does not handle. | No |
+| all | **B** Chronic wasting disease / TSE in cervids | Not currently | Not present in GB deer. Monitored nationally. Any suspicion is an APHA notification, not a HACCP control. | No |
+
+### A6.1 Why the alcohol wash is not a CCP
+
+Identical reasoning to the salami plan. The wash reduces load on the **surface of intact pieces**, cannot reach organisms inside the muscle, and does nothing to spores. It is applied before mincing precisely because mincing would spread surface organisms through the batch where a surface treatment can no longer reach them. Real hurdle, monitored at 60 seconds, **not claimed as a kill step**.
+
+## A7. CCP determination
+
+Questions applied at each step: (Q1) is a control measure in place? (Q2) is this step specifically designed to eliminate or reduce the hazard to an acceptable level? (Q3) could contamination occur or increase to unacceptable levels here? (Q4) will a later step eliminate or reduce it to an acceptable level?
+
+| Step | Q1 | Q2 | Q3 | Q4 | Outcome |
+|---|---|---|---|---|---|
+| A1 larder | Yes | No | Yes | No — see below | Supplier condition, evidenced at A2 |
+| **A2 acceptance** | **Yes** | **Yes — this is the step that rejects abused meat** | **Yes** | **No — no later step destroys pre-formed toxin** | **CCP 1** |
+| A3 transport | Yes | No | Yes | Yes — recorded again at A4 | Not a CCP |
+| A4 arrival | Yes | No | Yes | Yes — B, C or Annex S | Not a CCP, prerequisite |
+| A5 breakdown | Yes | No | Yes | Yes — B, C or Annex S | Not a CCP, prerequisite |
+| A6 boning | Yes | No | Yes | Partly — physical hazards removed here | Not a CCP, prerequisite |
+| A7 segregation | Yes | No | Yes | No | Not a CCP, segregation control |
+| A8 alcohol wash | Yes | No — reduces, does not eliminate | Yes | Yes — B, C or Annex S | Not a CCP |
+
+**Why acceptance is a CCP and not simply a prerequisite.** Drying (CCP 2) and cooking (CCP 3) both act on live organisms. Neither destroys *Staphylococcus aureus* enterotoxin, which is heat-stable and survives both. If a carcass has been held warm long enough for toxin to form, no later step in any of these plans will make it safe. Acceptance is therefore the last point at which that hazard can be controlled, which is exactly the test in Q4.
+
+## A8. CCP summary
+
+**CCP 1 — A2, temperature at acceptance**
+
+| | |
+|---|---|
+| **Hazard** | Growth of vegetative pathogens and formation of heat-stable *Staphylococcus aureus* enterotoxin following temperature abuse at the estate or in transit |
+| **Critical limit** | **7 °C or below throughout the meat**, measured at the thickest part of the haunch |
+| **Second limit** | Numbered trained person's declaration present, complete and matching the carcass |
+| **Monitoring** | Probe thermometer into the deepest muscle of the haunch, every carcass, at acceptance. Reading written on the intake record with the estate, date and batch code. |
+| **Second reading** | Repeated on arrival at UK 2820 and recorded, as evidence the cold chain held in transit |
+| **Frequency** | Every carcass, every collection |
+| **Who** | Robert Fry |
+| **Records** | Intake record in the FSA app, carried into the nightly audit PDF |
+| **Corrective action — above 7 °C** | Do not load. If discovered on arrival, quarantine and reject. Rejected carcasses go to the private-use freezer route or to disposal — **never into product** — and the rejection is recorded with the reason. |
+| **Corrective action — no declaration** | Do not accept. Contact the estate. Meat may not be accepted retrospectively on a declaration written after the event. |
+| **Corrective action — repeated failure** | Estate larder standard reviewed with the estate before the next collection. Two failures from one estate in a season triggers a written condition of supply. |
+| **Verification** | Probe accuracy checked against iced water and boiling water at a stated interval; intake records reviewed against production records at each seasonal audit |
+| **Validation** | 7 °C is the statutory chilling limit for large wild game under 853/2004 Annex III Section IV Chapter II paragraph 5. *S. aureus* growth and toxin production are negligible below 7 °C on intact muscle. |
+
+---
+
+# PLAN B — Whole muscle: prosciutto, cured loin, fillet, bresaola
+
+## B1. Scope
+
+Dried, uncooked, whole-muscle cured meat: venison prosciutto from the boned haunch, cured loin and fillet from the saddle, and beef bresaola.
+
+Begins at boned whole muscle leaving Plan A. Ends at vac-packed finished product held in ambient storage awaiting delivery.
+
+**Scope note — bresaola.** Bresaola is made from farmed beef, not wild game. The premises approval is for wild game. The process below is identical, but the scope question is open with the EHO and is listed in section B10. Do not read this plan as an assertion that farmed beef is within approval.
+
+## B2. Product description
+
+| | |
+|---|---|
+| Product | Dried, uncooked, whole-muscle cured meat, ready to eat |
+| Meat | Wild deer (haunch, loin, fillet); farmed beef for bresaola |
+| Curing agent | **Salt only** |
+| Salt rate | **2.5 per cent** of the raw weight into cure — confirmed 6 September 2026 |
+| **Nitrates / nitrites** | **None used** |
+| Starter culture | **None.** Flora Italia is used in salami only, never in whole muscle. |
+| Alcohol | Above 13 per cent ABV, applied at A8 as a processing aid, drained off, not an ingredient |
+| Casing | Prosciutto: collagen wrap and net. Loin and fillet: bare on the rack. |
+| Press | Prosciutto only — spring form press, 5 days at 3 °C |
+| Shelf stability | Water activity reduction, target 40 per cent weight loss |
+| Packaging | Vacuum packed |
+| Storage after packing | Ambient, below 18 °C |
+
+## B3. Intended use and consumers
+
+As Plan A section A3. Ready to eat without cooking.
+
+## B4. The thing an inspector will ask first
+
+**Salt only, no nitrate, no starter culture, months on the rack — what is actually keeping this safe?**
+
+One answer: **water activity**. Salt at 2.5 per cent draws water out during the press or vac stage; air drying takes the rest out until the product will not support pathogen growth. Whole muscle has one advantage over salami — it is intact. Contamination is on the surface, not distributed through the mass, and the surface is the part that dries first and hardest.
+
+Two things this plan does **not** claim:
+
+- It does not claim the alcohol wash is a kill step. It is a surface hurdle. See A6.1.
+- It does not claim a pH hurdle. There is no starter culture in whole muscle, so there is no acidification and none is claimed.
+
+**Cold, not ambient.** Whole muscle is dried in the same chilled conditions as the salami. The reasoning in the salami plan applies with less force here — deer are not poultry and carry a lower load than pheasant — but the same room is used and the same cold chain is recorded.
+
+## B5. Process flow
+
+| Step | Process | Temperature |
+|---|---|---|
+| B1 | Whole muscle received from Plan A, washed in alcohol above 13 per cent ABV, drained | below 4 °C |
+| B2 | Salt at 2.5 per cent of raw weight, applied by hand, weight into cure recorded | below 4 °C |
+| B3a | **Prosciutto:** spring form press, 5 days, drained | 3 °C |
+| B3b | **Loin, fillet, bresaola:** vac packed, 5 days | 3 °C |
+| B4 | Remove from press or vac, drain, collagen wrap and net (prosciutto only), tag with batch code | below 4 °C |
+| **B5** | **Air dry on the rack until shelf stable — CCP 2** | **below 4 °C throughout** |
+| B6 | Move to ambient storage | below 18 °C |
+| B7 | Vac pack, customer label, store | ambient, below 18 °C |
+
+Removal from press or vac is 5 days from the salting date. Weight into cure is the baseline the 40 per cent loss is measured from and must be recorded at B2.
+
+## B6. Hazard analysis
+
+| Step | Hazard | Significant? | Control measure | CCP? |
+|---|---|---|---|---|
+| B1 receive and wash | **B** Surface bacteria on the muscle | Yes | Alcohol wash above 13 per cent ABV, 60 seconds minimum, drained. Hurdle, not a kill step. | No — see A6.1 |
+| B2 salt | **C** Under-salting weakens the cure and slows water loss | Yes | Salt calculated as a percentage of the weighed raw piece by the app; both weights recorded on the production record | No — recipe control, verified at CCP 2 |
+| B2 | **B** Growth during salting and handling | Yes | Work below 4 °C, minimal handling time | No — prerequisite |
+| B3a press | **B** Growth in the press; brine pooling around the meat | Yes | Held at 3 °C. Drained at B4. Spring form press cleaned down per SOP between batches. | No — prerequisite |
+| B3b vac | **B** Anaerobic growth in a vac pack, principally *Clostridium botulinum* | Yes | 3 °C for 5 days only. Salt present from B2. Chilled, short, and followed by drying. Vac is a curing stage, not storage. | No — controlled by time, temperature and salt |
+| B4 wrap and net | **B/P** Contamination from wrap, net, hands or bench | Yes | Clean handling per SOP; single-use collagen wrap; batch code tag applied here | No — prerequisite |
+| **B5 air dry** | **B Survival or growth of *Salmonella*, *Listeria monocytogenes*, *E. coli*, *Staph. aureus* in a ready-to-eat product cured without nitrate** | **Yes** | **Cold chain below 4 °C throughout drying, plus reduction of water activity to the point the product will not support growth** | **CCP 2** |
+| B5 | **B** Surface mould during drying | Yes | Wipe with vinegar as required and record. Excessive mould is investigated as an upstream handling problem, not simply wiped off. | No — corrective action |
+| B5 | **B** Case hardening — the outside dries and seals, the centre stays wet, so weight loss reads correct while the core is not stable | Yes | Drying progress tracked from stuffing or from weight into cure, not estimated. Test-string method applied per batch. Water activity read on a cut face, not on the crust. | Covered by CCP 2 |
+| B6 ambient | **quality** Fat softening, oiliness | No — quality | Limit 18 °C | No |
+| B7 pack and label | **C** Incorrect allergen or species declaration reaching the customer | Yes | Customer label generated from the stored recipe; allergens in bold; batch code on every label | No — prerequisite (labelling control) |
+
+## B7. CCP determination
+
+| Step | Q1 | Q2 | Q3 | Q4 | Outcome |
+|---|---|---|---|---|---|
+| B1 wash | Yes | No — reduces, does not eliminate | Yes | Yes — B5 | Not a CCP |
+| B2 salt | Yes | No | No | Yes — B5 | Not a CCP, recipe control |
+| B3a/b press or vac | Yes | No | Yes | Yes — B5 | Not a CCP, prerequisite |
+| B4 wrap | Yes | No | Yes | Yes — B5 | Not a CCP, prerequisite |
+| **B5 air dry** | **Yes** | **Yes** | **Yes** | **No later step exists** | **CCP 2** |
+| B6 ambient | Yes | No | No | — | Not a CCP |
+| B7 pack | Yes | No | No | — | Not a CCP, prerequisite |
+
+## B8. CCP summary
+
+**CCP 2 — B5, air drying to shelf stability**
+
+| | |
+|---|---|
+| **Hazard** | Survival or growth of vegetative pathogens in a ready-to-eat, uncooked, whole-muscle product cured with salt alone |
+| **Critical limit** | Water activity **0.82 or below**, **and** weight loss of **40 per cent or more** from the recorded weight into cure. Both must be met. |
+| **Supporting limit** | Product temperature below 4 °C throughout drying |
+| **Primary monitoring** | Water activity meter, read on a cut face of a representative piece — not on the crust |
+| **Secondary monitoring** | Weight loss against the weight into cure recorded at B2. Weighed weekly. Test-string method used to track drying rate through the batch. |
+| **Frequency** | Weekly during drying; both measures confirmed before the batch leaves the rack |
+| **Who** | Robert Fry |
+| **Records** | Production record in the FSA app, carried into the nightly audit PDF |
+| **Corrective action** | Either limit not met: **keep drying**, re-measure. The batch does not proceed to B6 or B7 until both limits are met. |
+| **Corrective action — over-dried** | A quality fault, not a safety fault. Recorded in the quality register and reviewed; product remains safe. |
+| **Corrective action — mould** | Wipe with vinegar and record. Recurrent mould is investigated upstream. |
+| **Verification** | Laboratory testing of finished batches — salt and water activity on the same samples. Water activity meter calibration checked per manufacturer's instruction. |
+| **Validation** | 0.82 is the recognised threshold below which *Staphylococcus aureus* growth ceases and below which the product is shelf stable without refrigeration. 40 per cent weight loss is the physically measurable corroboration. **Validation is incomplete until the lab panel returns salt and water activity together — see the appendix.** |
+
+### B8.1 What the 40 per cent actually means
+
+**40 per cent weight loss is not the same thing as water activity 0.82, and this plan does not treat it as if it were.**
+
+Water activity is the free water available to bacteria, on a scale where pure water is 1.00. Weight loss is how much water has left the piece. They move together, but there is no fixed conversion between them, because water activity depends on what is dissolved in the water that remains as well as on how much remains. At the same 40 per cent loss:
+
+- a piece salted at 2.5 per cent finishes with roughly 4.2 per cent salt in the remaining mass, which drags water activity down further than the drying alone would
+- a fatty piece loses less water for the same weight loss, because fat carries almost no water — so weight loss overstates the drying
+- an unevenly dried or case-hardened piece can read 40 per cent overall while the core is still well above 0.82
+
+Published figures for salt-cured, air-dried whole muscle put 0.82 somewhere in the region of 30 to 40 per cent loss at these salt levels — which is why 40 per cent is a **conservative** working figure rather than an equivalence. Typical values for orientation only: 0.90 to 0.92 around 20 per cent loss, 0.85 to 0.88 around 30 per cent, 0.80 to 0.84 around 40 per cent. These are indications, not limits, and no batch is released on them.
+
+**How the two limits are used, therefore:**
+
+| | |
+|---|---|
+| Water activity 0.82 | The **safety limit**. It is the thing that makes the product shelf stable, and it is measured directly. |
+| 40 per cent weight loss | The **operating check**. It is measured every week, on every batch, at no cost, and it tells Robert whether drying is on track long before a meter is worth reaching for. |
+
+A batch that has hit 40 per cent but reads above 0.82 keeps drying. A batch that reads 0.82 but has lost less than 40 per cent is measured again on a fresh cut face before anything is released — that pattern is the signature of case hardening, not of an early finish.
+
+**The pairing is what makes the plan defensible.** The lab panel now requested — salt, water activity and pH on the same samples — is what turns the relationship between the two from a reasonable assumption into this establishment's own evidence, for these products at these salt rates.
+
+---
+
+# PLAN C — Pastrami
+
+## C1. Scope
+
+Cooked, chilled, sliced, vac-packed and frozen pastrami from boned and rolled venison shoulder.
+
+Begins at boned shoulders leaving Plan A. Ends at sliced product in frozen storage.
+
+**This is the only cooked product in the business, and it has the only kill step.** Everything else on these pages is controlled by drying. Pastrami is controlled by heat, and then by how fast it comes back down.
+
+## C2. Product description
+
+| | |
+|---|---|
+| Product | Cooked, cured, sliced meat — ready to eat |
+| Meat | Venison shoulder, boned and rolled |
+| Salt rate | 2.2 per cent |
+| Seasoning | Cracked black pepper, coriander seed |
+| **Nitrates / nitrites** | **None used** — the product is grey-brown, not pink, by design |
+| Cook | Water boiler with digital control, 3 hours timed from the unit reaching 82 °C from cold |
+| Chill | Straight from the boiler into an ice plunge bath, then 3 °C fridge overnight |
+| Packaging | Sliced, vacuum packed |
+| Storage | Frozen |
+
+## C3. Intended use and consumers
+
+Ready to eat without further cooking, from frozen storage, thawed by the client. As Plan A section A3.
+
+## C4. The thing an inspector will ask first
+
+**Two questions, and they are the two CCPs.**
+
+**Did it get hot enough?** The boiler is set at 82 °C and the 3 hours is timed from the moment the unit reaches 82 °C from cold — not from when the meat went in. That is a conservative way to run it, but the plan cannot claim a core temperature that has never been measured. **The one-off validation probe has not yet been done.** Until it is, CCP 3 has a limit and a monitoring method but no validation record, and this plan says so rather than implying otherwise.
+
+**Did it cool fast enough?** A cooked, nitrate-free meat is a growth medium. The hazard after cooking is spore-forming organisms — *Clostridium perfringens* and *Bacillus cereus* — which survive the cook and germinate in the danger zone as the product cools. That is why the pastrami now goes straight from the boiler into an ice plunge rather than being left to cool. Frozen 2 L bottles are kept in stock for the purpose.
+
+## C5. Process flow
+
+| Step | Process | Temperature |
+|---|---|---|
+| C1 | Shoulders received from Plan A, boned and rolled, alcohol washed | below 4 °C |
+| C2 | Salt at 2.2 per cent, cracked black pepper and coriander seed applied | below 4 °C |
+| C3 | Cure, vac packed | 3 °C |
+| **C4** | **Cook — water boiler, 3 hours timed from the unit reaching 82 °C from cold — CCP 3** | **82 °C water** |
+| **C5** | **Chill — straight into ice plunge bath, then 3 °C fridge overnight — CCP 4** | **63 °C to below 8 °C within 90 minutes** |
+| C6 | Slice | below 4 °C |
+| C7 | Vac pack, label, freeze | frozen |
+
+## C6. Hazard analysis
+
+| Step | Hazard | Significant? | Control measure | CCP? |
+|---|---|---|---|---|
+| C1 receive | **B** Surface bacteria | Yes | Alcohol wash; work below 4 °C | Covered by CCP 3 |
+| C2 salt and season | **C** Under-salting | Yes | Salt calculated on the weighed piece, recorded | No — recipe control |
+| C2 | **C** Undeclared allergen — mustard, spice blends | Yes | Recipe held in the app, ingredients ticked individually, allergens bold on the label | No — prerequisite (labelling) |
+| C3 cure | **B** Growth during the cure | Yes | 3 °C, vac packed, time limited | No — prerequisite |
+| **C4 cook** | **B Survival of *Salmonella*, *Listeria monocytogenes*, *E. coli* including O157** | **Yes** | **Time and temperature in the boiler, digitally controlled, 3 hours from 82 °C** | **CCP 3** |
+| C4 | **B** *Staph. aureus* enterotoxin already present before cooking | Yes | Heat-stable — not destroyed here. Controlled upstream by CCP 1. | Covered by CCP 1 |
+| **C5 chill** | **B Germination and growth of *Clostridium perfringens* and *Bacillus cereus* spores surviving the cook, during cooling** | **Yes** | **Ice plunge immediately out of the boiler, then 3 °C fridge** | **CCP 4** |
+| C6 slice | **B** Recontamination of a cooked ready-to-eat product with *Listeria monocytogenes* from the slicer, board or hands | Yes | Slicer and boards cleaned and disinfected before use on cooked product; cooked product never handled on a surface used for raw that shift; product below 4 °C while sliced | No — prerequisite, but the highest-consequence prerequisite in this plan. See C6.1 |
+| C7 pack and freeze | **B** Growth between slicing and freezing | Yes | Packed and into the freezer without delay | No — prerequisite |
+| C7 | **C** Wrong label, wrong batch, missing allergen | Yes | Label generated from the stored recipe with the batch code | No — prerequisite |
+
+### C6.1 The raw-to-cooked boundary
+
+Everything before C4 is raw. Everything after it is ready to eat, cooked, and has no further kill step. Cross-contamination at C6 puts *Listeria* into a product that will be eaten without cooking.
+
+This is handled as a prerequisite because it is a hygiene and separation control rather than a measurable limit, but it carries the same weight as a CCP in practice: **cooked pastrami is never sliced on a surface, board or slicer that has handled raw meat that day without a full clean-down and disinfection first, and the clean-down is recorded.**
+
+## C7. CCP determination
+
+| Step | Q1 | Q2 | Q3 | Q4 | Outcome |
+|---|---|---|---|---|---|
+| C1 receive | Yes | No | Yes | Yes — C4 | Not a CCP |
+| C2 salt | Yes | No | No | Yes — C4 | Not a CCP |
+| C3 cure | Yes | No | Yes | Yes — C4 | Not a CCP |
+| **C4 cook** | **Yes** | **Yes** | **Yes** | **No** | **CCP 3** |
+| **C5 chill** | **Yes** | **Yes** | **Yes** | **No** | **CCP 4** |
+| C6 slice | Yes | No | Yes | **No later step** | Not a CCP — prerequisite, see C6.1 |
+| C7 pack and freeze | Yes | No | Yes | No | Not a CCP, prerequisite |
+
+## C8. CCP summary
+
+**CCP 3 — C4, cook**
+
+| | |
+|---|---|
+| **Hazard** | Survival of vegetative pathogens in a ready-to-eat cooked product |
+| **Critical limit** | Core temperature of the thickest piece reaching **70 °C held for 2 minutes**, or an equivalent time-temperature combination |
+| **Operating limit** | Boiler at 82 °C, 3 hours timed from the unit reaching 82 °C from cold |
+| **Monitoring** | Boiler digital controller — temperature and start time recorded on the production record every cook |
+| **Verification probe** | Calibrated probe into the core of the thickest piece at the end of the cook |
+| **Frequency** | Every cook |
+| **Who** | Robert Fry |
+| **Records** | Production record in the FSA app |
+| **Corrective action** | Limit not reached: continue cooking and re-probe. Product is not removed from the boiler until the core limit is met. If the boiler fails mid-cook, the batch is chilled immediately and treated as raw; it is not held warm while the fault is investigated. |
+| **Verification** | Probe calibration checked against iced water and boiling water at a stated interval |
+| **Validation** | **NOT YET DONE.** 70 °C for 2 minutes is the standard UK cooking equivalence for ready-to-eat meat. The one-off core probe at the end of a 3-hour cook has not been carried out, so the operating limit of 3 hours at 82 °C is not yet evidenced as delivering it. Until that probe is done and recorded, CCP 3 is monitored but unvalidated. |
+
+**CCP 4 — C5, chill**
+
+| | |
+|---|---|
+| **Hazard** | Germination and growth of *Clostridium perfringens* and *Bacillus cereus* spores surviving the cook |
+| **Critical limit** | **63 °C down to below 8 °C within 90 minutes**, then to 3 °C in the fridge |
+| **Method** | Straight out of the boiler into an ice plunge bath. Frozen 2 L bottles held in stock at all times so the bath can always be made. |
+| **Monitoring** | Probe reading of a pack at the start of the plunge and at 90 minutes, recorded |
+| **Frequency** | Every cook |
+| **Who** | Robert Fry |
+| **Records** | Production record in the FSA app |
+| **Corrective action** | Above 8 °C at 90 minutes: add ice, re-probe. If the product has been between 8 °C and 63 °C for more than 4 hours in total, it is not fit for sale as a ready-to-eat product. Recorded and diverted. |
+| **Verification** | Chill curve re-probed at 30, 60 and 90 minutes annually and after any change to bath size or batch size |
+| **Validation** | **NOT YET DONE.** The 30 / 60 / 90 minute probe run that establishes the chill curve for this bath and this batch size has not been carried out. Until it is, CCP 4 is monitored but unvalidated. |
+
+---
+
+# ANNEX S — Venison in the salami plan
+
+Venison salami is made by the process already documented in the Pheasant / Partridge Salami HACCP plan. This annex records only where venison differs. **No separate salami plan exists or is needed.**
+
+| | Pheasant / partridge salami | Venison salami |
+|---|---|---|
+| Intake route | Processor — Vicars Game, Oaklands Park, Willo, Lincolnshire Game | Estate own-kill, via **Plan A** of this document |
+| Species hazard | Poultry-type load — *Salmonella*, *Campylobacter* — high | Deer — lower surface load, no poultry-specific organisms |
+| Meat entering the mince | Whole birds broken down | **Trim from all three primals** (Plan A step A7), washed and drained |
+| Fat | Organic pork fat | Organic pork fat — **venison fat is never used, it is always waste** |
+| Salt | Per salami plan | **2.2 per cent of the wet mix** from 4 September 2026 |
+| Starter culture | Flora Italia | Flora Italia — unchanged |
+| CCP | CCP 1, air dry, water activity 0.82 or below and 40 per cent loss | **Identical** |
+| Finished salt | Per salami plan | 3.7 per cent at 40 per cent loss |
+
+**Consequences for the salami plan.** Two amendments are needed to it, both already open:
+
+1. **Salt.** The plan text says 2.5 per cent. The season rule is 2.2 per cent and the recipe library was updated on 5 September 2026. Section 2 and the S2 hazard analysis of the salami plan are out of date. Task `gt_haccp_salt_update` is open.
+2. **Species and scope.** Section 1 of the salami plan scopes it to wild game birds. It needs a line admitting venison, referring to this annex and to Plan A for the intake route.
+
+**pH.** The salami plan describes the Flora Italia starter as a supporting hurdle that could not be relied on because pH was never measured. pH has now been added to the standing lab panel, on the salami samples delivered in the week of 31 August 2026. When those results come back, that section of the salami plan can be rewritten from a described effect to an evidenced hurdle.
+
+Neither amendment changes CCP 1 of the salami plan. Water activity and weight loss are unaffected by species or by a 0.3 per cent salt change.
+
+---
+
+# APPENDIX 1 — Prerequisite programmes these plans rely on
+
+- Meat intake HACCP plan, in force from 26 July 2026 (birds)
+- Equipment clean-down SOPs — saw, knives, mincer, stuffer, slicer, spring form press, boiler, ice bath — each recorded per use
+- Daily opening and closing checks, including chiller, drying room and freezer temperatures
+- Pest control programme, including bait stations and insectocutor; insectocutor tubes and sticky boards replaced annually
+- Personal hygiene and staff training, including the part-time helper
+- Supplier conditions on estates: chilled insect-proof larder at 7 °C or below, trained person's declaration, no smoking during carcass handling
+- Traceability: batch code from intake through production to every label; contributing batch codes recorded at mince
+- Allergen control: recipes held centrally; allergens in bold on customer labels
+- Water supply testing and environmental swabbing
+- Waste and animal by-product route for bone, fat and rejected meat
+
+# APPENDIX 2 — Verification and review
+
+| Activity | Frequency | Status |
+|---|---|---|
+| Pastrami core temperature probe at end of cook | Once, then annually | **OUTSTANDING — CCP 3 unvalidated until done** |
+| Pastrami chill probe at 30 / 60 / 90 minutes | Once, then annually | **OUTSTANDING — CCP 4 unvalidated until done** |
+| Drained brine weighed on one prosciutto batch | Once | **OUTSTANDING — retained salt unknown until done** |
+| Lab panel: salt, **water activity and pH** on the same samples | Requested | **IN HAND — salami samples delivered week of 31 August 2026, water activity and pH added to the standing panel. Results awaited.** |
+| Batch laboratory testing | Minimum 2 batches | **OVERDUE** (carried from the salami plan) |
+| Annual water supply test | Annually | **OVERDUE** |
+| Environmental wall swab | Annually | **OVERDUE** |
+| Probe and water activity meter calibration | Per manufacturer's instruction | To confirm |
+| Plan review | Annually or on process change | Next: September 2027 |
+
+**On the four outstanding validations.** They are one-off jobs, each takes under a day, and until they are done Plans B and C describe controls that are monitored but not evidenced. An inspector will accept a plan that says "not yet validated, here is the date it will be". An inspector will not accept a plan that states a validated limit that was never measured. Nothing in this document claims a measurement that has not been taken.
+
+**Ask the lab which salt method it uses.** Mohr titration is unreliable on cured meat.
+
+# APPENDIX 3 — Open items
+
+1. **EHO scope — own-kill route.** Estate own-kill venison entering UK 2820 and returning to the supplying estate. Needs an answer in writing. Robert's call on when to raise it.
+2. **EHO scope — farmed beef.** Bresaola from beef in a wild game approval. Same conversation.
+3. **Salt meter.** Deferred until the lab panel returns.
+4. **Nduja.** Not covered by any plan. Written once the first batch is finished and there is something to describe.
+5. **Salami plan amendments.** Salt 2.2 per cent, and venison admitted to scope — see Annex S.
+6. **Water activity on the rack.** Case hardening means a crust reading is not a core reading. Method for taking the reading on a cut face should be written into the drying SOP.
+
+---
+
+*Drafted 6 September 2026 from the process confirmed in `ref_haccp_venison_design`. Status: DRAFT. Not approved. Not in the nightly audit PDF.*
+"""
+
+_hh3 = ParagraphStyle('hac_h3', fontName=SERIFB, fontSize=10, textColor=GOLDLBL,
+                      spaceBefore=9, spaceAfter=2, keepWithNext=1)
+_hbul = ParagraphStyle('hac_bul', fontName=SERIF, fontSize=10, textColor=INK,
+                       leading=13.5, spaceAfter=3, leftIndent=8)
+
+def _md_inline(t):
+    t = t.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+    t = _re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', t)
+    t = _re.sub(r'(?<!\*)\*([^*]+)\*(?!\*)', r'<i>\1</i>', t)
+    t = _re.sub(r'`([^`]+)`', r'<font name="Courier">\1</font>', t)
+    return t
+
+def _md_table(block):
+    """Markdown table -> reportlab table. An all-blank header row means a
+    key/value table: no header band, first column rendered as the key."""
+    rows = [[c.strip() for c in ln.strip().strip('|').split('|')] for ln in block]
+    head, body = rows[0], rows[2:]
+    keyval = not any(head)
+    ncol = max(len(r) for r in rows)
+    body = [r + [''] * (ncol - len(r)) for r in body]
+    widths_raw = []
+    for i in range(ncol):
+        longest = max([len(r[i]) for r in body] + ([0] if keyval else [len(head[i]) if i < len(head) else 0]))
+        widths_raw.append(max(longest, 6))
+    total = float(sum(widths_raw))
+    avail = 267.0
+    widths = [max(16.0, avail * w / total) for w in widths_raw]
+    scale = avail / sum(widths)
+    widths = [w * scale * mm for w in widths]
+    out = []
+    if not keyval:
+        out.append([Paragraph(_md_inline(c), _hhdr) for c in head])
+    for r in body:
+        cells = []
+        for i, c in enumerate(r):
+            style = _hkey if (keyval and i == 0) else _hcell
+            cells.append(Paragraph(_md_inline(c), style))
+        out.append(cells)
+    # Header tables split cleanly because the header row repeats. Long key/value
+    # tables have no header, so a page break can strand a single row on an empty
+    # page - they are chunked and each chunk kept together instead.
+    if keyval and len(out) > 8:
+        parts = []
+        for j in range(0, len(out), 5):
+            parts.append(KeepTogether(_hac_table(out[j:j+5], widths, header=False)))
+        return parts
+    return [_hac_table(out, widths, header=not keyval)]
+
+def _md_flow(md):
+    """Render the plan markdown into the story. Supports # ## ### headings,
+    paragraphs, bullet and numbered lists, and pipe tables."""
+    lines = md.split('\n')
+    i = 0
+    first_title = False   # every '# ' plan heading starts a fresh page
+    while i < len(lines):
+        ln = lines[i].rstrip()
+        if not ln.strip() or ln.strip() == '---':
+            i += 1
+            continue
+        if ln.startswith('|'):
+            block = []
+            while i < len(lines) and lines[i].lstrip().startswith('|'):
+                block.append(lines[i])
+                i += 1
+            if len(block) >= 2:
+                for _fl in _md_table(block):
+                    story.append(_fl)
+                story.append(Spacer(1, 4))
+            continue
+        if ln.startswith('### '):
+            story.append(Paragraph(_md_inline(ln[4:]), _hh3))
+        elif ln.startswith('## '):
+            _hac_sec(_md_inline(ln[3:]))
+        elif ln.startswith('# '):
+            if not first_title:
+                story.append(PageBreak())
+            first_title = False
+            story.append(Paragraph(_md_inline(ln[2:]), _ht))
+            story.append(HRFlowable(width='28%', thickness=1, color=GOLD,
+                                    spaceAfter=6, spaceBefore=2, hAlign='CENTER'))
+        elif ln.lstrip().startswith('- '):
+            story.append(Paragraph('\u2022&nbsp;&nbsp;' + _md_inline(ln.lstrip()[2:]), _hbul))
+        elif _re.match(r'^\d+\.\s', ln.strip()):
+            story.append(Paragraph(_md_inline(ln.strip()), _hbul))
+        else:
+            story.append(Paragraph(_md_inline(ln.strip()), _hb))
+        i += 1
+
+story.append(PageBreak())
+story.append(Paragraph('HACCP Plans &mdash; Venison', _ht))
+story.append(HRFlowable(width='28%', thickness=1, color=GOLD, spaceAfter=6, spaceBefore=2, hAlign='CENTER'))
+story.append(Paragraph('Intake and breakdown &nbsp;&middot;&nbsp; whole muscle &nbsp;&middot;&nbsp; pastrami &nbsp;&middot;&nbsp; salami annex', _hsub))
+story.append(Paragraph('Prepared by Robert Fry &nbsp;&middot;&nbsp; Revised ' + report_date + ' &nbsp;&middot;&nbsp; Review annually (next due ' + _review_date + ') &nbsp;&middot;&nbsp; FSA Licence UK2820', _hmeta))
+_md_flow(VENISON_HACCP_MD)
+story.append(Spacer(1, 10))
+story.append(Paragraph('Prepared and signed off by: Robert Fry &nbsp;&nbsp;&middot;&nbsp;&nbsp; Date ' + report_date + ' &nbsp;&nbsp;&middot;&nbsp;&nbsp; Next review: ' + _review_date,
+    ParagraphStyle('ven_hac_sign', fontName=SERIF, fontSize=9.5, textColor=INK)))
+story.append(PageBreak())
+# ── END HACCP PLANS: VENISON ──────────────────────────────────────────────────
+
 # ── Venison Breakdown ───────────────────────────────────────────────────────
 VEN_ORDER = ['prosciutto', 'curedloin', 'salami', 'pastrami']
 ven_cell = ParagraphStyle('vcell', fontName=SERIF, fontSize=8.5, leading=11)
