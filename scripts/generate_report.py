@@ -260,6 +260,10 @@ pest_records = [r['data'] for r in deliveries_raw if r.get('data') and r['data']
 production_records = [r['data'] for r in deliveries_raw if r.get('data') and r['data'].get('_type') == 'production']
 daily_checks = [r['data'] for r in deliveries_raw if r.get('data') and r['data'].get('_type') == 'dailychecks']
 venison_runs = [r['data'] for r in deliveries_raw if r.get('data') and r['data'].get('_type') == 'venison']
+# Annual compliance items live in a single reference row so the list can be
+# updated in Supabase without touching this script. Added 08/09/2026.
+annual_compliance = next((r['data'] for r in deliveries_raw
+                          if r.get('data') and r['data'].get('_type') == 'ref_annual_compliance'), None)
 periodic_cleans = [r['data'] for r in deliveries_raw if r.get('data') and r['data'].get('_type') == 'periodic_clean']
 _log(f"  Records: intakes={len(intakes)}, daily={len(daily_records)}, deliveries={len(deliveries)}, pest={len(pest_records)}, prod={len(production_records)}, checks={len(daily_checks)}, venison={len(venison_runs)}")
 
@@ -2494,6 +2498,82 @@ class NumberedCanvas(_canvas.Canvas):
 def _page_bg(canvas, doc):
     canvas.saveState(); canvas.setFillColor(IVORY)
     canvas.rect(0, 0, *landscape(A4), fill=1, stroke=0); canvas.restoreState()
+
+# ── ANNUAL COMPLIANCE ITEMS ───────────────────────────────────────────────────
+# Last section of the report. Driven by the ref_annual_compliance row in
+# Supabase - edit that record, not this code. Added 08/09/2026.
+def _fmt_date(iso):
+    """2026-09-04 -> 04/09/2026. Returns the input unchanged if it will not parse."""
+    try:
+        return datetime.strptime(iso, '%Y-%m-%d').strftime('%d/%m/%Y')
+    except Exception:
+        return iso or '-'
+
+_log("Building Annual Compliance section")
+story.append(PageBreak())
+add_section('Annual Compliance Items',
+    'The once-a-year jobs that prove the establishment is controlled rather than just running: probe accuracy, environmental swabs, the water supply, and periodic product testing. Each line carries the evidence and the date it next falls due.')
+
+if not annual_compliance or not annual_compliance.get('items'):
+    story.append(Paragraph('No annual compliance record found in Supabase (ref_annual_compliance).', small))
+else:
+    def _due_status(next_due, override=None):
+        """Days to the due date -> a plain-English status and a colour."""
+        if override:
+            return override, colors.HexColor('#8A6D2F')
+        try:
+            d = datetime.strptime(next_due, '%Y-%m-%d').date()
+        except Exception:
+            return 'DATE NOT SET', colors.HexColor('#8A6D2F')
+        days = (d - date.today()).days
+        if days < 0:
+            return f'OVERDUE by {abs(days)} days', colors.HexColor('#A33A3A')
+        if days <= 30:
+            return f'DUE in {days} days', colors.HexColor('#8A6D2F')
+        return f'In date - {days} days to run', GREEN
+
+    _ac_hdr = ParagraphStyle('ac_hdr', fontName=SERIFB, fontSize=9, textColor=colors.white, leading=11)
+    _ac_cell = ParagraphStyle('ac_cell', fontName=SERIF, fontSize=8.5, textColor=INK, leading=11)
+    _ac_key = ParagraphStyle('ac_key', fontName=SERIFB, fontSize=8.5, textColor=GREEN, leading=11)
+
+    rows = [[Paragraph(h, _ac_hdr) for h in
+             ('Item', 'How often', 'Last done', 'Result', 'Next due', 'Status')]]
+    for it in annual_compliance['items']:
+        st, col = _due_status(it.get('nextDue', ''), it.get('status_override'))
+        rows.append([
+            Paragraph(it.get('item', ''), _ac_key),
+            Paragraph(it.get('frequency', ''), _ac_cell),
+            Paragraph(_fmt_date(it.get('lastDone', '')) if it.get('lastDone') else '-', _ac_cell),
+            Paragraph(it.get('result', ''), _ac_cell),
+            Paragraph(_fmt_date(it.get('nextDue', '')) if it.get('nextDue') else '-', _ac_cell),
+            Paragraph('<font color="#%s"><b>%s</b></font>' % (col.hexval()[2:], st), _ac_cell)])
+    t = Table(rows, colWidths=[58*mm, 26*mm, 24*mm, 50*mm, 24*mm, 45*mm], repeatRows=1)
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), GREEN),
+        ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#C9C6BE')),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 4), ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING', (0, 0), (-1, -1), 4), ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F7F5EE')])]))
+    story.append(t)
+    story.append(Spacer(1, 5*mm))
+
+    # Evidence, one block per item - this is what an inspector actually reads
+    story.append(Paragraph('Evidence', ParagraphStyle('ac_h2', fontName=SERIFB, fontSize=11,
+                                                      textColor=GREEN, spaceAfter=3)))
+    for it in annual_compliance['items']:
+        story.append(Paragraph(it.get('item', ''), _ac_key))
+        if it.get('why'):
+            story.append(Paragraph('<i>Why it matters:</i> ' + it['why'], _ac_cell))
+        if it.get('evidence'):
+            story.append(Paragraph(it['evidence'], _ac_cell))
+        if it.get('method'):
+            story.append(Paragraph('<i>Method:</i> ' + it['method'], _ac_cell))
+        story.append(Spacer(1, 3*mm))
+
+    if annual_compliance.get('note'):
+        story.append(HRFlowable(width='100%', thickness=0.6, color=GOLD, spaceBefore=2, spaceAfter=4))
+        story.append(Paragraph('<b>Note on this year\u2019s sampling.</b> ' + annual_compliance['note'], _ac_cell))
 
 story.append(Spacer(1, 8*mm))
 story.append(HRFlowable(width='100%', thickness=0.8, color=GOLD, spaceAfter=4))
