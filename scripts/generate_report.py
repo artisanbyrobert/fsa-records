@@ -262,6 +262,8 @@ daily_checks = [r['data'] for r in deliveries_raw if r.get('data') and r['data']
 venison_runs = [r['data'] for r in deliveries_raw if r.get('data') and r['data'].get('_type') == 'venison']
 # Annual compliance items live in a single reference row so the list can be
 # updated in Supabase without touching this script. Added 08/09/2026.
+carcass_declarations = [r['data'] for r in deliveries_raw
+                        if r.get('data') and r['data'].get('_type') == 'ref_carcass_declaration']
 annual_compliance = next((r['data'] for r in deliveries_raw
                           if r.get('data') and r['data'].get('_type') == 'ref_annual_compliance'), None)
 periodic_cleans = [r['data'] for r in deliveries_raw if r.get('data') and r['data'].get('_type') == 'periodic_clean']
@@ -477,7 +479,8 @@ from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, PageBreak, KeepTogether
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, PageBreak, KeepTogether, Image as RLImage
+from io import BytesIO
 from reportlab.graphics.shapes import Drawing, Rect, Circle, Line, String
 from reportlab.graphics import renderPDF
 from reportlab.pdfgen import canvas as _canvas
@@ -530,6 +533,140 @@ h1 = ParagraphStyle('h1', fontName=DISPLAY, fontSize=30, textColor=GREEN, leadin
 h2 = ParagraphStyle('h2', fontName=DISPLAY, fontSize=19, textColor=GREEN, leading=21, spaceAfter=2, spaceBefore=4, keepWithNext=1)
 small = ParagraphStyle('small', fontName=SERIF, fontSize=9, textColor=MUTE)
 desc_style = ParagraphStyle('desc', fontName=SERIF, fontSize=9.5, textColor=INK, spaceAfter=8, leading=13)
+
+# ── IMAGE EMBEDDING ───────────────────────────────────────────────────────────
+# Added 12/09/2026. The report had no way to put a photograph on a page, so
+# certificates and signed forms could only ever be referred to by URL. An
+# inspector wants to SEE the signed sheet, not a link to it.
+#
+# CONTRACT
+#   _embed_image(url, caption=None, max_w_mm=150, max_h_mm=150)
+#   - fetches the URL, scales it to fit inside the box, keeps aspect ratio
+#   - returns a list of flowables (may be empty) - never raises
+#   - a fetch failure is logged and the caption is replaced by a plain-English
+#     line saying the photo could not be loaded, so a missing photo is visible
+#     on the audit document rather than silently absent
+_IMG_CACHE = {}
+
+def _dmy(iso):
+    """ISO date -> DD/MM/YYYY. Returns '' on anything unparseable."""
+    try:
+        return datetime.strptime(str(iso), '%Y-%m-%d').strftime('%d/%m/%Y')
+    except Exception:
+        return ''
+
+def _fetch_image_bytes(url, timeout=25):
+    if url in _IMG_CACHE:
+        return _IMG_CACHE[url]
+    try:
+        r = requests.get(url, timeout=timeout)
+        if not r.ok:
+            _log(f"  !! image HTTP {r.status_code}: {url}")
+            _IMG_CACHE[url] = None
+            return None
+        _IMG_CACHE[url] = r.content
+        _log(f"  ok image fetched ({len(r.content)} bytes): {url}")
+        return r.content
+    except Exception as e:
+        _log(f"  !! image fetch failed ({e}): {url}")
+        _IMG_CACHE[url] = None
+        return None
+
+_img_cap = ParagraphStyle('img_cap', fontName=SERIF, fontSize=8, textColor=colors.HexColor('#444'),
+                          leading=10.5, spaceBefore=2, spaceAfter=5)
+_img_miss = ParagraphStyle('img_miss', fontName=SERIF, fontSize=8, textColor=colors.HexColor('#A33A3A'),
+                           leading=10.5, spaceBefore=2, spaceAfter=5)
+
+def _embed_image(url, caption=None, max_w_mm=150, max_h_mm=150, rotate=0):
+    out = []
+    if not url:
+        return out
+    data = _fetch_image_bytes(url)
+    if not data:
+        out.append(Paragraph('Photograph could not be loaded from the record. Source: '
+                             + str(url), _img_miss))
+        return out
+    if rotate:
+        data = _rotate_bytes(data, rotate)
+    try:
+        bio = BytesIO(data)
+        img = RLImage(bio)
+        iw, ih = img.imageWidth, img.imageHeight
+        if not iw or not ih:
+            raise ValueError('zero image dimensions')
+        scale = min((max_w_mm * mm) / float(iw), (max_h_mm * mm) / float(ih))
+        img.drawWidth = iw * scale
+        img.drawHeight = ih * scale
+        img.hAlign = 'LEFT'
+        out.append(img)
+        if caption:
+            out.append(Paragraph(caption, _img_cap))
+    except Exception as e:
+        _log(f"  !! image embed failed ({e}): {url}")
+        out.append(Paragraph('Photograph found but could not be placed on the page. Source: '
+                             + str(url), _img_miss))
+    return out
+
+def _rotate_bytes(data, degrees):
+    """Rotate image bytes by 90/180/270. Returns the original bytes on any failure.
+    A portrait sheet on a landscape page wastes two thirds of the width; turning it
+    lets the sheet fill the page and stay readable on paper. Added 12/09/2026."""
+    try:
+        from PIL import Image as _PILImage
+        im = _PILImage.open(BytesIO(data))
+        im = im.rotate(-int(degrees), expand=True)
+        buf = BytesIO()
+        im.convert('RGB').save(buf, format='JPEG', quality=88)
+        _log(f"  image rotated {degrees} degrees")
+        return buf.getvalue()
+    except Exception as e:
+        _log(f"  !! image rotate failed ({e}) - using the original")
+        return data
+
+def _embed_b64(b64, caption=None, max_w_mm=150, max_h_mm=150, rotate=0):
+    """Same as _embed_image but the JPEG/PNG is stored inside the Supabase record
+    as base64. Preferred for signed forms: nothing to upload, nothing to 404."""
+    out = []
+    try:
+        data = base64.b64decode(b64)
+    except Exception as e:
+        _log(f"  !! base64 image decode failed ({e})")
+        out.append(Paragraph('Photograph stored on the record could not be decoded.', _img_miss))
+        return out
+    if rotate:
+        data = _rotate_bytes(data, rotate)
+    try:
+        img = RLImage(BytesIO(data))
+        iw, ih = img.imageWidth, img.imageHeight
+        scale = min((max_w_mm * mm) / float(iw), (max_h_mm * mm) / float(ih))
+        img.drawWidth, img.drawHeight = iw * scale, ih * scale
+        img.hAlign = 'LEFT'
+        out.append(img)
+        if caption:
+            out.append(Paragraph(caption, _img_cap))
+        _log(f"  ok inline image placed ({len(data)} bytes)")
+    except Exception as e:
+        _log(f"  !! inline image embed failed ({e})")
+        out.append(Paragraph('Photograph stored on the record could not be placed on the page.', _img_miss))
+    return out
+
+def _embed_images(images, max_w_mm=150, max_h_mm=150):
+    """images = [{'url': ...} or {'b64': ...}, 'caption': ...] - also takes bare strings."""
+    out = []
+    for im in (images or []):
+        if isinstance(im, str):
+            out += _embed_image(im, None, max_w_mm, max_h_mm)
+        elif isinstance(im, dict):
+            _rot = im.get('rotate', 0)
+            if im.get('b64'):
+                out += _embed_b64(im['b64'], im.get('caption'), max_w_mm, max_h_mm, _rot)
+            elif im.get('url'):
+                out += _embed_image(im['url'], im.get('caption'), max_w_mm, max_h_mm, _rot)
+            else:
+                _log("  !! image entry has neither url nor b64 - skipped")
+                out.append(Paragraph('A photograph is referenced on this record but no image data '
+                                     'or address was stored with it.', _img_miss))
+    return out
 
 def hdr_cells(labels, tint):
     # pale tinted header cells with dark text — returned as Paragraphs
@@ -843,6 +980,94 @@ if intakes:
     story.append(t)
 else:
     story.append(Paragraph('No intake records found.', small))
+
+# ── CARCASS HANDOVER DECLARATIONS ─────────────────────────────────────────────
+# Added 12/09/2026. The declaration is the hunter's signed statement about the
+# things we cannot see or control - gralloch timing, gut leakage, larder
+# temperature, shot damage. It is the paperwork that supports every raw cured
+# product made from an estate's own kill, so it belongs in the audit document
+# in full, with the signed sheet reproduced.
+_log(f"Building Carcass Declarations ({len(carcass_declarations)} records)")
+if carcass_declarations:
+    story.append(PageBreak())
+    story.append(Paragraph('Carcass Handover Declarations',
+        ParagraphStyle('cd_h', fontName=DISPLAY, fontSize=17, textColor=GREEN,
+                       spaceAfter=2, keepWithNext=1)))
+    story.append(HRFlowable(width='28%', thickness=1, color=GOLD, spaceAfter=6,
+                            spaceBefore=2, hAlign='LEFT'))
+    story.append(Paragraph(
+        'One sheet per carcass, completed by the hunter or gamekeeper at collection and kept with the '
+        'intake record for the batch. Nothing made from these carcasses is cooked, so there is no later '
+        'step that makes the meat safe - the declaration is how the conditions before collection are '
+        'evidenced. A blank line is not a fault: it tells us what to trim or reject.', small))
+    story.append(Spacer(1, 3*mm))
+
+    _cd_key  = ParagraphStyle('cd_key', fontName=SERIFB, fontSize=8.5, textColor=GREEN, leading=11)
+    _cd_cell = ParagraphStyle('cd_cell', fontName=SERIF, fontSize=8.5, textColor=INK, leading=11)
+    _cd_tick = ParagraphStyle('cd_tick', fontName=SERIF, fontSize=8.5, textColor=INK, leading=11.5,
+                              leftIndent=4)
+    _cd_blank = ParagraphStyle('cd_blank', fontName=SERIF, fontSize=8.5,
+                               textColor=colors.HexColor('#8A6D2F'), leading=11.5, leftIndent=4)
+    _cd_sub = ParagraphStyle('cd_sub', fontName=SERIFB, fontSize=9.5, textColor=GOLDLBL,
+                             spaceBefore=5, spaceAfter=2, keepWithNext=1)
+
+    for _decl in sorted(carcass_declarations, key=lambda d: (d.get('created') or ''), reverse=True):
+        # Skip shells with no carcass and no hunter on them - an empty table on an
+        # audit document looks like a missing record rather than an unused one.
+        if not (_decl.get('carcass') or _decl.get('hunter') or _decl.get('batch')):
+            _log(f"  skipped empty declaration record: {_decl.get('id','(no id)')}")
+            continue
+        _c = _decl.get('carcass', {}) or {}
+        _hu = _decl.get('hunter', {}) or {}
+        _title = ('Batch ' + str(_decl.get('batch', '-')) + ' \u00b7 '
+                  + str(_decl.get('estate', '-')) + ' \u00b7 ' + str(_c.get('species', '-')))
+        story.append(Paragraph('<b>' + clean(_title) + '</b>',
+            ParagraphStyle('cd_t', fontSize=10, fontName=SERIFB, textColor=GREEN,
+                           spaceBefore=6, spaceAfter=3, keepWithNext=1)))
+        # The scanned sheet overleaf IS the record. Only what the scan cannot show
+        # is set in type: the searchable identifiers, what each blank box means,
+        # and where our own half of the form was completed instead. Trimmed
+        # 12/09/2026 - the ticks and the carcass details were duplicating the image.
+        _ident = ' &nbsp;&middot;&nbsp; '.join(x for x in [
+            'Species: ' + str(_c.get('species', '-')),
+            'Killed ' + (_dmy(_c.get('dateOfKill', '')) or '-') + ' at ' + str(_c.get('timeOfKill', '-')),
+            'Larder ' + str(_c.get('larderTemperatureC', '-')) + ' \u00b0C',
+            'Shot: ' + str(_c.get('shotPlacement', '-')),
+            'Hunter: ' + str(_hu.get('name', '-')),
+            'Trained person ' + str(_hu.get('trainedPersonNumber', '-')),
+            'Signed ' + (_dmy(_hu.get('dateSigned', '')) or 'NOT SIGNED')] if x)
+        story.append(Paragraph(clean(_ident), _cd_cell))
+        if _decl.get('MILESTONE'):
+            story.append(Paragraph('<i>' + clean(_decl['MILESTONE']) + '</i>', _cd_cell))
+        for _w in (_decl.get('WHAT_IT_TELLS_US') or []):
+            story.append(Paragraph(clean(str(_w)), _cd_cell))
+
+        if _decl.get('NOT_TICKED'):
+            story.append(Paragraph('Lines left blank \u2014 and what that means', _cd_sub))
+            for _nb in _decl['NOT_TICKED']:
+                if isinstance(_nb, dict):
+                    _txt = '<b>' + clean(str(_nb.get('line',''))) + '</b> &mdash; ' + clean(str(_nb.get('meaning','')))
+                else:
+                    _txt = clean(str(_nb))
+                story.append(Paragraph('&bull;&nbsp;&nbsp;' + _txt, _cd_blank))
+        _n_tick = len(_decl.get('ticked') or [])
+        if _n_tick:
+            story.append(Paragraph('Every other line on the sheet was ticked \u2014 '
+                + str(_n_tick) + ' in total. See the scan overleaf.', _cd_cell))
+        for _k, _lbl in (('section3AnythingWeShouldKnow', 'Anything we should know'),
+                         ('section5ArtisanAtCollection', 'Artisan by Robert \u2014 at collection'),
+                         ('otherMarkingsOnSheet', 'Other markings on the sheet')):
+            if _decl.get(_k):
+                story.append(Paragraph(_lbl, _cd_sub))
+                story.append(Paragraph(clean(str(_decl[_k])), _cd_cell))
+        if _decl.get('images'):
+            _sheet = [Paragraph('The signed sheet', _cd_sub)]
+            _sheet += _embed_images(_decl['images'], max_w_mm=250, max_h_mm=138)
+            story.append(KeepTogether(_sheet))
+        story.append(Spacer(1, 4*mm))
+else:
+    _log("  no carcass declaration records found")
+
 
 cell_style = ParagraphStyle('cell', fontName=SERIF, fontSize=8, leading=10.5)
 header_style = ParagraphStyle('hdr', fontSize=7.5, textColor=GREEN, fontName=SERIFB)
@@ -1394,7 +1619,10 @@ if production_records:
                 lines = rcp.get('lines', []) if isinstance(rcp, dict) else []
                 if lines:
                     story.append(Paragraph('<b>Child ' + clean(str(c.get('code',''))) + ' — ' + clean(rcp.get('name','')) + '</b>', ParagraphStyle('rch', fontSize=8, fontName=SERIFB, textColor=GOLDLBL, spaceAfter=2, spaceBefore=4, keepWithNext=1)))
-                    irows = [['Ingredient', 'Amount', 'Added']]
+                    # 'source' says whether the amount was weighed at the bench or
+                    # calculated from house rates and confirmed afterwards. An
+                    # auditor reading a recipe is entitled to know which. 12/09/2026.
+                    irows = [['Ingredient', 'Amount', 'Added', 'How the amount was arrived at']]
                     for ln in lines:
                         amt = ln.get('amount')
                         unit = ln.get('unit','') or 'g'
@@ -1403,13 +1631,74 @@ if production_records:
                         else:
                             amt_str = f"{amt} {unit}".strip()
                         added = clean(str(ln.get('addedDate',''))) or '-'
+                        _src = clean(str(ln.get('source','') or ''))
+                        _nte = clean(str(ln.get('note','') or ''))
+                        _prov_txt = ('<b>' + _src + '</b>' if _src else '')
+                        if _nte:
+                            _prov_txt = (_prov_txt + ' &mdash; ' + _nte) if _prov_txt else _nte
                         irows.append([Paragraph(clean(ln.get('name','')), cell_style),
                                       Paragraph(amt_str, cell_style),
-                                      Paragraph(added, cell_style)])
-                    it = Table(irows, colWidths=[110*mm, 64*mm, 50*mm], repeatRows=1)
+                                      Paragraph(added, cell_style),
+                                      Paragraph(_prov_txt or '-', cell_style)])
+                    it = Table(irows, colWidths=[52*mm, 26*mm, 24*mm, 122*mm], repeatRows=1)
                     it.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), SAGE[0]), ('LINEABOVE', (0,0), (-1,0), 0.8, GOLD), ('LINEBELOW', (0,0), (-1,0), 0.8, GOLD), ('TEXTCOLOR', (0,0), (-1,0), GREEN), ('FONTNAME', (0,0), (-1,0), SERIFB), ('FONTNAME', (0,1), (-1,-1), SERIF), ('FONTSIZE', (0,0), (-1,-1), 8), ('GRID', (0,0), (-1,-1), 0.35, HAIR), ('LEFTPADDING', (0,0), (-1,-1), 4), ('TOPPADDING', (0,0), (-1,-1), 2), ('BOTTOMPADDING', (0,0), (-1,-1), 2)]))
                     story.append(it)
                     story.append(Spacer(1, 2*mm))
+            # ── Stuffing and CCP 1 baseline, per child ────────────────────────
+            # The wet weight at stuffing is the number every later drying check is
+            # measured against. Without it on the record the 40 per cent loss
+            # limit cannot be evidenced. Added 12/09/2026.
+            for c in children:
+                _b = c.get('ccp1Baseline') or {}
+                _sw = c.get('subWeightsG') or []
+                if not (_b or _sw or c.get('stuffDate')):
+                    continue
+                story.append(Paragraph('Child ' + clean(str(c.get('code',''))) +
+                    ' \u2014 stuffing and CCP 1 baseline',
+                    ParagraphStyle('sfh', fontSize=8, fontName=SERIFB, textColor=GOLDLBL,
+                                   spaceAfter=2, spaceBefore=4, keepWithNext=1)))
+                def _sfv(v, suf=''):
+                    if v in (None, '', []): return 'not yet recorded'
+                    return f"{v}{suf}"
+                # _fmt_date is defined later in the file, so format locally here.
+                def _sfd(iso):
+                    try:
+                        return datetime.strptime(str(iso), '%Y-%m-%d').strftime('%d/%m/%Y')
+                    except Exception:
+                        return ''
+                _srows = [
+                    ['Stuffed', _sfd(c.get('stuffDate','')) or 'not yet recorded',
+                     'Hung', _sfd(c.get('hungDate','')) or 'not yet recorded'],
+                    ['Casing', _sfv(c.get('stuffSkin')), 'Machine setting', _sfv(c.get('machineSetting'))],
+                    ['Weighed at stuffing', (', '.join(f"{x:,} g" for x in _sw) if _sw else 'not yet recorded'),
+                     'Pieces', _sfv(c.get('stuffCount'))],
+                    ['Basis of the baseline', _sfv(_b.get('basis')),
+                     'Target loss', _sfv(_b.get('targetLossPct'), ' %')],
+                    ['Ready at or below', _sfv(_b.get('targetBatchDryG'), ' g'),
+                     'Est. ready', _sfd(c.get('estReadyDate','')) or '-'],
+                ]
+                _st = Table([[Paragraph(clean(str(a)), ParagraphStyle('sk', fontName=SERIFB, fontSize=8,
+                                        textColor=GREEN, leading=10.5)),
+                              Paragraph(clean(str(b)), cell_style),
+                              Paragraph(clean(str(cc)), ParagraphStyle('sk2', fontName=SERIFB, fontSize=8,
+                                        textColor=GREEN, leading=10.5)),
+                              Paragraph(clean(str(dd)), cell_style)]
+                             for a, b, cc, dd in _srows],
+                            colWidths=[40*mm, 55*mm, 33*mm, 96*mm])
+                _st.setStyle(TableStyle([
+                    ('GRID', (0,0), (-1,-1), 0.35, HAIR),
+                    ('ROWBACKGROUNDS', (0,0), (-1,-1), [colors.white, LIGHT_GREY]),
+                    ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                    ('LEFTPADDING', (0,0), (-1,-1), 4), ('RIGHTPADDING', (0,0), (-1,-1), 4),
+                    ('TOPPADDING', (0,0), (-1,-1), 3), ('BOTTOMPADDING', (0,0), (-1,-1), 3)]))
+                story.append(_st)
+                if _b.get('howToMonitor'):
+                    story.append(Paragraph('<b>How to monitor:</b> ' + clean(str(_b['howToMonitor'])), cell_style))
+                if c.get('stuffCountNote'):
+                    story.append(Paragraph(clean(str(c['stuffCountNote'])), cell_style))
+                if c.get('note'):
+                    story.append(Paragraph(clean(str(c['note'])), cell_style))
+                story.append(Spacer(1, 2.5*mm))
         stages = rec.get('stages',[]) or []
         if stages:
             if children:
@@ -2569,6 +2858,9 @@ else:
             story.append(Paragraph(it['evidence'], _ac_cell))
         if it.get('method'):
             story.append(Paragraph('<i>Method:</i> ' + it['method'], _ac_cell))
+        # Certificates and lab reports photographed against the item. 12/09/2026.
+        for _f in _embed_images(it.get('images'), max_w_mm=150, max_h_mm=150):
+            story.append(_f)
         story.append(Spacer(1, 3*mm))
 
     if annual_compliance.get('note'):
