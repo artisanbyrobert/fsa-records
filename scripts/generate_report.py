@@ -75,6 +75,7 @@ import json
 import base64
 import atexit
 import traceback
+import time
 import requests
 from datetime import date, datetime
 
@@ -242,11 +243,48 @@ def get_dropbox_token():
 
 headers = {'apikey': SUPABASE_KEY, 'Authorization': f'Bearer {SUPABASE_KEY}', 'Content-Type': 'application/json'}
 
+# Supabase occasionally returns 504 or 502 under load. Until 13/09/2026 a failed
+# fetch returned an empty list and the report carried on, producing a PDF that
+# looked fine and contained almost nothing - the 00:31 run on 13/09 shipped a
+# 167 KB file with daily=0, deliveries=0, prod=0 and nobody would have known
+# without opening it. A missing table is now a hard stop, not a silent gap.
+#
+#   - up to 4 attempts per table, backing off 2, 5 then 10 seconds
+#   - anything other than a 2xx after that writes RED and exits
+#   - a table that comes back EMPTY when it has held rows before also stops the
+#     run, because an empty deliveries table is a fault, not a quiet day
+_MUST_NOT_BE_EMPTY = ('intakes', 'deliveries', 'app_config')
+
 def fetch(table):
     _log(f"  Fetching table: {table}")
-    r = requests.get(f"{SUPABASE_URL}/rest/v1/{table}?select=*", headers=headers, timeout=30)
-    _log(f"    HTTP {r.status_code} ({len(r.text)} bytes)")
-    return r.json() if r.ok else []
+    _delays = [2, 5, 10]
+    _last = ''
+    for _attempt in range(4):
+        try:
+            r = requests.get(f"{SUPABASE_URL}/rest/v1/{table}?select=*",
+                             headers=headers, timeout=60)
+            _log(f"    HTTP {r.status_code} ({len(r.text)} bytes)"
+                 + (f" [attempt {_attempt + 1}]" if _attempt else ""))
+            if r.ok:
+                rows = r.json()
+                if not rows and table in _MUST_NOT_BE_EMPTY:
+                    _last = f"table '{table}' came back empty"
+                    _log(f"    !! {_last} - retrying")
+                else:
+                    return rows
+            else:
+                _last = f"HTTP {r.status_code} from table '{table}'"
+        except Exception as e:
+            _last = f"{type(e).__name__} fetching table '{table}': {e}"
+            _log(f"    !! {_last}")
+        if _attempt < 3:
+            time.sleep(_delays[_attempt])
+    msg = (f"Could not read Supabase table '{table}' after 4 attempts ({_last}). "
+           f"No PDF was written, so last night's good copy in Dropbox is untouched. "
+           f"This is almost always Supabase being slow - re-run the workflow.")
+    _log(f"!!! {msg}")
+    _write_status("RED", msg)
+    sys.exit(1)
 
 _log("Fetching from Supabase...")
 intakes_raw = fetch('intakes')
