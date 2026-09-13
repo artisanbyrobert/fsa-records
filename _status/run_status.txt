@@ -1,5 +1,4 @@
-AMBER
-Last run: 2026-09-13T00:31:08.384215
-Reason: PDF FSA_Records_202627.pdf (167080 bytes) uploaded successfully. Records: intakes=35, daily=0, deliveries=0, pest=0, prod=0
-Backup: SKIPPED - a Supabase table returned empty (intakes=35, deliveries=0, app_config=8). Previous backups left untouched.
-AMBER because the PDF is fine but the data backup did not land.
+GREEN
+Last run: 2026-09-13T13:00:23.899116
+Reason: PDF FSA_Records_202627.pdf (1066205 bytes) uploaded successfully. Records: intakes=35, daily=61, deliveries=3, pest=13, prod=21
+Backup: OK - 5511203 bytes, intakes=35, deliveries=384, app_config=8, files=latest+weekday+month
