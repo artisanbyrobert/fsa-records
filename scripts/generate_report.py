@@ -517,7 +517,7 @@ from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, PageBreak, KeepTogether, Image as RLImage
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, PageBreak, KeepTogether, CondPageBreak, Image as RLImage
 from io import BytesIO
 from reportlab.graphics.shapes import Drawing, Rect, Circle, Line, String
 from reportlab.graphics import renderPDF
@@ -549,6 +549,9 @@ if _HAS_EBG:
 DISPLAY = 'Cor'   if 'Cor' in pdfmetrics.getRegisteredFontNames() else SERIFB
 
 doc = SimpleDocTemplate(filename, pagesize=landscape(A4), rightMargin=15*mm, leftMargin=15*mm, topMargin=24*mm, bottomMargin=16*mm)
+# Usable height inside the frame. Used by add_section to break only when the
+# current page actually has content on it.
+_FRAME_H = doc.height - 2
 # ── Luxury palette (estate house style — no solid colour bars anywhere) ──────
 IVORY   = colors.HexColor('#FBF8F1')
 GREEN   = colors.HexColor('#18342A')   # deep racing green (display + accents)
@@ -736,7 +739,17 @@ def add_section(title, description=None, new_page=True):
     # Each major section starts on its own page and grows downward over the season.
     # An optional description explains what the section records.
     if new_page and not _first_section[0]:
-        story.append(PageBreak())
+        # Start the section on a fresh page - but do NOT force a break when the
+        # cursor is ALREADY at the top of an empty page. A plain PageBreak there
+        # throws away a whole page, which is how two entirely blank pages got
+        # into the document (125 and 147 on the 06/10/2026 build). A trailing
+        # Spacer does the same thing, so drop those first. CondPageBreak only
+        # breaks when the space asked for is not available, and asking for the
+        # full frame height means "break unless this page is already empty".
+        # Fixed 06/10/2026.
+        while story and isinstance(story[-1], Spacer):
+            story.pop()
+        story.append(CondPageBreak(_FRAME_H))
     _first_section[0] = False
     story.append(Paragraph(title, h2))
     hr = HRFlowable(width='100%', thickness=1, color=GOLD, spaceAfter=6)
@@ -979,6 +992,37 @@ else:
 story.append(Spacer(1, 6))
 # ── END RECORD PROVENANCE ─────────────────────────────────────────────────────
 
+# ── CHILLING LIMIT BY SPECIES ────────────────────────────────────────────────
+# Added 06/10/2026. The report printed a flat "Chilled < 4 C" against every
+# chilled intake. 4 C is the SMALL wild game figure. Large wild game - deer - is
+# 7 C. Southwick 202627-27 came in at 4.7 C, a comfortable pass, and printed as
+# though it had failed. An inspector reading that would open with a breach that
+# never happened.
+_LARGE_WILD_GAME = ('venison', 'deer', 'roe', 'fallow', 'muntjac', 'red deer', 'sika', 'boar', 'wild boar')
+_SMALL_WILD_GAME = ('pheasant', 'partridge', 'mallard', 'duck', 'grouse', 'pigeon', 'woodcock',
+                    'snipe', 'teal', 'rabbit', 'hare', 'quail')
+_DOMESTIC_RED    = ('beef', 'pork', 'lamb', 'mutton', 'veal', 'pork fat')
+_FISH            = ('salmon', 'trout', 'fish')
+
+def _chill_limit(item):
+    """Return (limit as a string, short reason) for one intake item, or
+    (None, reason) where a numeric ceiling is not the right control."""
+    _t = ' '.join([str(item.get('species', '') or ''), str(item.get('custom', '') or ''),
+                   str(item.get('part', '') or '')]).lower()
+    for _k in _FISH:
+        if _k in _t:
+            return (None, 'fishery product \u2014 on melting ice, 0 to 2 \u00b0C')
+    for _k in _LARGE_WILD_GAME:
+        if _k in _t:
+            return ('7', 'large wild game')
+    for _k in _SMALL_WILD_GAME:
+        if _k in _t:
+            return ('4', 'small wild game')
+    for _k in _DOMESTIC_RED:
+        if _k in _t:
+            return ('7', 'domestic red meat')
+    return ('4', 'species not matched \u2014 the tighter limit is shown')
+
 add_section('Intake Records',
     'All raw meat brought in, by batch. Each batch carries its season code, intake date, source estate, species and weights. This is the start of the traceability chain — every finished product traces back to a batch here.',
     new_page=False)
@@ -989,11 +1033,24 @@ if intakes:
     for rec in sorted(intakes, key=lambda x: (x.get('date') or ''), reverse=True):
         items_list = rec.get('items', [])
         items_str = '<br/>'.join([clean(f"{i.get('qty','')} {i.get('unit','')} {i.get('species','')}").strip() for i in items_list])
-        species = ''
-        if items_list:
-            first = items_list[0]
-            species = first.get('custom','') if first.get('species','') in ('Other','') else first.get('species','')
-        # derive storage/temp display: frozen = < -18C, chilled = < 4C
+        # SPECIES: every DISTINCT species on the batch, not just the first item.
+        # Fixed 06/10/2026 - Donhead 202627-25 holds muntjac, fallow, beef and
+        # salmon and printed as "Salmon" because salmon happened to be item [0].
+        _sp_seen = []
+        for _it in items_list:
+            _s = _it.get('species', '')
+            _s = _it.get('custom', '') if _s in ('Other', '') else _s
+            _s = str(_s).strip()
+            if _s and _s.lower() not in [x.lower() for x in _sp_seen]:
+                _sp_seen.append(_s)
+        species = ', '.join(_sp_seen)
+        # derive storage/temp display. The CHILLED limit is NOT one number:
+        #   large wild game (deer)            7 \u00b0C  - 853/2004 Annex III Sec IV Ch II
+        #   small wild game (birds, rabbit)   4 \u00b0C  - Annex III Sec IV Ch III
+        #   domestic red meat (beef)          7 \u00b0C
+        #   fishery products                  on melting ice, 0 to 2 \u00b0C
+        # Fixed 06/10/2026 - every chilled intake printed "Chilled < 4 C", so a
+        # venison intake at 4.7 C read as a BREACH when it is a comfortable pass.
         _storage_parts = []
         for _it in items_list:
             _st = (_it.get('storage') or '').strip().lower()
@@ -1001,7 +1058,12 @@ if intakes:
             if _st == 'frozen':
                 _storage_parts.append('Frozen &lt; -18\u00b0C' + (' (' + _tmp + '\u00b0C recorded)' if _tmp else ''))
             elif _st == 'chilled':
-                _storage_parts.append('Chilled &lt; 4\u00b0C' + (' (' + _tmp + '\u00b0C recorded)' if _tmp else ''))
+                _lim, _why = _chill_limit(_it)
+                if _lim is None:
+                    _storage_parts.append('Chilled, ' + _why + (' (' + _tmp + '\u00b0C recorded)' if _tmp else ''))
+                else:
+                    _storage_parts.append('Chilled &le; ' + _lim + '\u00b0C <font size=6>(' + _why + ')</font>'
+                                          + (' (' + _tmp + '\u00b0C recorded)' if _tmp else ''))
             else:
                 _storage_parts.append(clean(_st) if _st else '?')
         _storage_str = '<br/>'.join(dict.fromkeys(_storage_parts))  # deduplicate while preserving order
@@ -1105,6 +1167,108 @@ if carcass_declarations:
         story.append(Spacer(1, 4*mm))
 else:
     _log("  no carcass declaration records found")
+
+# ── BENCH RECORDS: BREAKDOWN, BENCH TIME, CARCASS CONDITION, STUFFING ────────
+# Added 06/10/2026. Robert has been logging every weight at the bench with its
+# clock time since 13/09/2026 (ref_rule_breakdown_timestamps), plus carcass
+# condition and the stuffing baseline. None of it reached this document - the
+# blocks live on the intake record and no section read them. The elapsed time
+# between the first cut and the last weight IS the bench time, and on a
+# premises record it evidences how long meat was out of the chiller.
+# FSA scope only: weights, times, temperatures, casing and machine settings.
+# No money, no client commercial detail (ref_rule_fsa_pdf_scope).
+_log("Building Bench Records section")
+_bench_batches = [r for r in sorted(intakes, key=lambda x: (x.get('date') or ''), reverse=True)
+                  if r.get('BREAKDOWN_EVENTS') or r.get('BENCH_TIME')
+                  or r.get('CARCASS_CONDITION') or r.get('STUFFING')]
+if _bench_batches:
+    add_section('Bench Records \u2014 breakdown, bench time and stuffing',
+        'Every weight taken at the bench with the clock time it was taken, the elapsed bench time for the session, '
+        'the condition of each carcass on arrival, and the stuffing baseline for each batch. The bench time is the '
+        'span from the first weight to the last, so it shows how long meat was out of the chiller.')
+    _bh    = ParagraphStyle('bnh',  fontName=SERIFB, fontSize=10.5, textColor=GREEN, spaceBefore=8, spaceAfter=2, keepWithNext=1)
+    _bsub  = ParagraphStyle('bnsb', fontName=SERIFB, fontSize=8.5,  textColor=GOLDLBL, spaceBefore=5, spaceAfter=2, keepWithNext=1)
+    _bcell = ParagraphStyle('bnc',  fontName=SERIF,  fontSize=8,    leading=10.5)
+    _bhdr  = ParagraphStyle('bnhd', fontName=SERIFB, fontSize=7.5,  textColor=GREEN)
+    for _b in _bench_batches:
+        _bc = str(_b.get('batchCode', '') or '')
+        story.append(Paragraph('Batch ' + clean(_bc) + ' \u00b7 ' + clean(get_estate(_b)), _bh))
+
+        _cc = _b.get('CARCASS_CONDITION') or {}
+        if _cc:
+            _bits = []
+            if _cc.get('condition'):  _bits.append('Condition: ' + str(_cc['condition']))
+            if _cc.get('shotAngle'):  _bits.append('Shot: ' + str(_cc['shotAngle']))
+            if _bits:
+                story.append(Paragraph(clean(' &nbsp;&middot;&nbsp; '.join(_bits)), _bcell))
+
+        _bt = _b.get('BENCH_TIME') or {}
+        if _bt:
+            _tb = []
+            for _k, _lbl in (('sessionStart','Session start'), ('firstWeight','First weight'),
+                             ('lastWeight','Last weight'), ('sessionEnd','Session end'),
+                             ('benchMinutes','Bench minutes'), ('labourHours','Labour hours')):
+                if _bt.get(_k) not in (None, ''):
+                    _tb.append(_lbl + ': ' + str(_bt[_k]))
+            if _tb:
+                story.append(Paragraph('Bench time', _bsub))
+                story.append(Paragraph(clean(' &nbsp;&middot;&nbsp; '.join(_tb)), _bcell))
+
+        _ev = _b.get('BREAKDOWN_EVENTS') or []
+        if _ev:
+            story.append(Paragraph('Weights taken at the bench', _bsub))
+            _rows = [[Paragraph(x, _bhdr) for x in ('Time', 'Date', 'Item', 'Grams', 'Stream', 'Section')]]
+            for _e in _ev:
+                _rows.append([
+                    Paragraph(clean(str(_e.get('at', _e.get('time','')) or '')), _bcell),
+                    Paragraph(_dmy(_e.get('date','')) or clean(str(_e.get('date','') or '')), _bcell),
+                    Paragraph(clean(str(_e.get('item','') or '')), _bcell),
+                    Paragraph(clean(str(_e.get('grams', _e.get('weightG','')) or '')), _bcell),
+                    Paragraph(clean(str(_e.get('stream','') or '')), _bcell),
+                    Paragraph(clean(str(_e.get('section','') or '')), _bcell)])
+            _t = Table(_rows, colWidths=[16*mm, 20*mm, 96*mm, 18*mm, 32*mm, 22*mm], repeatRows=1)
+            _t.setStyle(lux_table_style(SAGE, len(_rows)))
+            story.append(_t)
+            for _e in _ev:
+                if _e.get('note'):
+                    story.append(Paragraph('&bull;&nbsp;&nbsp;' + clean(str(_e['at'] if _e.get('at') else '')) + ' '
+                                           + clean(str(_e['note'])), _bcell))
+
+        _sf = _b.get('STUFFING') or {}
+        if _sf:
+            story.append(Paragraph('Stuffing and CCP 1 baseline', _bsub))
+            _sb = []
+            for _k, _lbl in (('product','Product'), ('flavour','Flavour'), ('stuffSkin','Casing'),
+                             ('machineSetting','Machine setting'), ('stuffDate','Stuffed'),
+                             ('stuffCount','Pieces')):
+                if _sf.get(_k) not in (None, ''):
+                    _sb.append(_lbl + ': ' + str(_sf[_k]))
+            if _sb:
+                story.append(Paragraph(clean(' &nbsp;&middot;&nbsp; '.join(_sb)), _bcell))
+            _cb = _sf.get('ccp1Baseline') or {}
+            if _cb:
+                _cbits = []
+                for _k, _lbl in (('wetTargetG','Wet target per piece, g'), ('measuredTotalWetG','Measured total wet, g'),
+                                 ('avgPerPieceG','Average per piece, g'), ('targetLossPct','Target loss, per cent'),
+                                 ('readyAtG','Ready at, g')):
+                    if _cb.get(_k) not in (None, ''):
+                        _cbits.append(_lbl + ': ' + str(_cb[_k]))
+                if _cbits:
+                    story.append(Paragraph(clean(' &nbsp;&middot;&nbsp; '.join(_cbits)), _bcell))
+                if _cb.get('criticalLimit'):
+                    story.append(Paragraph('<b>' + clean(str(_cb['criticalLimit'])) + '</b>', _bcell))
+            _sw = _sf.get('subWeightsG') or []
+            if _sw:
+                _parts = []
+                for _w in _sw:
+                    if isinstance(_w, dict):
+                        _parts.append(str(_w.get('label', 'string')) + ' ' + str(_w.get('wetG', '')) + ' g')
+                    else:
+                        _parts.append(str(_w) + ' g')
+                story.append(Paragraph('Strings weighed: ' + clean(', '.join(_parts)), _bcell))
+        story.append(Spacer(1, 3*mm))
+else:
+    _log("  no bench records found")
 
 
 cell_style = ParagraphStyle('cell', fontName=SERIF, fontSize=8, leading=10.5)
@@ -1244,7 +1408,10 @@ def _check_matrix(days, key, fixed_labels, section_title, section_desc):
 
 _mince_days = _gather_mince_days()
 # Standalone daily-check records (decoupled from mince day) join the same matrices.
-_standalone_checks = [(c.get('date', ''), '\u2014', c) for c in daily_checks]
+# Batch comes from the dailychecks record itself. Until 06/10/2026 this was
+# hard-coded to an em dash, so every standalone check day printed a blank
+# batch column even when the record carried a batch code.
+_standalone_checks = [(c.get('date', ''), str(c.get('batchCode') or '\u2014'), c) for c in daily_checks]
 _check_days = _mince_days + _standalone_checks
 _check_days.sort(key=lambda x: x[0], reverse=True)
 # Derive the fixed label sets from the data (fall back to first day's labels)
@@ -2454,7 +2621,9 @@ _md_flow(VENISON_HACCP_MD)
 story.append(Spacer(1, 10))
 story.append(Paragraph('Prepared and signed off by: Robert Fry &nbsp;&nbsp;&middot;&nbsp;&nbsp; Date ' + report_date + ' &nbsp;&nbsp;&middot;&nbsp;&nbsp; Next review: ' + _review_date,
     ParagraphStyle('ven_hac_sign', fontName=SERIF, fontSize=9.5, textColor=INK)))
-story.append(PageBreak())
+# A bare PageBreak used to sit here. The Venison Breakdown section that follows
+# calls add_section, which starts its own page, so this one produced a blank
+# page every night. Removed 06/10/2026.
 # ── END HACCP PLANS: VENISON ──────────────────────────────────────────────────
 
 # ── Venison Breakdown ───────────────────────────────────────────────────────
@@ -2837,7 +3006,9 @@ def _fmt_date(iso):
         return iso or '-'
 
 _log("Building Annual Compliance section")
-story.append(PageBreak())
+# The bare PageBreak that used to sit here broke the page, and add_section below
+# then broke it AGAIN - one entirely blank page every single night. Removed
+# 06/10/2026; add_section already starts the section on a fresh page.
 add_section('Annual Compliance Items',
     'The once-a-year jobs that prove the establishment is controlled rather than just running: probe accuracy, environmental swabs, the water supply, and periodic product testing. Each line carries the evidence and the date it next falls due.')
 
