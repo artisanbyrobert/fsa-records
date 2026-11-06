@@ -25,7 +25,7 @@
   DOES:
     1. Pulls intakes, deliveries (incl. daily/pest/production), app_config from Supabase
     2. Builds A4-landscape PDF with: intake records, daily records, deliveries,
-       pest control checks, production runs
+       pest control checks, production runs, equipment maintenance
     3. Uploads PDF to Dropbox at:
        /FSA forms and records for emilys charcuterie/automated intake records/
        FSA_Records_<season_code>.pdf
@@ -305,6 +305,8 @@ carcass_declarations = [r['data'] for r in deliveries_raw
 annual_compliance = next((r['data'] for r in deliveries_raw
                           if r.get('data') and r['data'].get('_type') == 'ref_annual_compliance'), None)
 periodic_cleans = [r['data'] for r in deliveries_raw if r.get('data') and r['data'].get('_type') == 'periodic_clean']
+# Equipment faults and repairs (_type 'maintenance', id maint_*). Added 06/11/2026.
+maintenance_records = [r['data'] for r in deliveries_raw if r.get('data') and r['data'].get('_type') == 'maintenance']
 _log(f"  Records: intakes={len(intakes)}, daily={len(daily_records)}, deliveries={len(deliveries)}, pest={len(pest_records)}, prod={len(production_records)}, checks={len(daily_checks)}, venison={len(venison_runs)}")
 
 # ── NIGHTLY DATA BACKUP ───────────────────────────────────────────────────────
@@ -1576,6 +1578,67 @@ else:
     story.append(Paragraph('No periodic deep cleans recorded yet this season.', small))
 story.append(Spacer(1, 6))
 # ── END PERIODIC DEEP CLEANS ──────────────────────────────────────────────────
+
+# ── EQUIPMENT MAINTENANCE ─────────────────────────────────────────────────────
+# Added 06/11/2026 (Robert: hanging fridge icing record "under maintenance
+# section"). One row per fault or repair: equipment, fault, cause, actions,
+# readings before and after, result, prevention and status. Records are
+# _type 'maintenance' rows in the deliveries table (id maint_*).
+_log(f"Building Equipment Maintenance section ({len(maintenance_records)} records)")
+add_section('Equipment Maintenance',
+    'Faults, breakdowns and repairs to equipment, with the cause found, the action taken, '
+    'temperature readings before and after, and how a repeat is prevented.')
+
+_mt_hdr  = ParagraphStyle('mthdr',  fontName=SERIFB, fontSize=8.5, textColor=GREEN)
+_mt_cell = ParagraphStyle('mtcell', fontName=SERIF,  fontSize=8.5, leading=11)
+
+def _mt_readings(rec):
+    out = []
+    for _r in (rec.get('readings') or []):
+        if not isinstance(_r, dict):
+            out.append(clean(str(_r))); continue
+        _bits = []
+        if _r.get('tempC') is not None:      _bits.append(f"{_r['tempC']} &deg;C")
+        if _r.get('humidityPct') is not None: _bits.append(f"{_r['humidityPct']}% RH")
+        if _r.get('coil'):                   _bits.append(clean(str(_r['coil'])))
+        out.append('<b>' + clean(str(_r.get('time',''))) + '</b> ' + ', '.join(_bits))
+    return '<br/>'.join(out)
+
+if maintenance_records:
+    _mts = sorted(maintenance_records, key=lambda x: x.get('date') or '', reverse=True)
+    _rows = [[Paragraph(h, _mt_hdr) for h in
+              ('Date', 'Equipment and fault', 'Cause', 'Action taken', 'Readings', 'Result and prevention', 'Status')]]
+    for _m in _mts:
+        _acts = _m.get('actions') or []
+        if isinstance(_acts, str): _acts = [_acts]
+        _res = clean(str(_m.get('result','')))
+        if _m.get('productAffected'):
+            _res += '<br/><b>Product:</b> ' + clean(str(_m['productAffected']))
+        if _m.get('prevention'):
+            _res += '<br/><b>Prevention:</b> ' + clean(str(_m['prevention']))
+        _rows.append([
+            Paragraph(_cd_fmt(_m.get('date','')), _mt_cell),
+            Paragraph('<b>' + clean(str(_m.get('equipment',''))) + '</b><br/>' + clean(str(_m.get('fault',''))), _mt_cell),
+            Paragraph(clean(str(_m.get('cause',''))), _mt_cell),
+            Paragraph('<br/>'.join('&bull; ' + clean(str(a)) for a in _acts) +
+                      ('<br/><i>By ' + clean(str(_m['doneBy'])) + '</i>' if _m.get('doneBy') else ''), _mt_cell),
+            Paragraph(_mt_readings(_m), _mt_cell),
+            Paragraph(_res, _mt_cell),
+            Paragraph(clean(str(_m.get('status',''))), _mt_cell)])
+    _mtt = Table(_rows, colWidths=[20*mm, 46*mm, 40*mm, 44*mm, 42*mm, 54*mm, 21*mm], repeatRows=1)
+    _mtt.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), SAGE[0]),
+        ('LINEABOVE', (0,0), (-1,0), 0.8, GOLD), ('LINEBELOW', (0,0), (-1,0), 0.8, GOLD),
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, LIGHT_GREY]),
+        ('GRID', (0,0), (-1,-1), 0.35, HAIR),
+        ('LEFTPADDING', (0,0), (-1,-1), 5), ('RIGHTPADDING', (0,0), (-1,-1), 5),
+        ('TOPPADDING', (0,0), (-1,-1), 4), ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('VALIGN', (0,0), (-1,-1), 'TOP')]))
+    story.append(_mtt)
+else:
+    story.append(Paragraph('No equipment faults or repairs recorded yet this season.', small))
+story.append(Spacer(1, 6))
+# ── END EQUIPMENT MAINTENANCE ─────────────────────────────────────────────────
 
 # ── HACCP PLAN: PHEASANT / PARTRIDGE SALAMI ───────────────────────────────────
 # Sits at the START of the Production section, on its own page(s), with a
